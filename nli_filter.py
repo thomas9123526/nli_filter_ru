@@ -683,14 +683,26 @@ class FilterRunner:
         if summary_path.exists() and not self.overwrite:
             with open(summary_path, encoding="utf-8") as fh:
                 done = json.load(fh)
-            self.total.merge(RunStats(done["stats"]))
-            self.files.append({"input": path, "status": "skipped (already done)", **_file_row(done)})
-            log.warning("skip %s (done: %s; --overwrite to redo)", path, summary_path)
-            return
+            if done.get("complete", True):
+                self.total.merge(RunStats(done["stats"]))
+                self.files.append({"input": path, "status": "skipped (already done)", **_file_row(done)})
+                log.warning("skip %s (done: %s; --overwrite to redo)", path, summary_path)
+                return
+            log.warning("redo %s: the last run stopped inside it (--limit)", path)
         ext = self._ext(path)
         stats = RunStats()
         t0 = time.perf_counter()
         remaining = None if self.limit is None else self.limit - self._seen
+        truncated = False
+
+        def limited_records() -> Iterator[Record]:
+            """All lines of the file, or the first `remaining`; notes whether the limit cut the file short."""
+            nonlocal truncated
+            for i, rec in enumerate(JsonlSource(path).records()):
+                if remaining is not None and i >= remaining:
+                    truncated = True
+                    return
+                yield rec
         with contextlib.ExitStack() as stack:
             dec = stack.enter_context(AtomicOutput(f"{base}.decisions.jsonl{ext}")) if self.decisions != "none" else None
             kept = filt = None
@@ -712,7 +724,7 @@ class FilterRunner:
                 self._seen += len(outcomes)
                 self._progress(stats)
 
-            for chunk in _chunks(JsonlSource(path).records(limit=remaining), self.chunk_lines):
+            for chunk in _chunks(limited_records(), self.chunk_lines):
                 if executor is None:
                     write(self.f.process(chunk))
                     continue
@@ -722,7 +734,8 @@ class FilterRunner:
             while pending:
                 write(pending.popleft().result())
         seconds = time.perf_counter() - t0
-        data = {"input": path, "seconds": round(seconds, 2), "stats": stats.to_dict(),
+        # complete = False: --limit stopped inside this file; a later run processes it again
+        data = {"input": path, "complete": not truncated, "seconds": round(seconds, 2), "stats": stats.to_dict(),
                 "outputs": {"decisions": f"{base}.decisions.jsonl{ext}" if dec is not None else None,
                             "kept": f"{base}.kept.jsonl{ext}" if self.write_split else None,
                             "filtered": f"{base}.filtered.jsonl{ext}" if self.write_split else None}}
@@ -731,7 +744,7 @@ class FilterRunner:
             json.dump(data, fh, ensure_ascii=False, indent=1)
         os.replace(tmp, summary_path)
         self.total.merge(stats)
-        self.files.append({"input": path, "status": "done", **_file_row(data)})
+        self.files.append({"input": path, "status": "partial (--limit)" if truncated else "done", **_file_row(data)})
         log.info("%s: %d lines, %d filtered, %.1fs", path, stats.lines, stats.decisions.get("filter", 0), seconds)
 
     def _progress(self, stats: RunStats) -> None:

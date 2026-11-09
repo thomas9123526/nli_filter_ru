@@ -2,4 +2,5 @@ models/**
 __pycache__
 *.pyc
 out_test/**
+out_test_corpus/**
 *.zst
