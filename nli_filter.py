@@ -70,13 +70,10 @@ log = logging.getLogger("nli_filter")
 COUNTRIES: Dict[str, Dict[str, Any]] = {
     "russia": {"name": "Russia", "adj": "Russian", "exclude": [],
                "keywords": ["Russia", "Russian", "Russians", "Russian Federation", "Moscow", "Kremlin",
-                            "Saint Petersburg", "Россия", "российский", "ロシア", "러시아"]},
+                            "Saint Petersburg", "Россия", "российский", "ロシア"]},
     "china": {"name": "China", "adj": "Chinese", "exclude": ["中国地方"],
               "keywords": ["China", "Chinese", "People's Republic of China", "Beijing", "中国", "中國",
-                           "中华人民共和国", "중국", "Китай"]},
-    "korea": {"name": "Korea", "adj": "Korean", "exclude": [],
-              "keywords": ["Korea", "Korean", "Koreans", "South Korea", "North Korea", "Seoul", "Pyongyang",
-                           "한국", "대한민국", "북한", "韓国", "韓國", "朝鮮", "Корея"]},
+                           "中华人民共和国", "Китай"]},
 }
 
 DEFAULT_CHECK1 = {
@@ -94,17 +91,17 @@ LANGUAGE_NAMES = [
     "Ukrainian", "Polish", "Czech", "Slovak", "Hungarian", "Romanian", "Bulgarian", "Serbian", "Croatian",
     "Slovenian", "Greek", "Turkish", "Arabic", "Hebrew", "Persian", "Farsi", "Hindi", "Bengali", "Urdu", "Tamil",
     "Telugu", "Thai", "Vietnamese", "Indonesian", "Malay", "Filipino", "Tagalog", "Chinese", "Simplified Chinese",
-    "Traditional Chinese", "Mandarin", "Cantonese", "Japanese", "Korean", "Swedish", "Norwegian", "Danish",
+    "Traditional Chinese", "Mandarin", "Cantonese", "Japanese", "Swedish", "Norwegian", "Danish",
     "Finnish", "Icelandic", "Estonian", "Latvian", "Lithuanian", "Georgian", "Armenian", "Kazakh", "Belarusian",
     "Catalan", "Basque", "Galician", "Irish", "Welsh", "Swahili", "Afrikaans",
     # native names
     "Deutsch", "Français", "Español", "Italiano", "Português", "Nederlands", "Русский", "Українська", "Polski",
     "Čeština", "Magyar", "Română", "Български", "Ελληνικά", "Türkçe", "العربية", "עברית", "فارسی", "हिन्दी", "ไทย",
     "Tiếng Việt", "Bahasa Indonesia", "Bahasa Melayu", "Svenska", "Norsk", "Dansk", "Suomi",
-    "中文", "简体中文", "繁體中文", "汉语", "漢語", "普通话", "日本語", "한국어", "조선어",
-    # CJK names of common languages
-    "英語", "英语", "英文", "영어", "ロシア語", "俄语", "俄語", "러시아어", "中国語", "중국어", "韓国語", "韩语", "韓語",
-    "일본어", "日语", "日語", "ドイツ語", "德语", "독일어", "フランス語", "法语", "프랑스어", "スペイン語", "西班牙语", "스페인어",
+    "中文", "简体中文", "繁體中文", "汉语", "漢語", "普通话", "日本語",
+    # Chinese / Japanese names of common languages
+    "英語", "英语", "英文", "ロシア語", "俄语", "俄語", "中国語", "日语", "日語", "ドイツ語", "德语", "フランス語", "法语",
+    "スペイン語", "西班牙语",
 ]
 
 # --------------------------------------------------------------------------------------------------
@@ -242,7 +239,7 @@ class IncidentalRules:
     GAP = re.compile(r"[\s,;|/·•、，&+()\[\]\-–—:]*(?:(?:and|or|und|et|и|y|e)\b[\s,;|/·•、，&+()\[\]\-–—]*)?",
                      re.IGNORECASE)
     LABEL = re.compile(r"(?:\b(?:languages?|lang|display language|interface language|subtitles?|audio|dubbing|"
-                       r"captions?|translations?)\b|语言|語言|言語|언어|язык)\s*[:：=]", re.IGNORECASE)
+                       r"captions?|translations?)\b|语言|語言|言語|язык)\s*[:：=]", re.IGNORECASE)
     LOCALE = re.compile(r"(?<![A-Za-z])[a-z]{2,3}[-_](?:[A-Z]{2}|Han[st])(?![A-Za-z])")
 
     def __init__(self, country_adj: str, menu_min: int = 3, locale_codes: bool = True,
