@@ -123,14 +123,39 @@ def _needs_boundary(ch: str) -> bool:
     return ch.isalnum() and not is_cjk(ch)
 
 
+def _trie_pattern(words: Iterable[str]) -> str:
+    """Regex for a set of words shaped as a trie ("Russian|Rwandan" -> "R(?:ussian|wandan)"): the regex engine
+    branches on the next character instead of trying every word at every position. Longer words win."""
+    trie: Dict[str, Any] = {}
+    for w in words:
+        node = trie
+        for ch in w.lower():
+            node = node.setdefault(ch, {})
+        node[""] = True
+
+    def build(node: Dict[str, Any]) -> str:
+        branches = [re.escape(ch) + build(child) for ch, child in sorted(node.items()) if ch != ""]
+        if not branches:
+            return ""
+        body = branches[0] if len(branches) == 1 else "(?:" + "|".join(branches) + ")"
+        if "" in node:  # a word ends here: the rest is optional (tried first, so the longest word wins)
+            return "(?:" + body + ")?"
+        return body
+
+    return build(trie)
+
+
 def _phrase_regex(phrases: Iterable[str]) -> Optional["re.Pattern[str]"]:
-    """Case-insensitive alternation, longest first, word boundaries on Latin/Cyrillic ends only."""
+    """Case-insensitive matcher for phrases, longest match first, word boundaries on Latin/Cyrillic ends only."""
+    groups: Dict[Tuple[bool, bool], List[str]] = collections.defaultdict(list)
+    for p in {p for p in phrases if p}:
+        groups[(_needs_boundary(p[0]), _needs_boundary(p[-1]))].append(p)
+    if not groups:
+        return None
     parts = []
-    for p in sorted({p for p in phrases if p}, key=len, reverse=True):
-        left = r"(?<!\w)" if _needs_boundary(p[0]) else ""
-        right = r"(?!\w)" if _needs_boundary(p[-1]) else ""
-        parts.append(left + re.escape(p) + right)
-    return re.compile("|".join(parts), re.IGNORECASE) if parts else None
+    for (left, right), words in sorted(groups.items()):
+        parts.append((r"(?<!\w)" if left else "") + "(?:" + _trie_pattern(words) + ")" + (r"(?!\w)" if right else ""))
+    return re.compile("|".join(parts), re.IGNORECASE)
 
 
 def _overlaps(a0: int, a1: int, b0: int, b1: int) -> bool:
@@ -244,50 +269,67 @@ class IncidentalRules:
 
     def __init__(self, country_adj: str, menu_min: int = 3, locale_codes: bool = True,
                  language_labels: bool = True, company_names: Iterable[str] = (), locale_distance: int = 80,
-                 max_gap: int = 20):
+                 max_gap: int = 20, margin: int = 300):
         self.menu_min = menu_min
         self.locale_codes = locale_codes
         self.language_labels = language_labels
         self.locale_distance = locale_distance
         self.max_gap = max_gap
+        self.margin = margin  # characters around a hit that the rules look at
         self._lang = _phrase_regex(list(LANGUAGE_NAMES) + [country_adj])
         self._company = _phrase_regex(company_names)
+        self._company_margin = max((len(c) for c in company_names), default=0)
+
+    @staticmethod
+    def _spans(pattern: "re.Pattern[str]", text: str, lo: int, hi: int) -> List[Tuple[int, int]]:
+        """Matches inside text[lo:hi], as positions in text. Only a slice is searched: the language-name
+        pattern has ~120 alternatives and is far too slow to run over a whole long document."""
+        return [(lo + m.start(), lo + m.end()) for m in pattern.finditer(text[lo:hi])]
 
     def apply(self, text: str, hits: List[Hit]) -> None:
-        if self._company is not None:
-            spans = [m.span() for m in self._company.finditer(text)]
-            for h in hits:
-                if any(s <= h.start and h.end <= e for s, e in spans):
-                    h.rule = "company_name"
-        langs = [m.span() for m in self._lang.finditer(text)]
-        if not langs:
-            return
-        # runs of language names joined by separators
-        run_of, runs = [], []
-        for i, (s, e) in enumerate(langs):
-            if i and s - langs[i - 1][1] <= self.max_gap and self.GAP.fullmatch(text, langs[i - 1][1], s):
-                runs[-1].append(i)
-            else:
-                runs.append([i])
-            run_of.append(len(runs) - 1)
-        locales = [m.span() for m in self.LOCALE.finditer(text)] if self.locale_codes else []
-        labels = [m.span() for m in self.LABEL.finditer(text)] if self.language_labels else []
+        n = len(text)
         for h in hits:
             if h.rule:
                 continue
-            k = next((i for i, (s, e) in enumerate(langs) if _overlaps(h.start, h.end, s, e)), None)
-            if k is None:
-                continue  # the hit is not a language name
-            run = runs[run_of[k]]
-            if any(min(abs(h.start - e), abs(s - h.end)) <= self.locale_distance for s, e in locales):
-                h.rule = "locale_code"
-                continue
-            first = langs[run[0]][0]
-            if any(e <= first and first - e <= self.max_gap and self.GAP.fullmatch(text, e, first) for _, e in labels):
-                h.rule = "language_label"
-                continue
-            if len(run) >= self.menu_min:
-                h.rule = "language_menu"
+            if self._company is not None:
+                lo, hi = max(0, h.start - self._company_margin), min(n, h.end + self._company_margin)
+                if any(s <= h.start and h.end <= e for s, e in self._spans(self._company, text, lo, hi)):
+                    h.rule = "company_name"
+                    continue
+            h.rule = self._language_rule(text, h)
+
+    def _language_rule(self, text: str, h: Hit) -> Optional[str]:
+        n = len(text)
+        # cheap test first: is the hit itself (part of) a language name? "Russia", "Moscow" ... never are
+        near = self._spans(self._lang, text, max(0, h.start - 25), min(n, h.end + 25))
+        if not any(_overlaps(h.start, h.end, s, e) for s, e in near):
+            return None
+        lo, hi = max(0, h.start - self.margin), min(n, h.end + self.margin)
+        langs = self._spans(self._lang, text, lo, hi)
+        k = next((i for i, (s, e) in enumerate(langs) if _overlaps(h.start, h.end, s, e)), None)
+        if k is None:
+            return None
+
+        def joined(a: int, b: int) -> bool:  # language names a and b are neighbours in a list
+            gap_start, gap_end = langs[a][1], langs[b][0]
+            return gap_end - gap_start <= self.max_gap and self.GAP.fullmatch(text, gap_start, gap_end) is not None
+
+        i = k
+        while i > 0 and joined(i - 1, i):
+            i -= 1
+        j = k
+        while j + 1 < len(langs) and joined(j, j + 1):
+            j += 1
+        if self.locale_codes and any(min(abs(h.start - e), abs(s - h.end)) <= self.locale_distance
+                                     for s, e in self._spans(self.LOCALE, text, lo, hi)):
+            return "locale_code"
+        first = langs[i][0]
+        if self.language_labels and any(e <= first and first - e <= self.max_gap and self.GAP.fullmatch(text, e, first)
+                                        for _, e in self._spans(self.LABEL, text, lo, hi)):
+            return "language_label"
+        if j - i + 1 >= self.menu_min:
+            return "language_menu"
+        return None
 
 
 # --------------------------------------------------------------------------------------------------
@@ -925,6 +967,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="output compression (default auto = .zst if the input was compressed)")
     g.add_argument("--overwrite", action="store_true", help="redo files that already have a .summary.json")
     g.add_argument("--show", type=int, default=20, help="mistakes to print (default 20)")
+    g.add_argument("--report", action="store_true",
+                   help="no filtering: print the summary of --output-dir from its *.summary.json files "
+                        "(e.g. after several --shard copies) and save it as summary.report.json")
     g.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -937,6 +982,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if not args.verbose:
         quiet_transformers()
+    if args.report:
+        return report_main(args)
 
     # ---- country, keywords, hypotheses ----------------------------------------------------------
     known = COUNTRIES.get(args.country.strip().lower(), {})
@@ -1066,10 +1113,72 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "command": " ".join([Path(sys.argv[0]).name] + list(argv if argv is not None else sys.argv[1:])),
         "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
-    summary_path = out_dir / "summary.json"
-    with open(summary_path, "w", encoding="utf-8") as fh:
+    # one run summary per shard, so copies running side by side do not overwrite each other
+    name = "summary.json" if not args.shard else "summary.shard-{}-of-{}.json".format(*args.shard.split("/"))
+    with open(out_dir / name, "w", encoding="utf-8") as fh:
         json.dump(summary, fh, ensure_ascii=False, indent=1)
     print(format_summary(summary, args.show))
+    if args.shard:
+        print(f" shard summary: {out_dir / name}   (all shards together: python nli_filter.py --report "
+              f"--output-dir {out_dir})")
+    return 0
+
+
+def build_report(out_dir: Path) -> Optional[Dict[str, Any]]:
+    """Whole-run summary rebuilt from the per-file *.summary.json files (and the run summaries for model
+    and timing details). Works after several --shard copies, or while a run is still going."""
+    run_files = sorted(p for p in out_dir.glob("summary*.json") if p.name != "summary.report.json")
+    per_file = sorted(p for p in out_dir.rglob("*.summary.json")
+                      if not (p.parent == out_dir and p.name.startswith("summary")))
+    if not per_file:
+        return None
+    total = RunStats()
+    files = []
+    for p in per_file:
+        with open(p, encoding="utf-8") as fh:
+            d = json.load(fh)
+        total.merge(RunStats(d["stats"]))
+        files.append({"input": d["input"], "status": "done" if d.get("complete", True) else "partial (--limit)",
+                      **_file_row(d)})
+    runs = []
+    for p in run_files:
+        with open(p, encoding="utf-8") as fh:
+            runs.append(json.load(fh))
+    base = runs[0] if runs else {}
+    run_seconds = max((r["timing"]["run_seconds"] for r in runs), default=0.0)  # shards ran side by side
+    fast_pairs = sum(r["timing"]["fast_pairs"] for r in runs)
+    judge_pairs = sum(r["timing"]["judge_pairs"] for r in runs)
+    stats = total.to_dict()
+    return {
+        "country": base.get("country", {"name": "?", "adj": "?"}),
+        "hypotheses": base.get("hypotheses"),
+        "settings": base.get("settings", {"uncertain_band": None, "expect_field": "expect", "write_split": False}),
+        "models": base.get("models") or {"fast": {"model": "?", "mode": "?", "devices": ["?"], "dtype": "?"}},
+        "timing": {"load_seconds": max((r["timing"]["load_seconds"] for r in runs), default=0.0),
+                   "run_seconds": run_seconds,
+                   "lines_per_second": round(stats["lines"] / run_seconds, 2) if run_seconds else 0.0,
+                   "fast_pairs": fast_pairs, "judge_pairs": judge_pairs,
+                   "pairs_per_second": round((fast_pairs + judge_pairs) / run_seconds, 2) if run_seconds else 0.0},
+        "runs": [p.name for p in run_files],
+        "files": files,
+        "stats": stats,
+        "output_dir": str(out_dir),
+        "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def report_main(args) -> int:
+    out_dir = Path(args.output_dir)
+    report = build_report(out_dir)
+    if report is None:
+        print(f"error: no *.summary.json files under {out_dir}", file=sys.stderr)
+        return 2
+    with open(out_dir / "summary.report.json", "w", encoding="utf-8") as fh:
+        json.dump(report, fh, ensure_ascii=False, indent=1)
+    print(format_summary(report, args.show))
+    partial = sum(1 for f in report["files"] if f["status"] != "done")
+    print(f" report from {len(report['files'])} file summaries ({partial} partial) and {len(report['runs'])} run "
+          f"summaries -> {out_dir / 'summary.report.json'}")
     return 0
 
 

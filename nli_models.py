@@ -338,7 +338,7 @@ class NLIModel:
         self.dtype = resolve_dtype(dtype, self.device)
         self.batch_size = int(batch_size)
         self.max_batch_tokens = max_batch_tokens
-        if cpu_threads and self.device == "cpu":
+        if cpu_threads:  # torch CPU threads of this process (on GPU only used for small helper ops)
             torch.set_num_threads(int(cpu_threads))
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.path, local_files_only=local_files_only)
@@ -482,6 +482,13 @@ def quiet_transformers() -> None:
 def _process_worker(wid: int, device: str, model_kwargs: Dict[str, Any], task_q, result_q,
                     log_level: int) -> None:
     """Runs in a child process: load the model once, then score batches until a None arrives."""
+    if device.startswith("cuda"):
+        # A GPU worker needs few CPU threads. Without a cap every worker (16 on 8 GPUs with a judge) starts
+        # torch, OpenMP and tokenizer thread pools as large as the machine, and they fight over the cores.
+        # Set before torch / tokenizers are imported in this process.
+        n = str(model_kwargs.get("cpu_threads") or 4)
+        for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "RAYON_NUM_THREADS"):
+            os.environ.setdefault(var, n)
     logging.basicConfig(level=log_level, format=f"%(asctime)s [worker {wid} {device}] %(message)s", stream=sys.stderr)
     if log_level > logging.INFO:
         quiet_transformers()

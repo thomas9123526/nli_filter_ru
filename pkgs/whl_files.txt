@@ -1,0 +1,182 @@
+# Wheel files needed by nli_models.py, nli_filter.py and make_test_corpus.py
+#
+# Generated 2026-11-09 from the METADATA inside the wheels in D:\hkc\nli_country_filter\pkgs\{linux,windows}
+# (dependency markers evaluated for each machine). Top-level packages the scripts need:
+#   torch 2.11.0+cu128, transformers 5.20.2   models (nli_models.py)
+#   orjson                                     fast JSON (optional; falls back to the json module)
+#   pyahocorasick                              fast keyword search (optional; falls back to regex)
+#   zstandard                                  .zst input/output (needed for .zst files and make_test_corpus.py)
+#   sentencepiece, protobuf                    tokenizer fallback for DeBERTa-v3 / bge-m3 (safety; tokenizer.json is used first)
+# Everything else below is a dependency of these.
+#
+# NOT in pkgs yet: zstandard (tested with 0.25.0). Download on a machine with internet:
+#   pip download zstandard==0.25.0 --only-binary=:all: --platform win_amd64 --python-version 3.10 -d pkgs/windows
+#   pip download zstandard==0.25.0 --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.10 -d pkgs/linux
+#   pip download zstandard==0.25.0 --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -d pkgs/linux
+#
+# Install offline (from the folder that holds pkgs/), e.g. on the H200 machine:
+#   pip install --no-index --find-links pkgs/linux torch==2.11.0+cu128 transformers==5.20.2 orjson pyahocorasick zstandard sentencepiece protobuf
+# pip then picks exactly the wheels listed below.
+
+[rtx5090-windows-py310]  pkgs/windows/  41 wheels, 2.80 GB  + zstandard (to download)
+pkgs/windows/annotated_doc-0.0.5-py3-none-any.whl
+pkgs/windows/anyio-4.16.0-py3-none-any.whl
+pkgs/windows/click-8.5.1-py3-none-any.whl
+pkgs/windows/colorama-0.4.6-py2.py3-none-any.whl
+pkgs/windows/exceptiongroup-1.3.1-py3-none-any.whl
+pkgs/windows/filelock-4.1.0-py3-none-any.whl
+pkgs/windows/fsspec-2026.9.0-py3-none-any.whl
+pkgs/windows/h11-0.16.0-py3-none-any.whl
+pkgs/windows/hf_xet-1.8.0-cp38-abi3-win_amd64.whl
+pkgs/windows/httpcore2-2.14.0-py3-none-any.whl
+pkgs/windows/httpx2-2.14.0-py3-none-any.whl
+pkgs/windows/huggingface_hub-2.4.0-py3-none-any.whl
+pkgs/windows/idna-3.20-py3-none-any.whl
+pkgs/windows/jinja2-3.1.6-py3-none-any.whl
+pkgs/windows/markdown_it_py-4.2.0-py3-none-any.whl
+pkgs/windows/markupsafe-3.0.4-cp310-cp310-win_amd64.whl
+pkgs/windows/mdurl-0.1.2-py3-none-any.whl
+pkgs/windows/mpmath-1.3.0-py3-none-any.whl
+pkgs/windows/networkx-3.4.2-py3-none-any.whl
+pkgs/windows/numpy-2.2.6-cp310-cp310-win_amd64.whl
+pkgs/windows/orjson-3.13.0-cp310-cp310-win_amd64.whl
+pkgs/windows/packaging-26.3-py3-none-any.whl
+pkgs/windows/protobuf-7.36.2-cp310-abi3-win_amd64.whl
+pkgs/windows/pyahocorasick-2.3.1-cp310-cp310-win_amd64.whl
+pkgs/windows/pygments-2.21.0-py3-none-any.whl
+pkgs/windows/pyyaml-6.0.3-cp310-cp310-win_amd64.whl
+pkgs/windows/regex-2026.9.29-cp310-cp310-win_amd64.whl
+pkgs/windows/rich-15.0.0-py3-none-any.whl
+pkgs/windows/safetensors-0.8.0-cp310-abi3-win_amd64.whl
+pkgs/windows/sentencepiece-0.2.3-cp310-cp310-win_amd64.whl
+pkgs/windows/setuptools-81.0.0-py3-none-any.whl
+pkgs/windows/shellingham-1.5.4-py2.py3-none-any.whl
+pkgs/windows/sympy-1.14.0-py3-none-any.whl
+pkgs/windows/tokenizers-0.23.3-cp310-abi3-win_amd64.whl
+pkgs/windows/tomli-2.5.0-py3-none-any.whl
+pkgs/windows/torch-2.11.0+cu128-cp310-cp310-win_amd64.whl
+pkgs/windows/tqdm-4.70.1-py3-none-any.whl
+pkgs/windows/transformers-5.20.2-py3-none-any.whl
+pkgs/windows/truststore-0.10.5-py3-none-any.whl
+pkgs/windows/typer-0.28.0-py3-none-any.whl
+pkgs/windows/typing_extensions-4.16.0-py3-none-any.whl
+
+[rtx5090-ubuntu-py310]  pkgs/linux/  59 wheels, 4.00 GB  + zstandard (to download)
+pkgs/linux/annotated_doc-0.0.5-py3-none-any.whl
+pkgs/linux/anyio-4.16.0-py3-none-any.whl
+pkgs/linux/click-8.5.1-py3-none-any.whl
+pkgs/linux/cuda_bindings-12.9.10-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/cuda_pathfinder-1.8.3-py3-none-any.whl
+pkgs/linux/cuda_toolkit-12.8.1-py2.py3-none-any.whl
+pkgs/linux/exceptiongroup-1.3.1-py3-none-any.whl
+pkgs/linux/filelock-4.1.0-py3-none-any.whl
+pkgs/linux/fsspec-2026.9.0-py3-none-any.whl
+pkgs/linux/h11-0.16.0-py3-none-any.whl
+pkgs/linux/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/httpcore2-2.14.0-py3-none-any.whl
+pkgs/linux/httpx2-2.14.0-py3-none-any.whl
+pkgs/linux/huggingface_hub-2.4.0-py3-none-any.whl
+pkgs/linux/idna-3.20-py3-none-any.whl
+pkgs/linux/jinja2-3.1.6-py3-none-any.whl
+pkgs/linux/markdown_it_py-4.2.0-py3-none-any.whl
+pkgs/linux/markupsafe-3.0.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/mdurl-0.1.2-py3-none-any.whl
+pkgs/linux/mpmath-1.3.0-py3-none-any.whl
+pkgs/linux/networkx-3.4.2-py3-none-any.whl
+pkgs/linux/numpy-2.2.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/nvidia_cublas_cu12-12.8.4.1-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cuda_cupti_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cuda_nvrtc_cu12-12.8.93-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl
+pkgs/linux/nvidia_cuda_runtime_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cudnn_cu12-9.19.0.56-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cufile_cu12-1.13.1.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_curand_cu12-10.3.9.90-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cusparselt_cu12-0.7.1-py3-none-manylinux2014_x86_64.whl
+pkgs/linux/nvidia_nccl_cu12-2.28.9-py3-none-manylinux_2_18_x86_64.whl
+pkgs/linux/nvidia_nvjitlink_cu12-12.8.93-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl
+pkgs/linux/nvidia_nvshmem_cu12-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_nvtx_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/orjson-3.13.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/packaging-26.3-py3-none-any.whl
+pkgs/linux/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl
+pkgs/linux/pyahocorasick-2.3.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/pygments-2.21.0-py3-none-any.whl
+pkgs/linux/pyyaml-6.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/regex-2026.9.29-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/rich-15.0.0-py3-none-any.whl
+pkgs/linux/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/sentencepiece-0.2.3-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/setuptools-81.0.0-py3-none-any.whl
+pkgs/linux/shellingham-1.5.4-py2.py3-none-any.whl
+pkgs/linux/sympy-1.14.0-py3-none-any.whl
+pkgs/linux/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/tomli-2.5.0-py3-none-any.whl
+pkgs/linux/torch-2.11.0+cu128-cp310-cp310-manylinux_2_28_x86_64.whl
+pkgs/linux/tqdm-4.70.1-py3-none-any.whl
+pkgs/linux/transformers-5.20.2-py3-none-any.whl
+pkgs/linux/triton-3.6.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/truststore-0.10.5-py3-none-any.whl
+pkgs/linux/typer-0.28.0-py3-none-any.whl
+pkgs/linux/typing_extensions-4.16.0-py3-none-any.whl
+
+[h200-ubuntu-py312]  pkgs/linux/  57 wheels, 4.00 GB  + zstandard (to download)
+pkgs/linux/annotated_doc-0.0.5-py3-none-any.whl
+pkgs/linux/anyio-4.16.0-py3-none-any.whl
+pkgs/linux/click-8.5.1-py3-none-any.whl
+pkgs/linux/cuda_bindings-12.9.10-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/cuda_pathfinder-1.8.3-py3-none-any.whl
+pkgs/linux/cuda_toolkit-12.8.1-py2.py3-none-any.whl
+pkgs/linux/filelock-4.1.0-py3-none-any.whl
+pkgs/linux/fsspec-2026.9.0-py3-none-any.whl
+pkgs/linux/h11-0.16.0-py3-none-any.whl
+pkgs/linux/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/httpcore2-2.14.0-py3-none-any.whl
+pkgs/linux/httpx2-2.14.0-py3-none-any.whl
+pkgs/linux/huggingface_hub-2.4.0-py3-none-any.whl
+pkgs/linux/idna-3.20-py3-none-any.whl
+pkgs/linux/jinja2-3.1.6-py3-none-any.whl
+pkgs/linux/markdown_it_py-4.2.0-py3-none-any.whl
+pkgs/linux/markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/mdurl-0.1.2-py3-none-any.whl
+pkgs/linux/mpmath-1.3.0-py3-none-any.whl
+pkgs/linux/networkx-3.4.2-py3-none-any.whl
+pkgs/linux/numpy-2.2.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/nvidia_cublas_cu12-12.8.4.1-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cuda_cupti_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cuda_nvrtc_cu12-12.8.93-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl
+pkgs/linux/nvidia_cuda_runtime_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cudnn_cu12-9.19.0.56-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cufile_cu12-1.13.1.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_curand_cu12-10.3.9.90-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_x86_64.whl
+pkgs/linux/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_cusparselt_cu12-0.7.1-py3-none-manylinux2014_x86_64.whl
+pkgs/linux/nvidia_nccl_cu12-2.28.9-py3-none-manylinux_2_18_x86_64.whl
+pkgs/linux/nvidia_nvjitlink_cu12-12.8.93-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl
+pkgs/linux/nvidia_nvshmem_cu12-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/nvidia_nvtx_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/orjson-3.13.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/packaging-26.3-py3-none-any.whl
+pkgs/linux/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl
+pkgs/linux/pyahocorasick-2.3.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+pkgs/linux/pygments-2.21.0-py3-none-any.whl
+pkgs/linux/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/regex-2026.9.29-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/rich-15.0.0-py3-none-any.whl
+pkgs/linux/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/sentencepiece-0.2.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/setuptools-81.0.0-py3-none-any.whl
+pkgs/linux/shellingham-1.5.4-py2.py3-none-any.whl
+pkgs/linux/sympy-1.14.0-py3-none-any.whl
+pkgs/linux/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pkgs/linux/torch-2.11.0+cu128-cp312-cp312-manylinux_2_28_x86_64.whl
+pkgs/linux/tqdm-4.70.1-py3-none-any.whl
+pkgs/linux/transformers-5.20.2-py3-none-any.whl
+pkgs/linux/triton-3.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+pkgs/linux/truststore-0.10.5-py3-none-any.whl
+pkgs/linux/typer-0.28.0-py3-none-any.whl
+pkgs/linux/typing_extensions-4.16.0-py3-none-any.whl
