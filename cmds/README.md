@@ -20,6 +20,7 @@
 | | `viewer_report.md` | Overnight report: what the viewer does, tests, fixes |
 | | `check_results.md` | Check a filter run in the viewer; running `start_viewer.ps1` on Windows 10/11 |
 | | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
+| | `sftp_192.168.170.200.md` | Filter and view `test_corpus` on the SFTP server 192.168.170.200 |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |
