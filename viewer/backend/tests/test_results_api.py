@@ -169,16 +169,25 @@ def test_api_errors(client):
     assert client.get("/api/datasets/broken").status_code == 404
 
 
-def test_api_over_ftp_and_s3(tree, ftp_server, s3_server, tmp_path):
+def test_api_over_ftp_sftp_and_s3(tree, ftp_server, sftp_server, s3_server, tmp_path):
     cfg = ViewerConfig(datasets=[
         DatasetConfig(name="ftp", corpus=ftp_server + "/corpus", output=ftp_server + "/out"),
+        # corpus on SFTP, results on local disk: the mixed set-up of a real run
+        DatasetConfig(name="sftp", corpus=sftp_server + "/corpus", output=str(tree / "out"),
+                      corpus_options={"host_key_check": "off"}),
+        # corpus and results both on SFTP
+        DatasetConfig(name="sftp2", corpus=sftp_server + "/corpus", output=sftp_server + "/out",
+                      corpus_options={"host_key_check": "off"}, output_options={"host_key_check": "off"}),
+        # corpus on FTP, results on S3: storages can be mixed freely
+        DatasetConfig(name="mixed", corpus=ftp_server + "/corpus", output=f"s3://nli/data/out?endpoint={s3_server}",
+                      output_options={"access_key": "test", "secret_key": "test"}),
         DatasetConfig(name="s3", corpus=f"s3://nli/data/corpus?endpoint={s3_server}",
                       output=f"s3://nli/data/out?endpoint={s3_server}",
                       corpus_options={"access_key": "test", "secret_key": "test"},
                       output_options={"access_key": "test", "secret_key": "test"})],
         cache_dir=str(tmp_path / "cache"), frontend_dir=str(tmp_path / "x"))
     with TestClient(create_app(cfg)) as c:
-        for name in ("ftp", "s3"):
+        for name in ("ftp", "sftp", "sftp2", "mixed", "s3"):
             assert c.get(f"/api/datasets/{name}").json()["files"] == 4
             rec = c.get(f"/api/datasets/{name}/record", params={"file": "a/x", "line": 4}).json()
             assert rec["original"]["record"]["id"] == "ax-4" and rec["explanation"]["verdict"]["decision"] == "filter"

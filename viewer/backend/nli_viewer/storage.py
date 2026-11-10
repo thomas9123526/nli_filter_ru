@@ -1,9 +1,10 @@
 """
-storage.py - one interface for files on local disk, FTP(S) and S3 / MinIO.
+storage.py - one interface for files on local disk, FTP(S), SFTP and S3 / MinIO.
 
     from nli_viewer.storage import open_storage
     st = open_storage("D:/data/corpus")                                   # local folder
     st = open_storage("ftp://user:secret@ftp.example.com:21/corpus")      # FTP (ftps:// for FTP over TLS)
+    st = open_storage("sftp://user@ssh.example.com:22/data/corpus", password="secret")  # SFTP (or key_file=)
     st = open_storage("s3://bucket/corpus?endpoint=http://minio:9000")    # S3 / MinIO
     st = open_storage("minio://minio:9000/bucket/corpus")                 # same, shorter (minios:// = https)
 
@@ -35,7 +36,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Dict, Iterator, List, Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
-__all__ = ["Entry", "Storage", "LocalStorage", "FTPStorage", "S3Storage", "open_storage", "clean_path",
+__all__ = ["Entry", "Storage", "LocalStorage", "FTPStorage", "SFTPStorage", "S3Storage", "open_storage", "clean_path",
            "StorageError"]
 
 
@@ -352,6 +353,215 @@ class _suppress:
 
 
 # --------------------------------------------------------------------------------------------------
+# SFTP (SSH)
+# --------------------------------------------------------------------------------------------------
+
+
+class _SFTPStream(io.RawIOBase):
+    """Read stream of one remote file; closes the file and its SFTP channel on close()."""
+
+    def __init__(self, sftp, fh):
+        self._sftp, self._fh = sftp, fh
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, b) -> int:
+        data = self._fh.read(len(b))
+        n = len(data)
+        b[:n] = data
+        return n
+
+    def close(self) -> None:
+        if not self.closed:
+            with _suppress():
+                self._fh.close()
+            with _suppress():
+                self._sftp.close()
+        super().close()
+
+
+class SFTPStorage(Storage):
+    """
+    Files on an SSH server (SFTP). Log in with a password, a private key file, or the keys of the local
+    SSH agent / ~/.ssh when neither is given.
+
+    host_key_check: 'warn' (default: unknown host keys are accepted and logged), 'strict' (the host must be
+    in known_hosts / ~/.ssh/known_hosts) or 'off' (accept silently).
+    """
+
+    def __init__(self, host: str, root: str = "", port: int = 22, user: Optional[str] = None,
+                 password: Optional[str] = None, key_file: Optional[str] = None, passphrase: Optional[str] = None,
+                 known_hosts: Optional[str] = None, host_key_check: str = "warn", timeout: float = 60.0):
+        try:
+            import paramiko  # noqa: F401
+        except ImportError as exc:  # pragma: no cover
+            raise StorageError("SFTP needs the 'paramiko' package (pip install paramiko)") from exc
+        if host_key_check not in ("warn", "strict", "off"):
+            raise ValueError("host_key_check must be warn, strict or off")
+        self.host, self.port, self.user = host, int(port or 22), user or None
+        self.password, self.key_file, self.passphrase = password or None, key_file or None, passphrase or None
+        self.known_hosts, self.host_key_check, self.timeout = known_hosts, host_key_check, timeout
+        # "/data/corpus" = absolute path; "" or "~" = login folder; "~/corpus" = below the login folder
+        r = (root or "").replace("\\", "/")
+        if r in ("", "/~", "~"):
+            self.root = "."
+        elif r.startswith(("/~/", "~/")):
+            self.root = clean_path(r.split("~/", 1)[1]) or "."
+        else:
+            self.root = "/" + clean_path(r) if clean_path(r) else "/"
+        cred = f"{self.user}{':x' if self.password else ''}@" if self.user else ""
+        shown = self.root if self.root.startswith("/") else "/~/" + ("" if self.root == "." else self.root)
+        self.uri = f"sftp://{cred}{host}:{self.port}{shown}"
+        self._lock = threading.Lock()
+        self._ssh = None
+        self._sftp = None  # shared SFTP channel for listings
+
+    # -- connection --------------------------------------------------------------------------------
+
+    def _connect(self):
+        import paramiko
+        ssh = paramiko.SSHClient()
+        with _suppress():
+            ssh.load_system_host_keys()
+        if self.known_hosts:
+            try:
+                ssh.load_host_keys(os.path.expanduser(self.known_hosts))
+            except OSError as exc:
+                raise StorageError(f"cannot read known_hosts file {self.known_hosts}: {exc}") from exc
+        ssh.set_missing_host_key_policy({"warn": paramiko.WarningPolicy, "strict": paramiko.RejectPolicy,
+                                         "off": paramiko.AutoAddPolicy}[self.host_key_check]())
+        explicit = bool(self.password or self.key_file)
+        try:
+            ssh.connect(self.host, port=self.port, username=self.user, password=self.password,
+                        key_filename=os.path.expanduser(self.key_file) if self.key_file else None,
+                        passphrase=self.passphrase, timeout=self.timeout, banner_timeout=self.timeout,
+                        auth_timeout=self.timeout, allow_agent=not explicit, look_for_keys=not explicit)
+            ssh.get_transport().set_keepalive(30)
+            return ssh
+        except paramiko.AuthenticationException as exc:
+            ssh.close()
+            raise StorageError(f"SFTP login to {self.host} as {self.user or '(default user)'} failed: {exc}") from exc
+        except paramiko.BadHostKeyException as exc:
+            ssh.close()
+            raise StorageError(f"SFTP host key of {self.host} does not match known_hosts: {exc}") from exc
+        except (paramiko.SSHException, OSError, EOFError) as exc:
+            ssh.close()
+            raise StorageError(f"cannot connect to SFTP {self.host}:{self.port}: {exc}") from exc
+
+    def _alive(self) -> bool:
+        t = self._ssh.get_transport() if self._ssh is not None else None
+        return bool(t and t.is_active())
+
+    def _ensure(self):
+        """Connected SSH client (call with the lock held)."""
+        if not self._alive():
+            self._drop()
+            self._ssh = self._connect()
+        return self._ssh
+
+    def _drop(self) -> None:
+        for obj in (self._sftp, self._ssh):
+            if obj is not None:
+                with _suppress():
+                    obj.close()
+        self._sftp = self._ssh = None
+
+    def _with_sftp(self, fn):
+        """Run fn(sftp) on the shared channel, reconnecting once if the connection dropped."""
+        import paramiko
+        with self._lock:
+            for attempt in (1, 2):
+                try:
+                    ssh = self._ensure()
+                    if self._sftp is None:
+                        self._sftp = ssh.open_sftp()
+                    return fn(self._sftp)
+                except (FileNotFoundError, StorageError):
+                    raise
+                except PermissionError as exc:
+                    raise StorageError(f"SFTP permission denied: {exc}") from exc
+                except (paramiko.SSHException, EOFError, OSError) as exc:
+                    self._drop()
+                    if attempt == 2:
+                        raise StorageError(f"SFTP error: {exc}") from exc
+
+    # -- paths -------------------------------------------------------------------------------------
+
+    def _full(self, path: str) -> str:
+        p = clean_path(path)
+        return posixpath.join(self.root, p) if p else self.root
+
+    @staticmethod
+    def _missing(exc: OSError, path: str) -> None:
+        """Re-raise 'no such file' as FileNotFoundError(path); other errors unchanged."""
+        if isinstance(exc, FileNotFoundError) or getattr(exc, "errno", None) == 2:
+            raise FileNotFoundError(path) from exc
+        raise exc
+
+    def _stat_full(self, sftp, full: str, rel: str):
+        try:
+            return sftp.stat(full)  # follows symbolic links
+        except OSError as exc:
+            self._missing(exc, rel)
+
+    # -- Storage -----------------------------------------------------------------------------------
+
+    def list(self, path: str = "") -> List[Entry]:
+        import stat as st_mod
+        rel_dir = clean_path(path)
+        full = self._full(path)
+
+        def run(sftp):
+            try:
+                attrs = sftp.listdir_attr(full)
+            except OSError as exc:
+                self._missing(exc, rel_dir)
+            out = []
+            for a in attrs:
+                if a.filename in (".", ".."):
+                    continue
+                rel = posixpath.join(rel_dir, a.filename) if rel_dir else a.filename
+                if a.st_mode is not None and st_mod.S_ISLNK(a.st_mode):
+                    try:
+                        a = sftp.stat(posixpath.join(full, a.filename))
+                    except OSError:
+                        continue  # broken link
+                is_dir = bool(a.st_mode is not None and st_mod.S_ISDIR(a.st_mode))
+                out.append(Entry(posixpath.basename(rel), rel, is_dir, None if is_dir else a.st_size,
+                                 float(a.st_mtime) if a.st_mtime is not None else None))
+            return out
+
+        return _sorted(self._with_sftp(run))
+
+    def stat(self, path: str) -> Entry:
+        import stat as st_mod
+        p = clean_path(path)
+        a = self._with_sftp(lambda sftp: self._stat_full(sftp, self._full(p), p))
+        is_dir = bool(a.st_mode is not None and st_mod.S_ISDIR(a.st_mode))
+        return Entry(posixpath.basename(p), p, is_dir, None if is_dir else a.st_size,
+                     float(a.st_mtime) if a.st_mtime is not None else None)
+
+    def open(self, path: str) -> BinaryIO:
+        e = self.stat(path)
+        if e.is_dir:
+            raise FileNotFoundError(f"{path} is a folder")
+        with self._lock:
+            sftp = self._ensure().open_sftp()  # a transfer gets its own channel on the same connection
+        try:
+            fh = sftp.open(self._full(path), "rb")
+            fh.prefetch(e.size)  # pipelined reads: much faster than one request per block
+        except OSError as exc:
+            sftp.close()
+            self._missing(exc, clean_path(path))
+        return io.BufferedReader(_SFTPStream(sftp, fh), buffer_size=1 << 20)
+
+    def close(self) -> None:
+        with self._lock:
+            self._drop()
+
+
+# --------------------------------------------------------------------------------------------------
 # S3 / MinIO
 # --------------------------------------------------------------------------------------------------
 
@@ -522,6 +732,18 @@ def open_storage(uri: str, base_dir: Optional[str] = None, **options: Any) -> St
             password=options.get("password") or (unquote(u.password) if u.password else ""),
             tls=options.get("tls", scheme == "ftps"), timeout=float(options.get("timeout", 60)),
             passive=options.get("passive", True))
+    if scheme == "sftp":
+        key_file = options.get("key_file") or query.get("key_file")
+        if key_file and base_dir and not os.path.isabs(os.path.expanduser(key_file)):
+            key_file = os.path.normpath(os.path.join(base_dir, key_file))
+        return SFTPStorage(
+            host=u.hostname or "", root=unquote(u.path or ""), port=u.port or 22,
+            user=options.get("user") or (unquote(u.username) if u.username else None),
+            password=options.get("password") or (unquote(u.password) if u.password else None),
+            key_file=key_file, passphrase=options.get("passphrase"),
+            known_hosts=options.get("known_hosts") or query.get("known_hosts"),
+            host_key_check=options.get("host_key_check") or query.get("host_key_check") or "warn",
+            timeout=float(options.get("timeout", 60)))
     if scheme in ("s3", "minio", "minios"):
         if scheme == "s3":
             bucket, prefix = u.netloc, u.path.lstrip("/")
@@ -538,4 +760,4 @@ def open_storage(uri: str, base_dir: Optional[str] = None, **options: Any) -> St
         return S3Storage(bucket, prefix, endpoint_url=endpoint, access_key=access, secret_key=secret,
                          session_token=options.get("session_token"), region=options.get("region") or query.get("region"),
                          verify=str(options.get("verify", query.get("verify", "true"))).lower() not in ("0", "false", "no"))
-    raise ValueError(f"unsupported storage URI {uri!r} (use a path, file://, ftp://, ftps://, s3://, minio://)")
+    raise ValueError(f"unsupported storage URI {uri!r} (use a path, file://, ftp://, ftps://, sftp://, s3://, minio://)")

@@ -1,0 +1,49 @@
+# Keywords for --country Germany (picked up automatically from keywords/germany.txt).
+# One keyword or phrase per line. Case-insensitive, whole words; CJK keywords match anywhere.
+# List every spelling and inflected form you need (München + Muenchen + Munich).
+
+# English
+Germany
+German
+Germans
+Federal Republic of Germany
+West Germany
+East Germany
+Berlin
+Bonn
+Munich
+Hamburg
+Frankfurt
+Cologne
+Bavaria
+Bavarian
+Bundestag
+Bundesrat
+Bundeswehr
+Bundesliga
+Reichstag
+Weimar Republic
+Autobahn
+
+# German
+Deutschland
+Bundesrepublik Deutschland
+deutsch
+deutsche
+deutschen
+deutscher
+deutsches
+München
+Muenchen
+Köln
+Koeln
+Bayern
+
+# Chinese (simplified / traditional)
+德国
+德國
+德意志
+
+# Japanese
+ドイツ
+独逸

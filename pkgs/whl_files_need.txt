@@ -1,0 +1,138 @@
+# Wheels needed by nli_models.py, nli_filter.py and make_test_corpus.py on a machine that ALREADY has
+# a working torch + CUDA environment. This is whl_files.txt minus what such an environment usually has:
+#   torch, triton, nvidia_* / cuda_* (CUDA libraries), numpy, and torch's own dependencies
+#   (filelock, fsspec, jinja2, markupsafe, mpmath, networkx, sympy, typing_extensions, setuptools).
+# Wheels live in D:\hkc\nli_country_filter\pkgs\{windows,linux}.
+#
+# This is a guess. Before copying, check on the target machine which packages are really missing:
+#   python check_missing.py        (prints the packages that are not installed yet)
+#
+# Install offline (pip uses the torch that is already installed and only adds what is missing):
+#   pip install --no-index --find-links <folder with these wheels> transformers==5.20.2 orjson pyahocorasick zstandard sentencepiece protobuf
+# If pip says "No matching distribution found for X", X was not already installed: copy X's wheel from whl_files.txt too.
+
+[rtx5090-windows-py310]  pkgs/rtx5090-windows-py310/  31 wheels, 25.5 MB
+pkgs/rtx5090-windows-py310/annotated_doc-0.0.5-py3-none-any.whl                                                               #    0.01 MB  typer
+pkgs/rtx5090-windows-py310/anyio-4.16.0-py3-none-any.whl                                                                      #    0.13 MB  httpx2
+pkgs/rtx5090-windows-py310/click-8.5.1-py3-none-any.whl                                                                       #    0.12 MB  typer
+pkgs/rtx5090-windows-py310/colorama-0.4.6-py2.py3-none-any.whl                                                                #    0.02 MB  click (Windows only)
+pkgs/rtx5090-windows-py310/exceptiongroup-1.3.1-py3-none-any.whl                                                              #    0.02 MB  anyio (Python 3.10 only)
+pkgs/rtx5090-windows-py310/h11-0.16.0-py3-none-any.whl                                                                        #    0.04 MB  httpcore2
+pkgs/rtx5090-windows-py310/hf_xet-1.8.0-cp38-abi3-win_amd64.whl                                                               #    3.73 MB  huggingface_hub
+pkgs/rtx5090-windows-py310/httpcore2-2.14.0-py3-none-any.whl                                                                  #    0.08 MB  httpx2
+pkgs/rtx5090-windows-py310/httpx2-2.14.0-py3-none-any.whl                                                                     #    0.09 MB  huggingface_hub
+pkgs/rtx5090-windows-py310/huggingface_hub-2.4.0-py3-none-any.whl                                                             #    0.82 MB  transformers
+pkgs/rtx5090-windows-py310/idna-3.20-py3-none-any.whl                                                                         #    0.07 MB  anyio
+pkgs/rtx5090-windows-py310/markdown_it_py-4.2.0-py3-none-any.whl                                                              #    0.09 MB  rich
+pkgs/rtx5090-windows-py310/mdurl-0.1.2-py3-none-any.whl                                                                       #    0.01 MB  markdown_it_py
+pkgs/rtx5090-windows-py310/orjson-3.13.0-cp310-cp310-win_amd64.whl                                                            #    0.12 MB  scripts (optional, faster JSON)
+pkgs/rtx5090-windows-py310/packaging-26.3-py3-none-any.whl                                                                    #    0.12 MB  transformers (often already installed)
+pkgs/rtx5090-windows-py310/protobuf-7.36.2-cp310-abi3-win_amd64.whl                                                           #    0.44 MB  scripts (tokenizer fallback)
+pkgs/rtx5090-windows-py310/pyahocorasick-2.3.1-cp310-cp310-win_amd64.whl                                                      #    0.03 MB  scripts (optional, faster keyword search)
+pkgs/rtx5090-windows-py310/pygments-2.21.0-py3-none-any.whl                                                                   #    1.19 MB  rich
+pkgs/rtx5090-windows-py310/pyyaml-6.0.3-cp310-cp310-win_amd64.whl                                                             #    0.15 MB  transformers (often already installed)
+pkgs/rtx5090-windows-py310/regex-2026.9.29-cp310-cp310-win_amd64.whl                                                          #    0.27 MB  transformers
+pkgs/rtx5090-windows-py310/rich-15.0.0-py3-none-any.whl                                                                       #    0.30 MB  typer
+pkgs/rtx5090-windows-py310/safetensors-0.8.0-cp310-abi3-win_amd64.whl                                                         #    0.34 MB  transformers
+pkgs/rtx5090-windows-py310/sentencepiece-0.2.3-cp310-cp310-win_amd64.whl                                                      #    1.58 MB  scripts (tokenizer fallback)
+pkgs/rtx5090-windows-py310/shellingham-1.5.4-py2.py3-none-any.whl                                                             #    0.01 MB  typer
+pkgs/rtx5090-windows-py310/tokenizers-0.23.3-cp310-abi3-win_amd64.whl                                                         #    2.74 MB  transformers
+pkgs/rtx5090-windows-py310/tomli-2.5.0-py3-none-any.whl                                                                       #    0.01 MB  huggingface_hub (Python 3.10 only)
+pkgs/rtx5090-windows-py310/tqdm-4.70.1-py3-none-any.whl                                                                       #    0.08 MB  transformers (often already installed)
+pkgs/rtx5090-windows-py310/transformers-5.20.2-py3-none-any.whl                                                               #   12.25 MB  scripts (models)
+pkgs/rtx5090-windows-py310/truststore-0.10.5-py3-none-any.whl                                                                 #    0.02 MB  httpx2
+pkgs/rtx5090-windows-py310/typer-0.28.0-py3-none-any.whl                                                                      #    0.12 MB  transformers
+pkgs/rtx5090-windows-py310/zstandard-0.25.0-cp310-cp310-win_amd64.whl                                                         #    0.48 MB  scripts (.zst files, make_test_corpus.py)
+
+[windows-py312]  pkgs/windows-py312/  29 wheels, 25.4 MB
+pkgs/windows-py312/annotated_doc-0.0.5-py3-none-any.whl                                                                       #    0.01 MB  typer
+pkgs/windows-py312/anyio-4.16.0-py3-none-any.whl                                                                              #    0.13 MB  httpx2
+pkgs/windows-py312/click-8.5.1-py3-none-any.whl                                                                               #    0.12 MB  typer
+pkgs/windows-py312/colorama-0.4.6-py2.py3-none-any.whl                                                                        #    0.02 MB  click (Windows only)
+pkgs/windows-py312/h11-0.16.0-py3-none-any.whl                                                                                #    0.04 MB  httpcore2
+pkgs/windows-py312/hf_xet-1.8.0-cp38-abi3-win_amd64.whl                                                                       #    3.73 MB  huggingface_hub
+pkgs/windows-py312/httpcore2-2.14.0-py3-none-any.whl                                                                          #    0.08 MB  httpx2
+pkgs/windows-py312/httpx2-2.14.0-py3-none-any.whl                                                                             #    0.09 MB  huggingface_hub
+pkgs/windows-py312/huggingface_hub-2.4.0-py3-none-any.whl                                                                     #    0.82 MB  transformers
+pkgs/windows-py312/idna-3.20-py3-none-any.whl                                                                                 #    0.07 MB  anyio
+pkgs/windows-py312/markdown_it_py-4.2.0-py3-none-any.whl                                                                      #    0.09 MB  rich
+pkgs/windows-py312/mdurl-0.1.2-py3-none-any.whl                                                                               #    0.01 MB  markdown_it_py
+pkgs/windows-py312/orjson-3.13.0-cp312-cp312-win_amd64.whl                                                                    #    0.12 MB  scripts (optional, faster JSON)
+pkgs/windows-py312/packaging-26.3-py3-none-any.whl                                                                            #    0.12 MB  transformers (often already installed)
+pkgs/windows-py312/protobuf-7.36.2-cp310-abi3-win_amd64.whl                                                                   #    0.44 MB  scripts (tokenizer fallback)
+pkgs/windows-py312/pyahocorasick-2.3.1-cp312-cp312-win_amd64.whl                                                              #    0.03 MB  scripts (optional, faster keyword search)
+pkgs/windows-py312/pygments-2.21.0-py3-none-any.whl                                                                           #    1.19 MB  rich
+pkgs/windows-py312/pyyaml-6.0.3-cp312-cp312-win_amd64.whl                                                                     #    0.15 MB  transformers (often already installed)
+pkgs/windows-py312/regex-2026.9.29-cp312-cp312-win_amd64.whl                                                                  #    0.27 MB  transformers
+pkgs/windows-py312/rich-15.0.0-py3-none-any.whl                                                                               #    0.30 MB  typer
+pkgs/windows-py312/safetensors-0.8.0-cp310-abi3-win_amd64.whl                                                                 #    0.34 MB  transformers
+pkgs/windows-py312/sentencepiece-0.2.3-cp312-cp312-win_amd64.whl                                                              #    1.58 MB  scripts (tokenizer fallback)
+pkgs/windows-py312/shellingham-1.5.4-py2.py3-none-any.whl                                                                     #    0.01 MB  typer
+pkgs/windows-py312/tokenizers-0.23.3-cp310-abi3-win_amd64.whl                                                                 #    2.74 MB  transformers
+pkgs/windows-py312/tqdm-4.70.1-py3-none-any.whl                                                                               #    0.08 MB  transformers (often already installed)
+pkgs/windows-py312/transformers-5.20.2-py3-none-any.whl                                                                       #   12.25 MB  scripts (models)
+pkgs/windows-py312/truststore-0.10.5-py3-none-any.whl                                                                         #    0.02 MB  httpx2
+pkgs/windows-py312/typer-0.28.0-py3-none-any.whl                                                                              #    0.12 MB  transformers
+pkgs/windows-py312/zstandard-0.25.0-cp312-cp312-win_amd64.whl                                                                 #    0.48 MB  scripts (.zst files, make_test_corpus.py)
+
+[rtx5090-ubuntu-py310]  pkgs/rtx5090-ubuntu-py310/  30 wheels, 32.4 MB
+pkgs/rtx5090-ubuntu-py310/annotated_doc-0.0.5-py3-none-any.whl                                                                #    0.01 MB  typer
+pkgs/rtx5090-ubuntu-py310/anyio-4.16.0-py3-none-any.whl                                                                       #    0.13 MB  httpx2
+pkgs/rtx5090-ubuntu-py310/click-8.5.1-py3-none-any.whl                                                                        #    0.12 MB  typer
+pkgs/rtx5090-ubuntu-py310/exceptiongroup-1.3.1-py3-none-any.whl                                                               #    0.02 MB  anyio (Python 3.10 only)
+pkgs/rtx5090-ubuntu-py310/h11-0.16.0-py3-none-any.whl                                                                         #    0.04 MB  httpcore2
+pkgs/rtx5090-ubuntu-py310/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    4.09 MB  huggingface_hub
+pkgs/rtx5090-ubuntu-py310/httpcore2-2.14.0-py3-none-any.whl                                                                   #    0.08 MB  httpx2
+pkgs/rtx5090-ubuntu-py310/httpx2-2.14.0-py3-none-any.whl                                                                      #    0.09 MB  huggingface_hub
+pkgs/rtx5090-ubuntu-py310/huggingface_hub-2.4.0-py3-none-any.whl                                                              #    0.82 MB  transformers
+pkgs/rtx5090-ubuntu-py310/idna-3.20-py3-none-any.whl                                                                          #    0.07 MB  anyio
+pkgs/rtx5090-ubuntu-py310/markdown_it_py-4.2.0-py3-none-any.whl                                                               #    0.09 MB  rich
+pkgs/rtx5090-ubuntu-py310/mdurl-0.1.2-py3-none-any.whl                                                                        #    0.01 MB  markdown_it_py
+pkgs/rtx5090-ubuntu-py310/orjson-3.13.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                            #    0.12 MB  scripts (optional, faster JSON)
+pkgs/rtx5090-ubuntu-py310/packaging-26.3-py3-none-any.whl                                                                     #    0.12 MB  transformers (often already installed)
+pkgs/rtx5090-ubuntu-py310/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl                                                 #    0.33 MB  scripts (tokenizer fallback)
+pkgs/rtx5090-ubuntu-py310/pyahocorasick-2.3.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                      #    0.11 MB  scripts (optional, faster keyword search)
+pkgs/rtx5090-ubuntu-py310/pygments-2.21.0-py3-none-any.whl                                                                    #    1.19 MB  rich
+pkgs/rtx5090-ubuntu-py310/pyyaml-6.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl       #    0.73 MB  transformers (often already installed)
+pkgs/rtx5090-ubuntu-py310/regex-2026.9.29-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl    #    0.76 MB  transformers
+pkgs/rtx5090-ubuntu-py310/rich-15.0.0-py3-none-any.whl                                                                        #    0.30 MB  typer
+pkgs/rtx5090-ubuntu-py310/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                         #    0.49 MB  transformers
+pkgs/rtx5090-ubuntu-py310/sentencepiece-0.2.3-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl                     #    1.63 MB  scripts (tokenizer fallback)
+pkgs/rtx5090-ubuntu-py310/shellingham-1.5.4-py2.py3-none-any.whl                                                              #    0.01 MB  typer
+pkgs/rtx5090-ubuntu-py310/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                         #    3.24 MB  transformers
+pkgs/rtx5090-ubuntu-py310/tomli-2.5.0-py3-none-any.whl                                                                        #    0.01 MB  huggingface_hub (Python 3.10 only)
+pkgs/rtx5090-ubuntu-py310/tqdm-4.70.1-py3-none-any.whl                                                                        #    0.08 MB  transformers (often already installed)
+pkgs/rtx5090-ubuntu-py310/transformers-5.20.2-py3-none-any.whl                                                                #   12.25 MB  scripts (models)
+pkgs/rtx5090-ubuntu-py310/truststore-0.10.5-py3-none-any.whl                                                                  #    0.02 MB  httpx2
+pkgs/rtx5090-ubuntu-py310/typer-0.28.0-py3-none-any.whl                                                                       #    0.12 MB  transformers
+pkgs/rtx5090-ubuntu-py310/zstandard-0.25.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                         #    5.30 MB  scripts (.zst files, make_test_corpus.py)
+
+[h200-ubuntu-py312]  pkgs/h200-ubuntu-py312/  28 wheels, 32.4 MB
+pkgs/h200-ubuntu-py312/annotated_doc-0.0.5-py3-none-any.whl                                                                   #    0.01 MB  typer
+pkgs/h200-ubuntu-py312/anyio-4.16.0-py3-none-any.whl                                                                          #    0.13 MB  httpx2
+pkgs/h200-ubuntu-py312/click-8.5.1-py3-none-any.whl                                                                           #    0.12 MB  typer
+pkgs/h200-ubuntu-py312/h11-0.16.0-py3-none-any.whl                                                                            #    0.04 MB  httpcore2
+pkgs/h200-ubuntu-py312/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    4.09 MB  huggingface_hub
+pkgs/h200-ubuntu-py312/httpcore2-2.14.0-py3-none-any.whl                                                                      #    0.08 MB  httpx2
+pkgs/h200-ubuntu-py312/httpx2-2.14.0-py3-none-any.whl                                                                         #    0.09 MB  huggingface_hub
+pkgs/h200-ubuntu-py312/huggingface_hub-2.4.0-py3-none-any.whl                                                                 #    0.82 MB  transformers
+pkgs/h200-ubuntu-py312/idna-3.20-py3-none-any.whl                                                                             #    0.07 MB  anyio
+pkgs/h200-ubuntu-py312/markdown_it_py-4.2.0-py3-none-any.whl                                                                  #    0.09 MB  rich
+pkgs/h200-ubuntu-py312/mdurl-0.1.2-py3-none-any.whl                                                                           #    0.01 MB  markdown_it_py
+pkgs/h200-ubuntu-py312/orjson-3.13.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                               #    0.12 MB  scripts (optional, faster JSON)
+pkgs/h200-ubuntu-py312/packaging-26.3-py3-none-any.whl                                                                        #    0.12 MB  transformers (often already installed)
+pkgs/h200-ubuntu-py312/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl                                                    #    0.33 MB  scripts (tokenizer fallback)
+pkgs/h200-ubuntu-py312/pyahocorasick-2.3.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                         #    0.11 MB  scripts (optional, faster keyword search)
+pkgs/h200-ubuntu-py312/pygments-2.21.0-py3-none-any.whl                                                                       #    1.19 MB  rich
+pkgs/h200-ubuntu-py312/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl          #    0.77 MB  transformers (often already installed)
+pkgs/h200-ubuntu-py312/regex-2026.9.29-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl       #    0.77 MB  transformers
+pkgs/h200-ubuntu-py312/rich-15.0.0-py3-none-any.whl                                                                           #    0.30 MB  typer
+pkgs/h200-ubuntu-py312/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                            #    0.49 MB  transformers
+pkgs/h200-ubuntu-py312/sentencepiece-0.2.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl                        #    1.64 MB  scripts (tokenizer fallback)
+pkgs/h200-ubuntu-py312/shellingham-1.5.4-py2.py3-none-any.whl                                                                 #    0.01 MB  typer
+pkgs/h200-ubuntu-py312/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                            #    3.24 MB  transformers
+pkgs/h200-ubuntu-py312/tqdm-4.70.1-py3-none-any.whl                                                                           #    0.08 MB  transformers (often already installed)
+pkgs/h200-ubuntu-py312/transformers-5.20.2-py3-none-any.whl                                                                   #   12.25 MB  scripts (models)
+pkgs/h200-ubuntu-py312/truststore-0.10.5-py3-none-any.whl                                                                     #    0.02 MB  httpx2
+pkgs/h200-ubuntu-py312/typer-0.28.0-py3-none-any.whl                                                                          #    0.12 MB  transformers
+pkgs/h200-ubuntu-py312/zstandard-0.25.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                            #    5.29 MB  scripts (.zst files, make_test_corpus.py)

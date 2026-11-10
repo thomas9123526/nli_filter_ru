@@ -6,14 +6,23 @@
 | | `01_nli_models.ps1` | `nli_models.py` commands (list, check, score) |
 | | `02_nli_filter.ps1` | `nli_filter.py` commands |
 | | `windows.md` | Summary of the three scripts above |
+| | `single_model.md` | Use one model on its own (filter without the judge, or score text directly) |
+| | `country_hypotheses.md` | Change or add countries, keywords, hypotheses, language names, labels |
+| | `remote_corpus.md` | Filter a corpus that is on FTP / SFTP / S3 (MinIO): rclone copy or mount, upload results |
+| | `germany_big_keywords.md` | Example: Germany with a 10,000+ keyword list, commands for each purpose |
+| | `offline_wheels.md` | Which wheels each machine needs (`pkgs/`), offline install, transformers 4.x vs 5.x |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
 | | `h200_readiness.md` | Review of the scripts for multi-GPU runs |
 | `testing/` | `test_corpus.md` | Make and filter `test_corpus` (`make_test_corpus.py`) |
 | | `tests.md` | Run the pytest suites |
+| | `germany_test.md` | Step-by-step Germany test: test files, runs, viewer, result folders |
 | `viewer/` | `viewer.md` | Start and use the result viewer |
 | | `viewer_report.md` | Overnight report: what the viewer does, tests, fixes |
+| | `check_results.md` | Check a filter run in the viewer; running `start_viewer.ps1` on Windows 10/11 |
+| | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |
+| | `how_it_works.md` | How keywords, country, hypotheses and models decide a line; what the output files contain |
 
 Run every command from the project folder `D:\hkc\nli_filter2`, not from `cmds`.

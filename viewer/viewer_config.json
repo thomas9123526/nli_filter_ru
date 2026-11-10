@@ -9,8 +9,8 @@
       "name": "test_corpus",
       "title": "Test corpus (Russia, ModernBERT + DeBERTa judge)",
       "description": "make_test_corpus.py output (5 folders x 3 sub folders of .zst files) filtered with nli_filter.py",
-      "corpus": "../test_corpus",
-      "output": "../out_test_corpus"
+      "corpus": "../test_corpus_de",
+      "output": "../out_test_corpus_de"
     }
   ]
 }

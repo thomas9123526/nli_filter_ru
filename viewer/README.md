@@ -3,7 +3,7 @@
 Pick any line of an `nli_filter.py` run and see its decision **next to the original corpus line**: the text
 with the keyword hits and NLI windows highlighted, the hypotheses, the fast / judge / final scores, the
 thresholds, the models, and a plain-language reason why it was kept or filtered. Nothing has to be
-decompressed by hand. Corpus and results can be on local disk, FTP(S) or S3 / MinIO.
+decompressed by hand. Corpus and results can be on local disk, FTP(S), SFTP or S3 / MinIO.
 
 ```
  Browser ──> Next.js UI (static files, served by the backend)
@@ -14,7 +14,7 @@ decompressed by hand. Corpus and results can be on local disk, FTP(S) or S3 / Mi
              │
            lines (jump to line N of .jsonl/.gz/.zst/.zip; disk cache + offset index + SQLite)
              │
-           storage (local | ftp:// | s3:// | minio://)
+           storage (local | ftp:// | sftp:// | s3:// | minio://)
 ```
 
 ## Start
@@ -69,6 +69,7 @@ A dataset = one `nli_filter.py` output folder + the corpus folder it was made fr
 |---|---|
 | Local folder | `D:\data\corpus`, `/data/corpus`, `../relative/to/config`, `file:///data/corpus` |
 | FTP / FTPS | `ftp://user:password@host:21/path`, `ftps://...` (special characters in the password: URL-encode, e.g. `@` = `%40`) |
+| SFTP (SSH) | `sftp://user@host:22/absolute/path` or `sftp://user@host/~/below/login/folder`; `"password"` or `"key_file"` (+ `"passphrase"`) in `*_options`; neither = SSH agent / `~/.ssh` keys. `"host_key_check"`: `warn` (default, unknown host keys accepted and logged), `strict` (host must be in `~/.ssh/known_hosts` or `"known_hosts"`), `off` |
 | MinIO | `minio://host:9000/bucket/prefix` (http), `minios://...` (https), keys in `*_options` |
 | S3 / other S3-compatible | `s3://bucket/prefix?region=eu-west-1`, `s3://bucket/prefix?endpoint=http://host:9000`; keys in `*_options` or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` |
 
@@ -131,7 +132,7 @@ Measured on the development PC (i7-8700K, local disk) with one corpus file of 10
 | Any further record, with prev / next navigation | 10 ms |
 | Threshold simulation with a 10-step sweep | 0.7 s |
 
-Over FTP or S3 the first look also includes the download.
+Over FTP, SFTP or S3 the first look also includes the download.
 
 ## API
 
@@ -161,7 +162,7 @@ writes the static UI to `frontend/out`, which the backend serves.
 ## Tests
 
 ```powershell
-cd viewer\backend; .venv\Scripts\python.exe -m pytest      # 45 tests: storages (real FTP + S3 servers), lines,
+cd viewer\backend; .venv\Scripts\python.exe -m pytest      # 52 tests: storages (real FTP, SFTP + S3 servers), lines,
                                                            # results, API, and the built UI in headless Chrome
 .venv\Scripts\python.exe -m pytest -k "not ui"             # without the browser test (~30 s instead of ~3 min)
 cd viewer\frontend; npm run typecheck; npm run build
@@ -171,7 +172,7 @@ cd viewer\frontend; npm run typecheck; npm run build
 
 | Path | Content |
 |---|---|
-| `backend/nli_viewer/storage.py` | Local / FTP / S3 storage, `open_storage(uri)` |
+| `backend/nli_viewer/storage.py` | Local / FTP / SFTP / S3 storage, `open_storage(uri)` |
 | `backend/nli_viewer/lines.py` | `LineFile` (line N of any file), `LineCache` |
 | `backend/nli_viewer/results.py` | `Dataset`, `DecisionIndex` (SQLite), file matching |
 | `backend/nli_viewer/explain.py` | highlight segments, score tables, verdict text |

@@ -17,3 +17,6 @@ viewer/frontend/*.tsbuildinfo
 viewer/.viewer_cache/
 .viewer_cache/
 test_corpus**
+out_test_corpus**
+out**
+pkgs/**

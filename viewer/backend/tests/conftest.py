@@ -151,6 +151,94 @@ def ftp_server(tree):
 
 
 @pytest.fixture(scope="session")
+def sftp_server(tree):
+    """Read-only SFTP server (paramiko) serving `tree`; login reader / s3cret. Yields 'sftp://reader:s3cret@host:port'."""
+    import paramiko
+    from paramiko import SFTPAttributes, SFTPHandle, SFTPServer, SFTPServerInterface
+
+    root = str(tree)
+
+    class Auth(paramiko.ServerInterface):
+        def check_auth_password(self, username, password):
+            ok = (username, password) == ("reader", "s3cret")
+            return paramiko.AUTH_SUCCESSFUL if ok else paramiko.AUTH_FAILED
+
+        def get_allowed_auths(self, username):
+            return "password"
+
+        def check_channel_request(self, kind, chanid):
+            return paramiko.OPEN_SUCCEEDED
+
+    class Handle(SFTPHandle):
+        def stat(self):
+            return SFTPAttributes.from_stat(os.fstat(self.readfile.fileno()))
+
+    class Files(SFTPServerInterface):
+        def _real(self, path):
+            return root + self.canonicalize(path)
+
+        def list_folder(self, path):
+            try:
+                folder = self._real(path)
+                out = []
+                for name in os.listdir(folder):
+                    a = SFTPAttributes.from_stat(os.stat(os.path.join(folder, name)))
+                    a.filename = name
+                    out.append(a)
+                return out
+            except OSError as e:
+                return SFTPServer.convert_errno(e.errno)
+
+        def stat(self, path):
+            try:
+                return SFTPAttributes.from_stat(os.stat(self._real(path)))
+            except OSError as e:
+                return SFTPServer.convert_errno(e.errno)
+
+        lstat = stat
+
+        def open(self, path, flags, attr):
+            try:
+                f = open(self._real(path), "rb")
+            except OSError as e:
+                return SFTPServer.convert_errno(e.errno)
+            h = Handle(flags)
+            h.filename, h.readfile = path, f
+            return h
+
+    host_key = paramiko.RSAKey.generate(2048)
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    sock.listen(20)
+    sock.settimeout(0.5)
+    port = sock.getsockname()[1]
+    stop = threading.Event()
+    transports = []
+
+    def serve():
+        while not stop.is_set():
+            try:
+                conn, _ = sock.accept()
+            except OSError:
+                continue
+            t = paramiko.Transport(conn)
+            t.add_server_key(host_key)
+            t.set_subsystem_handler("sftp", SFTPServer, Files)
+            try:
+                t.start_server(server=Auth())
+            except (paramiko.SSHException, EOFError, OSError):
+                continue
+            transports.append(t)
+
+    threading.Thread(target=serve, daemon=True).start()
+    yield f"sftp://reader:s3cret@127.0.0.1:{port}"
+    stop.set()
+    for t in transports:
+        t.close()
+    sock.close()
+
+
+@pytest.fixture(scope="session")
 def s3_server(tree):
     from moto.server import ThreadedMotoServer
     import boto3

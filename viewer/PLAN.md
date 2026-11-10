@@ -62,3 +62,8 @@ gives the same answers in a terminal.
 - Rewritten output files (nli_filter.py --overwrite while the viewer runs) are re-indexed automatically.
 - Datasets page probes every server in parallel (5 s limit) and shows why one is unavailable.
 - Narrow screens: grid items no longer overflow.
+
+## Added later
+
+- SFTP storage (`sftp://`, paramiko): password, key file or SSH agent; host key check warn / strict / off;
+  reconnects after a dropped connection. Tested against a local paramiko SFTP server (52 tests).

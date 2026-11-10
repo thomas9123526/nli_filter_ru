@@ -3,20 +3,27 @@ import json
 import pytest
 
 from nli_viewer.lines import LineCache, LineFile
-from nli_viewer.storage import FTPStorage, LocalStorage, S3Storage, clean_path, open_storage
+from nli_viewer.storage import FTPStorage, LocalStorage, S3Storage, SFTPStorage, StorageError, clean_path, open_storage
+
+KINDS = ["local", "ftp", "sftp", "s3"]
 
 
-def storages(tree, ftp_server, s3_server):
-    return {
-        "local": open_storage(str(tree)),
-        "ftp": open_storage(ftp_server + "/"),
-        "s3": open_storage(f"s3://nli/data?endpoint={s3_server}", access_key="test", secret_key="test"),
-    }
+@pytest.fixture
+def storages(tree, ftp_server, sftp_server, s3_server):
+    def make(kind):
+        if kind == "local":
+            return open_storage(str(tree))
+        if kind == "ftp":
+            return open_storage(ftp_server + "/")
+        if kind == "sftp":
+            return open_storage(sftp_server + "/", host_key_check="off")
+        return open_storage(f"s3://nli/data?endpoint={s3_server}", access_key="test", secret_key="test")
+    return make
 
 
-@pytest.mark.parametrize("kind", ["local", "ftp", "s3"])
-def test_list_walk_stat_open(kind, tree, ftp_server, s3_server):
-    st = storages(tree, ftp_server, s3_server)[kind]
+@pytest.mark.parametrize("kind", KINDS)
+def test_list_walk_stat_open(kind, tree, storages):
+    st = storages(kind)
     names = [e.name for e in st.list("")]
     assert names[:2] == ["corpus", "out"]
     files = [e.path for e in st.walk("corpus")]
@@ -32,10 +39,10 @@ def test_list_walk_stat_open(kind, tree, ftp_server, s3_server):
     st.close()
 
 
-@pytest.mark.parametrize("kind", ["local", "ftp", "s3"])
+@pytest.mark.parametrize("kind", KINDS)
 @pytest.mark.parametrize("rel", ["a/x.jsonl.zst", "a/y.jsonl.gz", "b/z.jsonl", "c/w.zip"])
-def test_line_access_every_format(kind, rel, tree, ftp_server, s3_server, tmp_path):
-    st = storages(tree, ftp_server, s3_server)[kind]
+def test_line_access_every_format(kind, rel, storages, tmp_path):
+    st = storages(kind)
     lf = LineFile(st, "corpus/" + rel, member="w1.jsonl" if rel.endswith(".zip") else None,
                   cache=LineCache(str(tmp_path / "cache")))
     assert len(lf) == 5
@@ -105,12 +112,39 @@ def test_open_storage_uris(tmp_path):
     s = open_storage("minio://key:secret@minio.lan:9000/bucket/pre/fix")
     assert isinstance(s, S3Storage) and s.bucket == "bucket" and s.prefix == "pre/fix"
     assert s.endpoint_url == "http://minio.lan:9000" and "secret" not in s.display_uri
+    p = open_storage("sftp://bob:p%40ss@ssh.lan/data/corpus")
+    assert isinstance(p, SFTPStorage) and p.port == 22 and p.user == "bob" and p.password == "p@ss"
+    assert p.root == "/data/corpus" and "p@ss" not in p.display_uri and ":***@" in p.display_uri
+    assert open_storage("sftp://bob@ssh.lan:2222/~/corpus").root == "corpus"
+    assert open_storage("sftp://bob@ssh.lan").root == "."
+    k = open_storage("sftp://bob@ssh.lan/x", base_dir=str(tmp_path), key_file="keys/id_ed25519")
+    assert k.key_file == str(tmp_path / "keys" / "id_ed25519") and k.password is None
+    with pytest.raises(ValueError):
+        open_storage("sftp://bob@ssh.lan/x", host_key_check="maybe")
     with pytest.raises(ValueError):
         open_storage("gopher://x/y")
 
 
 def test_wrong_ftp_password(tree, ftp_server):
-    from nli_viewer.storage import StorageError
     bad = ftp_server.replace("s3cret", "wrong")
     with pytest.raises(StorageError):
         open_storage(bad + "/").list("")
+
+
+def test_wrong_sftp_password_and_strict_host_key(tree, sftp_server, tmp_path):
+    with pytest.raises(StorageError, match="login"):
+        open_storage(sftp_server.replace("s3cret", "wrong") + "/", host_key_check="off").list("")
+    # the test server's key is in no known_hosts file, so 'strict' must refuse it
+    empty = tmp_path / "known_hosts"
+    empty.write_text("")
+    with pytest.raises(StorageError):
+        open_storage(sftp_server + "/", host_key_check="strict", known_hosts=str(empty)).list("")
+
+
+def test_sftp_reconnects_after_drop(tree, sftp_server):
+    st = open_storage(sftp_server + "/", host_key_check="off")
+    assert [e.name for e in st.list("")][:2] == ["corpus", "out"]
+    st._ssh.get_transport().close()  # connection lost (server restart, idle timeout ...)
+    assert st.read_bytes("corpus/b/z.jsonl") == (tree / "corpus/b/z.jsonl").read_bytes()
+    assert st.stat("corpus/a").is_dir
+    st.close()

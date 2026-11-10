@@ -19,6 +19,18 @@
       "output": "ftp://reader:${FTP_PASSWORD}@ftp.example.lan:21/nli_out"
     },
     {
+      // SFTP (SSH): corpus on an SSH server, results on local disk.
+      // Path after the host: absolute (/data/corpus) or below the login folder (/~/corpus).
+      // Log in with "password", or "key_file" (+ "passphrase" if the key has one); with neither, the
+      // SSH agent / ~/.ssh keys are tried. host_key_check: warn (default) | strict | off
+      "name": "corpus_sftp",
+      "title": "Full corpus (SFTP)",
+      "corpus": "sftp://reader@ssh.example.lan:22/data/corpus",
+      "output": "../out_corpus",
+      "corpus_options": {"password": "${SFTP_PASSWORD}"}
+      // or: "corpus_options": {"key_file": "C:/Users/me/.ssh/id_ed25519", "passphrase": "${SFTP_KEY_PASSPHRASE}"}
+    },
+    {
       // MinIO: minio://host:port/bucket/prefix (http), minios:// for https
       "name": "corpus_minio",
       "title": "Full corpus (MinIO)",
