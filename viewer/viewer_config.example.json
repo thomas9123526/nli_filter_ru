@@ -1,0 +1,41 @@
+{
+  // Copy to viewer_config.json and edit. Paths are relative to this file; ${VAR} = environment variable.
+  "cache_dir": ".viewer_cache",          // decompressed copies + indexes; can grow to cache_max_gb
+  "cache_max_gb": 20,
+  "cors_origins": ["http://localhost:3000"],   // only needed when the UI runs on another port (npm run dev)
+  "datasets": [
+    {
+      // local disk (Windows or Linux path)
+      "name": "test_corpus",
+      "title": "Test corpus (local disk)",
+      "corpus": "../test_corpus",
+      "output": "../out_test_corpus"
+    },
+    {
+      // FTP: user and password in the URI or in *_options; ftps:// for FTP over TLS
+      "name": "corpus_ftp",
+      "title": "Full corpus (FTP)",
+      "corpus": "ftp://reader:${FTP_PASSWORD}@ftp.example.lan:21/corpus",
+      "output": "ftp://reader:${FTP_PASSWORD}@ftp.example.lan:21/nli_out"
+    },
+    {
+      // MinIO: minio://host:port/bucket/prefix (http), minios:// for https
+      "name": "corpus_minio",
+      "title": "Full corpus (MinIO)",
+      "corpus": "minio://minio.example.lan:9000/corpus/common-crawl",
+      "output": "minio://minio.example.lan:9000/nli-out/run-2026-11",
+      "corpus_options": {"access_key": "${MINIO_ACCESS_KEY}", "secret_key": "${MINIO_SECRET_KEY}"},
+      "output_options": {"access_key": "${MINIO_ACCESS_KEY}", "secret_key": "${MINIO_SECRET_KEY}"}
+    },
+    {
+      // AWS S3 (credentials from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY or ~/.aws), any S3-compatible
+      // endpoint with ?endpoint=...
+      "name": "corpus_s3",
+      "corpus": "s3://my-bucket/corpus?region=eu-west-1",
+      "output": "s3://my-bucket/nli_out?region=eu-west-1",
+      // the line text / id fields, when they are not the ones nli_filter.py used
+      "text_field": "text",
+      "id_field": "id"
+    }
+  ]
+}

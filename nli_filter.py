@@ -348,11 +348,14 @@ class WindowBuilder:
         self.max_windows = max_windows
 
     @staticmethod
-    def _snap(text: str, s: int, e: int, slack: int = 40) -> Tuple[int, int]:
-        if s > 0:
+    def _snap(text: str, s: int, e: int, slack: int = 40, lo: int = 0, hi: Optional[int] = None) -> Tuple[int, int]:
+        """Move cut points to word boundaries, but never move an edge that already sits on lo / hi
+        (text start / end or a sentence boundary)."""
+        hi = len(text) if hi is None else hi
+        if s > lo:
             j = text.find(" ", s, s + slack)
             s = j + 1 if j >= 0 else s
-        if e < len(text):
+        if e < hi:
             j = text.rfind(" ", max(s + 1, e - slack), e)
             e = j if j > s else e
         return s, e
@@ -363,7 +366,7 @@ class WindowBuilder:
         s = max(lo, center - size // 2)
         e = min(hi, s + size)
         s = max(lo, e - size)
-        s, e = self._snap(text, s, e)
+        s, e = self._snap(text, s, e, lo=lo, hi=hi)
         return min(s, h.start), max(e, h.end)
 
     def check1(self, text: str, hits: List[Hit]) -> List[Tuple[int, int]]:

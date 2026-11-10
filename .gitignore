@@ -3,4 +3,17 @@ __pycache__
 *.pyc
 out_test/**
 out_test_corpus/**
+out_test_corpus2/**
+test_corpus/**
+test_corpus2/**
 *.zst
+
+# viewer (generated)
+viewer/backend/.venv/
+viewer/frontend/node_modules/
+viewer/frontend/.next/
+viewer/frontend/out/
+viewer/frontend/*.tsbuildinfo
+viewer/.viewer_cache/
+.viewer_cache/
+test_corpus**

@@ -1,0 +1,16 @@
+{
+  // Datasets shown by the viewer: an nli_filter.py output folder + the corpus it was made from.
+  // Paths are relative to this file. Remote examples: see viewer_config.example.json
+  "cache_dir": ".viewer_cache",
+  "cache_max_gb": 20,
+  "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+  "datasets": [
+    {
+      "name": "test_corpus",
+      "title": "Test corpus (Russia, ModernBERT + DeBERTa judge)",
+      "description": "make_test_corpus.py output (5 folders x 3 sub folders of .zst files) filtered with nli_filter.py",
+      "corpus": "../test_corpus",
+      "output": "../out_test_corpus"
+    }
+  ]
+}
