@@ -8,7 +8,7 @@ How to run `nli_models.py` and `nli_filter.py` on several GPUs.
 
 | What | Notes |
 |---|---|
-| `nli_models.py`, `nli_filter.py`, `run_shards.sh` | Keep them in the same folder; `chmod +x run_shards.sh` |
+| `nli_models.py`, `nli_filter.py`, `nli_storage.py`, `run_shards.sh` | Keep them in the same folder; `chmod +x run_shards.sh`. `nli_filter.py` needs `nli_storage.py` (corpus input from FTP / SFTP / S3) |
 | `models/` | The three model folders. If they are elsewhere, pass `--models-root /path/to/models` |
 | `test_russia.jsonl` | For the test run |
 | `pkgs/` | Offline Python packages (see step 2) |
@@ -17,6 +17,8 @@ How to run `nli_models.py` and `nli_filter.py` on several GPUs.
 
 Required: `torch 2.11.0+cu128`, `transformers 5.20.2` (see `pkgs/README.md`), NVIDIA driver **570 or newer**.
 Optional but recommended: `orjson`, `pyahocorasick`. Needed for `.zst` files: `zstandard`.
+Only for a corpus on a server: `paramiko` (`sftp://`), `boto3` (`s3://`, `minio://`); see `pkgs/whl_files.txt` and
+`cmds/setup/remote_corpus.md`.
 
 `zstandard` is **not in `pkgs/` yet**. On a machine with internet:
 

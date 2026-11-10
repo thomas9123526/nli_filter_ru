@@ -172,7 +172,7 @@ cd viewer\frontend; npm run typecheck; npm run build
 
 | Path | Content |
 |---|---|
-| `backend/nli_viewer/storage.py` | Local / FTP / SFTP / S3 storage, `open_storage(uri)` |
+| `backend/nli_viewer/storage.py` | Local / FTP / SFTP / S3 storage, `open_storage(uri)`: re-exports `nli_storage.py` from the project root (shared with `nli_filter.py`; copy it along when moving the viewer) |
 | `backend/nli_viewer/lines.py` | `LineFile` (line N of any file), `LineCache` |
 | `backend/nli_viewer/results.py` | `Dataset`, `DecisionIndex` (SQLite), file matching |
 | `backend/nli_viewer/explain.py` | highlight segments, score tables, verdict text |

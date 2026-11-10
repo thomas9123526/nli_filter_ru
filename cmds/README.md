@@ -8,7 +8,7 @@
 | | `windows.md` | Summary of the three scripts above |
 | | `single_model.md` | Use one model on its own (filter without the judge, or score text directly) |
 | | `country_hypotheses.md` | Change or add countries, keywords, hypotheses, language names, labels |
-| | `remote_corpus.md` | Filter a corpus that is on FTP / SFTP / S3 (MinIO): rclone copy or mount, upload results |
+| | `remote_corpus.md` | Filter a corpus that is on FTP / SFTP / S3 (MinIO): give `nli_filter.py` the server URL, or copy / mount with rclone |
 | | `germany_big_keywords.md` | Example: Germany with a 10,000+ keyword list, commands for each purpose |
 | | `offline_wheels.md` | Which wheels each machine needs (`pkgs/`), offline install, transformers 4.x vs 5.x |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
@@ -19,6 +19,7 @@
 | `viewer/` | `viewer.md` | Start and use the result viewer |
 | | `viewer_report.md` | Overnight report: what the viewer does, tests, fixes |
 | | `check_results.md` | Check a filter run in the viewer; running `start_viewer.ps1` on Windows 10/11 |
+| | `move_viewer.md` | Copy the viewer to another computer: what to copy, what to leave out |
 | | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
 | | `sftp_192.168.170.200.md` | Filter and view `test_corpus` on the SFTP server 192.168.170.200 |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |

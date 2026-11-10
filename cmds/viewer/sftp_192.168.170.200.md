@@ -2,46 +2,41 @@
 
 | | |
 |---|---|
-| Server | `sftp://192.168.170.200` (port 22), user `root` |
+| Server | `sftp://192.168.170.200` (port 22), user `download` |
 | Corpus | `/mnt/disk1/HKC_123/nli_filter2/test_corpus` |
-| Output | `/mnt/disk1/HKC_123/nli_filter2/out_test_corpus` |
+| Results | written to the PC: `D:\hkc\sftp_run\out_test_corpus` |
 
-The password is not written here: replace `PASSWORD` below, or keep it in the `SFTP_PASSWORD` environment
-variable.
+The password is not written here: it goes into the `SFTP_PASSWORD` environment variable (step 2), and the
+commands read it from there.
 
-`nli_filter.py` reads local files only, so the corpus is copied to the PC with rclone, filtered, and the
-results uploaded. The viewer then reads both over SFTP. General guide: `cmds\setup\remote_corpus.md`.
+`nli_filter.py` reads the corpus straight from the server (each file is downloaded while the previous one
+is filtered, then deleted) and writes the results locally. The viewer reads the corpus over SFTP and the
+results from the PC. General guide: `cmds\setup\remote_corpus.md`.
 
-## 1. Install rclone (once)
-
-Download `rclone-...-windows-amd64.zip` from https://rclone.org/downloads/ and unzip `rclone.exe` to
-`D:\hkc\tools`. Then:
+## 1. Install paramiko in the filter venv (once)
 
 ```powershell
-$env:Path += ";D:\hkc\tools"
-rclone config create hkc sftp host=192.168.170.200 user=root pass=PASSWORD
-rclone lsd hkc:/mnt/disk1/HKC_123/nli_filter2          # should list test_corpus and out_test_corpus
-```
-
-## 2. Copy the corpus, filter it, upload the results
-
-`D:\hkc\sftp_run` keeps this run apart from the local `test_corpus` / `out_test_corpus`.
-
-```powershell
-rclone copy hkc:/mnt/disk1/HKC_123/nli_filter2/test_corpus D:\hkc\sftp_run\test_corpus --progress
-
 cd D:\hkc\nli_filter2
 D:\hkc\nli_country_filter\.venv\Scripts\Activate.ps1
-python .\nli_filter.py D:\hkc\sftp_run\test_corpus --device cpu --write-split --output-dir D:\hkc\sftp_run\out_test_corpus
-
-rclone ls   hkc:/mnt/disk1/HKC_123/nli_filter2/out_test_corpus      # what is already there
-rclone copy D:\hkc\sftp_run\out_test_corpus hkc:/mnt/disk1/HKC_123/nli_filter2/out_test_corpus --progress
+pip install paramiko
 ```
 
+## 2. Filter the corpus from the server
+
+```powershell
+$env:SFTP_PASSWORD = "PASSWORD"
+python .\nli_filter.py 'sftp://download:${SFTP_PASSWORD}@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/test_corpus' --device cpu --write-split --output-dir D:\hkc\sftp_run\out_test_corpus
+```
+
+- Single quotes, so PowerShell passes `${SFTP_PASSWORD}` on; `nli_filter.py` fills it in.
 - `test_corpus` is the Russia test corpus; Russia is the default, so no `--country` is needed.
-- The default models (ModernBERT + DeBERTa judge) take several minutes on CPU; add `--judge-model none`
-  for a quicker run.
-- `rclone copy` **replaces** files that already exist in the server's `out_test_corpus`.
+- The default models (ModernBERT + DeBERTa judge) take several minutes on CPU; add `--judge-model none` for a
+  quicker run.
+- The first log line says how many files were found; the summary at the end should show 20 files.
+- A warning about the server's host key on the first connection is normal (the PC has not seen this server
+  before).
+- If a download fails three times the file is marked `failed` and the run goes on; run the same command
+  again and only the missing files are downloaded.
 
 ## 3. Viewer config
 
@@ -51,17 +46,15 @@ Add to the `"datasets"` list in `viewer\viewer_config.json` (comma after the pre
     {
       "name": "sftp_test_corpus",
       "title": "Test corpus on SFTP (192.168.170.200)",
-      "corpus": "sftp://root@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/test_corpus",
-      "output": "sftp://root@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/out_test_corpus",
-      "corpus_options": {"password": "${SFTP_PASSWORD}"},
-      "output_options": {"password": "${SFTP_PASSWORD}"}
+      "corpus": "sftp://download@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/test_corpus",
+      "output": "D:/hkc/sftp_run/out_test_corpus",
+      "corpus_options": {"password": "${SFTP_PASSWORD}"}
     }
 ```
 
-## 4. Check, then start the viewer (same PowerShell window)
+## 4. Check, then start the viewer (same PowerShell window as step 2)
 
 ```powershell
-$env:SFTP_PASSWORD = "PASSWORD"
 cd D:\hkc\nli_filter2\viewer\backend
 .venv\Scripts\python.exe -m nli_viewer check  --config ..\viewer_config.json
 .venv\Scripts\python.exe -m nli_viewer verify --config ..\viewer_config.json sftp_test_corpus
@@ -73,18 +66,19 @@ cd ..
 2. `verify`: every line is read over SFTP; all should be consistent.
 3. Open http://127.0.0.1:8000 and pick "Test corpus on SFTP".
 
+## Alternative: copy with rclone first
+
+For very long runs a local copy is the most robust; see `cmds\setup\remote_corpus.md` ("Alternative: copy
+(or mount) with rclone"), with `user=download`.
+
 ## If nli_filter2 is installed on the server itself
 
-Skip both `rclone copy` commands and filter there:
+Filter there with local paths, then use the server folder as both `corpus` and `output` in the viewer:
 
 ```bash
-ssh root@192.168.170.200
+ssh download@192.168.170.200
 cd /mnt/disk1/HKC_123/nli_filter2
 python nli_filter.py test_corpus --write-split --output-dir out_test_corpus
 ```
 
-Then steps 3 and 4 on the PC.
-
-## Security
-
-This is the root login. For the viewer (read-only) a separate read-only user on the server is safer.
+(`download` needs write access to that folder for this.)

@@ -56,6 +56,7 @@ import json
 import logging
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -818,15 +819,47 @@ class Record:
 
 
 class JsonlSource:
-    """One input file: .jsonl/.json/.ndjson, the same compressed with .gz or .zst, or a .zip of them."""
+    """
+    One input file: .jsonl/.json/.ndjson, the same compressed with .gz or .zst, or a .zip of them.
+    path may be a local path or a RemoteFile (nli_storage.expand_remote: a file on FTP / SFTP / S3), which is
+    streamed from the server (a .zip is downloaded to a temporary file first). local = an already downloaded
+    copy to read instead; Record.source still names path.
+    """
 
-    def __init__(self, path: PathLike):
+    def __init__(self, path: PathLike, local: Optional[PathLike] = None):
         self.path = str(path)
+        self.remote = path if hasattr(path, "storage") and local is None else None
+        self.local = str(local) if local is not None else None
+
+    @contextlib.contextmanager
+    def _open_raw(self) -> Iterator[BinaryIO]:
+        if self.remote is not None:
+            with self.remote.open() as fh:
+                yield fh
+        else:
+            with open(self.local or self.path, "rb") as fh:
+                yield fh
+
+    @contextlib.contextmanager
+    def _zip_path(self) -> Iterator[str]:
+        if self.remote is None:
+            yield self.local or self.path
+            return
+        import tempfile
+        from nli_storage import download
+        fd, tmp = tempfile.mkstemp(suffix=".zip", prefix="nli_")
+        os.close(fd)
+        try:
+            download(self.remote, tmp)
+            yield tmp
+        finally:
+            with contextlib.suppress(OSError):
+                os.remove(tmp)
 
     @contextlib.contextmanager
     def _open_members(self) -> Iterator[Iterator[Tuple[str, BinaryIO]]]:
         if self.path.lower().endswith(".zip"):
-            with zipfile.ZipFile(self.path) as zf:
+            with self._zip_path() as zpath, zipfile.ZipFile(zpath) as zf:
                 def members():
                     for info in zf.infolist():
                         if info.is_dir() or not _is_supported(info.filename) or info.filename.lower().endswith(".zip"):
@@ -835,7 +868,7 @@ class JsonlSource:
                             yield f"{self.path}!{info.filename}", fh
                 yield members()
         else:
-            with open(self.path, "rb") as raw, contextlib.closing(_decoded(self.path, raw)) as fh:
+            with self._open_raw() as raw, contextlib.closing(_decoded(self.path, raw)) as fh:
                 yield iter([(self.path, fh)])
 
     def records(self, parse: bool = True, limit: Optional[int] = None) -> Iterator[Record]:
@@ -863,14 +896,31 @@ class JsonlSource:
         return f"JsonlSource({self.path!r})"
 
 
+def _is_url(item: str) -> bool:
+    return bool(re.match(r"^(ftps?|sftp|s3|minios?)://", item, re.IGNORECASE))
+
+
 def expand_inputs(inputs: Union[PathLike, Sequence[PathLike]], recursive: bool = True) -> List[str]:
-    """Files, folders (searched recursively for supported files) and glob patterns -> sorted unique file list."""
+    """
+    Files, folders (searched recursively for supported files) and glob patterns -> sorted unique file list.
+    Server URLs (ftp:// ftps:// sftp:// s3:// minio://, see nli_storage.py) give RemoteFile items: a folder,
+    one file, or a pattern such as sftp://user:pw@host/data/corpus/**/*.zst.
+    """
     if isinstance(inputs, (str, os.PathLike)):
         inputs = [inputs]
     files: List[str] = []
     for item in inputs:
-        item = str(item)
-        if os.path.isdir(item):
+        if not isinstance(item, str) or not hasattr(item, "storage"):
+            item = str(item)
+        if hasattr(item, "storage"):  # already a RemoteFile
+            files.append(item)
+        elif _is_url(item):
+            try:
+                from nli_storage import expand_remote
+            except ImportError:
+                raise RuntimeError("server input needs nli_storage.py next to nli_models.py") from None
+            files.extend(expand_remote(item, _is_supported))
+        elif os.path.isdir(item):
             for root, dirs, names in os.walk(item):
                 dirs.sort()
                 files.extend(os.path.join(root, n) for n in sorted(names) if _is_supported(n))
@@ -887,7 +937,7 @@ def expand_inputs(inputs: Union[PathLike, Sequence[PathLike]], recursive: bool =
             raise FileNotFoundError(item)
     seen, out = set(), []
     for f in files:
-        key = os.path.normcase(os.path.abspath(f))
+        key = str(f) if hasattr(f, "storage") else os.path.normcase(os.path.abspath(f))
         if key not in seen:
             seen.add(key)
             out.append(f)

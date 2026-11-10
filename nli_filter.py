@@ -32,6 +32,11 @@ Examples
   python nli_filter.py corpus/ --device cuda --mode process --write-split --output-dir out/
   python nli_filter.py "shards/**/*.zst" --country China --keywords-file keywords/china.txt
   python nli_filter.py corpus/ --shard 0/4               # run 4 copies with 0/4 .. 3/4 on 4 machines
+  python nli_filter.py "sftp://user:${PW}@host/data/corpus" --output-dir out/   # corpus on a server
+
+Input on a server (ftp:// ftps:// sftp:// s3:// minio://, see nli_storage.py): every file is downloaded to
+--download-dir (default <output-dir>/.download) while the previous one is filtered, read from there and
+deleted; failed downloads are retried (--retries). Outputs are always written locally.
 """
 from __future__ import annotations
 
@@ -42,6 +47,7 @@ import contextlib
 import json
 import logging
 import os
+import posixpath
 import re
 import sys
 import threading
@@ -52,6 +58,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from nli_storage import StorageError, download, mask_uri  # noqa: E402
 from nli_models import (MODEL_SPECS, AtomicOutput, JsonlSource, NLIPool, Record, expand_inputs,  # noqa: E402
                         json_dumps, quiet_transformers, zstd_available)
 
@@ -683,10 +690,77 @@ def _chunks(it: Iterator[Record], size: int) -> Iterator[List[Record]]:
         yield buf
 
 
+def _layout(files: Sequence[str]) -> List[str]:
+    """Output path (relative, '/'-separated) of every input file: its path below the common input folder.
+    Files of one server input keep their path below the URL that was given (the corpus root for the viewer)."""
+    if not files:
+        return []
+    if all(hasattr(f, "storage") for f in files) and len({id(f.storage) for f in files}) == 1:
+        return [f.path for f in files]
+    keys = [f.layout_key if hasattr(f, "storage") else os.path.abspath(f).replace("\\", "/") for f in files]
+    try:
+        root = posixpath.commonpath([posixpath.dirname(k) for k in keys])
+    except ValueError:  # e.g. local and server files mixed
+        root = ""
+    return [posixpath.relpath(k, root) if root else k.replace(":", "").lstrip("/") for k in keys]
+
+
+class Prefetcher:
+    """
+    Downloads the server input files (RemoteFile) into a local folder, one file ahead: while file i is
+    filtered, file i + 1 is downloaded. get(i) waits for file i and returns its local path; release() deletes
+    it. Only files with needed[i] are downloaded (finished files of an earlier run are skipped).
+    """
+
+    def __init__(self, files: Sequence[str], needed: Sequence[bool], folder: Path, retries: int = 3, ahead: int = 1):
+        self.files, self.needed, self.folder, self.retries, self.ahead = files, needed, Path(folder), retries, ahead
+        self.folder.mkdir(parents=True, exist_ok=True)
+        self.pool = ThreadPoolExecutor(1, thread_name_prefix="download")
+        self.futures: Dict[int, Any] = {}
+
+    def _start(self, i: int) -> None:
+        if i < len(self.files) and self.needed[i] and hasattr(self.files[i], "storage") and i not in self.futures:
+            self.futures[i] = self.pool.submit(self._fetch, i)
+
+    def _fetch(self, i: int) -> str:
+        rf = self.files[i]
+        dest = str(self.folder / f"{i:06d}-{posixpath.basename(rf.path)}")
+        t0 = time.perf_counter()
+        size = download(rf, dest, retries=self.retries)
+        log.info("downloaded %s (%.1f MB, %.1fs)", rf, size / 1e6, time.perf_counter() - t0)
+        return dest
+
+    def get(self, i: int) -> Optional[str]:
+        self._start(i)
+        for j in range(i + 1, i + 1 + self.ahead):
+            self._start(j)
+        fut = self.futures.pop(i, None)
+        return fut.result() if fut is not None else None
+
+    def release(self, local: str) -> None:
+        with contextlib.suppress(OSError):
+            os.remove(local)
+
+    def close(self) -> None:
+        for fut in self.futures.values():
+            fut.cancel()
+        self.pool.shutdown(wait=True)
+        for fut in self.futures.values():
+            if fut.done() and not fut.cancelled() and fut.exception() is None:
+                self.release(fut.result())
+        self.futures.clear()
+        for p in self.folder.glob("*.part"):
+            with contextlib.suppress(OSError):
+                p.unlink()
+        with contextlib.suppress(OSError):
+            self.folder.rmdir()  # only when empty
+
+
 class FilterRunner:
     def __init__(self, line_filter: LineFilter, output_dir: Path, compress: str = "none", write_split: bool = False,
                  decisions: str = "all", chunk_lines: int = 512, inflight: int = 2, limit: Optional[int] = None,
-                 overwrite: bool = False, progress_seconds: float = 10.0):
+                 overwrite: bool = False, progress_seconds: float = 10.0, retries: int = 3,
+                 download_dir: Optional[Path] = None):
         self.f = line_filter
         self.output_dir = output_dir
         self.compress = compress
@@ -699,6 +773,9 @@ class FilterRunner:
         self.progress_seconds = progress_seconds
         self.total = RunStats()
         self.files: List[Dict[str, Any]] = []
+        self.failed = 0
+        self.retries = retries
+        self.download_dir = download_dir or output_dir / ".download"
         self._seen = 0
         self._t0 = time.perf_counter()
         self._last_progress = self._t0
@@ -710,20 +787,48 @@ class FilterRunner:
         return {"zst": ".zst", "gz": ".gz", "none": ""}[self.compress]
 
     def run(self, files: List[str]) -> None:
-        root = os.path.commonpath([os.path.dirname(os.path.abspath(f)) for f in files]) if files else ""
+        bases = [self.output_dir / os.path.dirname(rel) / _stem(os.path.basename(rel)) for rel in _layout(files)]
+        needed = [self.overwrite or not self._done(b) for b in bases]
+        fetch = Prefetcher(files, needed, self.download_dir, self.retries) if any(
+            hasattr(f, "storage") for f in files) else None
         executor = ThreadPoolExecutor(self.inflight, thread_name_prefix="chunk") if self.inflight > 1 else None
         try:
-            for path in files:
+            for i, (path, base) in enumerate(zip(files, bases)):
                 if self.limit is not None and self._seen >= self.limit:
                     break
-                rel = os.path.relpath(os.path.abspath(path), root)
-                base = self.output_dir / os.path.dirname(rel) / _stem(os.path.basename(rel))
-                self._run_file(path, base, executor)
+                local = None
+                if fetch is not None and needed[i]:
+                    try:
+                        local = fetch.get(i)
+                    except Exception as exc:  # download failed after the retries: go on with the other files
+                        self.failed += 1
+                        self.files.append({"input": path, "status": f"failed: {exc}", "lines": 0, "filtered": 0,
+                                           "seconds": None})
+                        log.error("skip %s: %s", path, exc)
+                        continue
+                try:
+                    self._run_file(path, base, executor, local)
+                finally:
+                    if local:
+                        fetch.release(local)
         finally:
             if executor:
                 executor.shutdown(wait=True)
+            if fetch:
+                fetch.close()
 
-    def _run_file(self, path: str, base: Path, executor: Optional[ThreadPoolExecutor]) -> None:
+    def _done(self, base: Path) -> bool:
+        p = Path(f"{base}.summary.json")
+        if not p.exists():
+            return False
+        try:
+            with open(p, encoding="utf-8") as fh:
+                return bool(json.load(fh).get("complete", True))
+        except (OSError, ValueError):
+            return False
+
+    def _run_file(self, path: str, base: Path, executor: Optional[ThreadPoolExecutor],
+                  local: Optional[str] = None) -> None:
         summary_path = Path(f"{base}.summary.json")
         if summary_path.exists() and not self.overwrite:
             with open(summary_path, encoding="utf-8") as fh:
@@ -743,7 +848,7 @@ class FilterRunner:
         def limited_records() -> Iterator[Record]:
             """All lines of the file, or the first `remaining`; notes whether the limit cut the file short."""
             nonlocal truncated
-            for i, rec in enumerate(JsonlSource(path).records()):
+            for i, rec in enumerate(JsonlSource(path, local=local).records()):
                 if remaining is not None and i >= remaining:
                     truncated = True
                     return
@@ -969,6 +1074,10 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--compress", choices=["auto", "zst", "gz", "none"], default="auto",
                    help="output compression (default auto = .zst if the input was compressed)")
     g.add_argument("--overwrite", action="store_true", help="redo files that already have a .summary.json")
+    g.add_argument("--retries", type=int, default=3,
+                   help="server input: download attempts after the first one fails (default 3)")
+    g.add_argument("--download-dir", help="server input: folder for the downloaded files "
+                                          "(default <output-dir>/.download; one or two files at a time)")
     g.add_argument("--show", type=int, default=20, help="mistakes to print (default 20)")
     g.add_argument("--report", action="store_true",
                    help="no filtering: print the summary of --output-dir from its *.summary.json files "
@@ -1024,7 +1133,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         files = expand_inputs(inputs)
     except FileNotFoundError as exc:
-        print(f"error: input not found: {exc}", file=sys.stderr)
+        print(f"error: input not found: {mask_uri(exc)}", file=sys.stderr)
+        return 2
+    except (StorageError, ValueError, RuntimeError) as exc:
+        print(f"error: cannot read the input: {mask_uri(exc)}", file=sys.stderr)
         return 2
     if args.shard:
         k, _, n = args.shard.partition("/")
@@ -1080,7 +1192,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         runner = FilterRunner(line_filter, out_dir, args.compress, args.write_split, args.decisions,
-                              args.chunk_lines, inflight, args.limit, args.overwrite)
+                              args.chunk_lines, inflight, args.limit, args.overwrite, retries=args.retries,
+                              download_dir=Path(args.download_dir) if args.download_dir else None)
         log.warning("filtering %d file(s) for %s: fast %s, judge %s, mode %s, devices %s, inflight %d, keywords %d (%s)",
                     len(files), country, fast.name, judge.name if judge else "none", fast.mode,
                     ",".join(fast.devices), inflight, len(matcher.keywords), matcher.engine)
@@ -1113,7 +1226,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "files": runner.files,
         "stats": stats,
         "output_dir": str(out_dir),
-        "command": " ".join([Path(sys.argv[0]).name] + list(argv if argv is not None else sys.argv[1:])),
+        "command": mask_uri(" ".join([Path(sys.argv[0]).name] + list(argv if argv is not None else sys.argv[1:]))),
         "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     # one run summary per shard, so copies running side by side do not overwrite each other
@@ -1124,6 +1237,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.shard:
         print(f" shard summary: {out_dir / name}   (all shards together: python nli_filter.py --report "
               f"--output-dir {out_dir})")
+    if runner.failed:
+        print(f"error: {runner.failed} file(s) could not be downloaded (see 'files' in {out_dir / name}); "
+              f"run the same command again to retry them", file=sys.stderr)
+        return 1
     return 0
 
 
