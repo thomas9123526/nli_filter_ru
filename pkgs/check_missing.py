@@ -21,3 +21,16 @@ for name in NAMES:
         missing.append(name)
         print(f"  MISSING  {name}")
 print("\nCopy the wheels for:", " ".join(missing) if missing else "(nothing missing)")
+
+# optional: corpus input from a server (sftp:// needs paramiko, s3:// / minio:// need boto3; ftp:// nothing)
+OPTIONAL = {"sftp://": "paramiko bcrypt cryptography invoke pynacl cffi pycparser".split(),
+            "s3:// minio://": "boto3 botocore jmespath s3transfer python-dateutil six urllib3".split()}
+print("\nOptional, only for a corpus on a server (see the end of whl_files_need.txt):")
+for what, names in OPTIONAL.items():
+    gone = []
+    for name in names:
+        try:
+            md.version(name)
+        except md.PackageNotFoundError:
+            gone.append(name)
+    print(f"  {what:<15}", "all installed" if not gone else "missing: " + " ".join(gone))

@@ -21,13 +21,11 @@
 # (Windows py312 = the py310 list with cp312 wheels instead of cp310, minus exceptiongroup and tomli, which only Python < 3.11 needs.)
 #
 # Optional, only for a corpus on a server (nli_filter.py / nli_models.py with sftp:// or s3:// / minio:// input;
-# ftp:// needs nothing extra). NOT in pkgs yet. Tested with paramiko 5.1.0, boto3 1.43.126:
+# ftp:// needs nothing extra). Downloaded 2026-11-10 into pkgs/<machine>/ (14 wheels each, about 22-24 MB),
+# listed at the end of whl_files_need.txt. Versions: paramiko 5.1.0, boto3 1.43.126.
 #   sftp://  paramiko + bcrypt, cryptography, invoke, pynacl, cffi, pycparser
 #   s3://    boto3 + botocore, jmespath, s3transfer, python-dateutil, six, urllib3
-# Download on a machine with internet (repeat per platform / Python version as above):
-#   pip download paramiko==5.1.0 boto3==1.43.126 --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -d pkgs/linux
-#   pip download paramiko==5.1.0 boto3==1.43.126 --only-binary=:all: --platform win_amd64 --python-version 3.10 -d pkgs/windows
-# Install: pip install --no-index --find-links pkgs/linux paramiko boto3
+# Install: pip install --no-index --find-links pkgs/<machine> paramiko boto3
 #
 # Install offline (from the folder that holds pkgs/), e.g. on the H200 machine:
 #   pip install --no-index --find-links pkgs/linux torch==2.11.0+cu128 transformers==5.20.2 orjson pyahocorasick zstandard sentencepiece protobuf

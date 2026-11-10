@@ -8,6 +8,7 @@
 | | `windows.md` | Summary of the three scripts above |
 | | `single_model.md` | Use one model on its own (filter without the judge, or score text directly) |
 | | `country_hypotheses.md` | Change or add countries, keywords, hypotheses, language names, labels |
+| | `run_sftp_test_corpus.md` | Run `nli_filter.py` on `test_corpus` straight from the SFTP server 192.168.170.200 |
 | | `remote_corpus.md` | Filter a corpus that is on FTP / SFTP / S3 (MinIO): give `nli_filter.py` the server URL, or copy / mount with rclone |
 | | `germany_big_keywords.md` | Example: Germany with a 10,000+ keyword list, commands for each purpose |
 | | `offline_wheels.md` | Which wheels each machine needs (`pkgs/`), offline install, transformers 4.x vs 5.x |

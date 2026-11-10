@@ -18,7 +18,7 @@ results from the PC. General guide: `cmds\setup\remote_corpus.md`.
 ```powershell
 cd D:\hkc\nli_filter2
 D:\hkc\nli_country_filter\.venv\Scripts\Activate.ps1
-pip install paramiko
+pip install --no-index --find-links D:\hkc\nli_filter2\pkgs\rtx5090-windows-py310 paramiko
 ```
 
 ## 2. Filter the corpus from the server

@@ -136,3 +136,76 @@ pkgs/h200-ubuntu-py312/transformers-5.20.2-py3-none-any.whl                     
 pkgs/h200-ubuntu-py312/truststore-0.10.5-py3-none-any.whl                                                                     #    0.02 MB  httpx2
 pkgs/h200-ubuntu-py312/typer-0.28.0-py3-none-any.whl                                                                          #    0.12 MB  transformers
 pkgs/h200-ubuntu-py312/zstandard-0.25.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                            #    5.29 MB  scripts (.zst files, make_test_corpus.py)
+
+# ---------------------------------------------------------------------------------------------------------
+# OPTIONAL: corpus on a server (nli_filter.py / nli_models.py with sftp:// or s3:// / minio:// input).
+# Not needed for local files or ftp:// / ftps://. Tested with paramiko 5.1.0, boto3 1.43.126 (2026-11-10).
+#   sftp://          paramiko bcrypt cryptography invoke pynacl cffi pycparser
+#   s3:// minio://   boto3 botocore jmespath s3transfer python_dateutil six urllib3
+# Install offline:
+#   pip install --no-index --find-links <folder with these wheels> paramiko boto3
+# Only SFTP: install just paramiko (its 7 wheels); only S3 / MinIO: just boto3 (its 7 wheels).
+
+[rtx5090-windows-py310-server-input]  pkgs/rtx5090-windows-py310/  14 wheels, 21.7 MB
+pkgs/rtx5090-windows-py310/bcrypt-5.0.0-cp39-abi3-win_amd64.whl                                                               #    0.15 MB  paramiko
+pkgs/rtx5090-windows-py310/boto3-1.43.126-py3-none-any.whl                                                                    #    0.14 MB  s3:// minio:// input
+pkgs/rtx5090-windows-py310/botocore-1.43.127-py3-none-any.whl                                                                 #   16.26 MB  boto3
+pkgs/rtx5090-windows-py310/cffi-2.1.1-cp310-cp310-win_amd64.whl                                                               #    0.19 MB  cryptography, pynacl
+pkgs/rtx5090-windows-py310/cryptography-50.0.2-cp39-abi3-win_amd64.whl                                                        #    3.85 MB  paramiko
+pkgs/rtx5090-windows-py310/invoke-3.0.3-py3-none-any.whl                                                                      #    0.16 MB  paramiko
+pkgs/rtx5090-windows-py310/jmespath-1.1.0-py3-none-any.whl                                                                    #    0.02 MB  boto3, botocore
+pkgs/rtx5090-windows-py310/paramiko-5.1.0-py3-none-any.whl                                                                    #    0.21 MB  sftp:// input
+pkgs/rtx5090-windows-py310/pycparser-3.11-py3-none-any.whl                                                                    #    0.05 MB  cffi
+pkgs/rtx5090-windows-py310/pynacl-1.6.2-cp38-abi3-win_amd64.whl                                                               #    0.24 MB  paramiko
+pkgs/rtx5090-windows-py310/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                   #    0.23 MB  botocore
+pkgs/rtx5090-windows-py310/s3transfer-0.19.3-py3-none-any.whl                                                                 #    0.09 MB  boto3
+pkgs/rtx5090-windows-py310/six-1.17.0-py2.py3-none-any.whl                                                                    #    0.01 MB  python_dateutil (often already installed)
+pkgs/rtx5090-windows-py310/urllib3-2.8.0-py3-none-any.whl                                                                     #    0.14 MB  botocore (often already installed)
+
+[windows-py312-server-input]  pkgs/windows-py312/  14 wheels, 21.7 MB
+pkgs/windows-py312/bcrypt-5.0.0-cp39-abi3-win_amd64.whl                                                                       #    0.15 MB  paramiko
+pkgs/windows-py312/boto3-1.43.126-py3-none-any.whl                                                                            #    0.14 MB  s3:// minio:// input
+pkgs/windows-py312/botocore-1.43.127-py3-none-any.whl                                                                         #   16.26 MB  boto3
+pkgs/windows-py312/cffi-2.1.1-cp312-cp312-win_amd64.whl                                                                       #    0.19 MB  cryptography, pynacl
+pkgs/windows-py312/cryptography-50.0.2-cp311-abi3-win_amd64.whl                                                               #    3.82 MB  paramiko
+pkgs/windows-py312/invoke-3.0.3-py3-none-any.whl                                                                              #    0.16 MB  paramiko
+pkgs/windows-py312/jmespath-1.1.0-py3-none-any.whl                                                                            #    0.02 MB  boto3, botocore
+pkgs/windows-py312/paramiko-5.1.0-py3-none-any.whl                                                                            #    0.21 MB  sftp:// input
+pkgs/windows-py312/pycparser-3.12-py3-none-any.whl                                                                            #    0.06 MB  cffi
+pkgs/windows-py312/pynacl-1.6.2-cp38-abi3-win_amd64.whl                                                                       #    0.24 MB  paramiko
+pkgs/windows-py312/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                           #    0.23 MB  botocore
+pkgs/windows-py312/s3transfer-0.19.3-py3-none-any.whl                                                                         #    0.09 MB  boto3
+pkgs/windows-py312/six-1.17.0-py2.py3-none-any.whl                                                                            #    0.01 MB  python_dateutil (often already installed)
+pkgs/windows-py312/urllib3-2.8.0-py3-none-any.whl                                                                             #    0.14 MB  botocore (often already installed)
+
+[rtx5090-ubuntu-py310-server-input]  pkgs/rtx5090-ubuntu-py310/  14 wheels, 24.0 MB
+pkgs/rtx5090-ubuntu-py310/bcrypt-5.0.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    0.28 MB  paramiko
+pkgs/rtx5090-ubuntu-py310/boto3-1.43.126-py3-none-any.whl                                                                     #    0.14 MB  s3:// minio:// input
+pkgs/rtx5090-ubuntu-py310/botocore-1.43.127-py3-none-any.whl                                                                  #   16.26 MB  boto3
+pkgs/rtx5090-ubuntu-py310/cffi-2.1.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    0.22 MB  cryptography, pynacl
+pkgs/rtx5090-ubuntu-py310/cryptography-50.0.2-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                        #    4.75 MB  paramiko
+pkgs/rtx5090-ubuntu-py310/invoke-3.0.3-py3-none-any.whl                                                                       #    0.16 MB  paramiko
+pkgs/rtx5090-ubuntu-py310/jmespath-1.1.0-py3-none-any.whl                                                                     #    0.02 MB  boto3, botocore
+pkgs/rtx5090-ubuntu-py310/paramiko-5.1.0-py3-none-any.whl                                                                     #    0.21 MB  sftp:// input
+pkgs/rtx5090-ubuntu-py310/pycparser-3.11-py3-none-any.whl                                                                     #    0.05 MB  cffi
+pkgs/rtx5090-ubuntu-py310/pynacl-1.6.2-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    1.40 MB  paramiko
+pkgs/rtx5090-ubuntu-py310/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                    #    0.23 MB  botocore
+pkgs/rtx5090-ubuntu-py310/s3transfer-0.19.3-py3-none-any.whl                                                                  #    0.09 MB  boto3
+pkgs/rtx5090-ubuntu-py310/six-1.17.0-py2.py3-none-any.whl                                                                     #    0.01 MB  python_dateutil (often already installed)
+pkgs/rtx5090-ubuntu-py310/urllib3-2.8.0-py3-none-any.whl                                                                      #    0.14 MB  botocore (often already installed)
+
+[h200-ubuntu-py312-server-input]  pkgs/h200-ubuntu-py312/  14 wheels, 23.9 MB
+pkgs/h200-ubuntu-py312/bcrypt-5.0.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    0.28 MB  paramiko
+pkgs/h200-ubuntu-py312/boto3-1.43.126-py3-none-any.whl                                                                        #    0.14 MB  s3:// minio:// input
+pkgs/h200-ubuntu-py312/botocore-1.43.127-py3-none-any.whl                                                                     #   16.26 MB  boto3
+pkgs/h200-ubuntu-py312/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    0.22 MB  cryptography, pynacl
+pkgs/h200-ubuntu-py312/cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                          #    4.72 MB  paramiko
+pkgs/h200-ubuntu-py312/invoke-3.0.3-py3-none-any.whl                                                                          #    0.16 MB  paramiko
+pkgs/h200-ubuntu-py312/jmespath-1.1.0-py3-none-any.whl                                                                        #    0.02 MB  boto3, botocore
+pkgs/h200-ubuntu-py312/paramiko-5.1.0-py3-none-any.whl                                                                        #    0.21 MB  sftp:// input
+pkgs/h200-ubuntu-py312/pycparser-3.12-py3-none-any.whl                                                                        #    0.06 MB  cffi
+pkgs/h200-ubuntu-py312/pynacl-1.6.2-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    1.40 MB  paramiko
+pkgs/h200-ubuntu-py312/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                       #    0.23 MB  botocore
+pkgs/h200-ubuntu-py312/s3transfer-0.19.3-py3-none-any.whl                                                                     #    0.09 MB  boto3
+pkgs/h200-ubuntu-py312/six-1.17.0-py2.py3-none-any.whl                                                                        #    0.01 MB  python_dateutil (often already installed)
+pkgs/h200-ubuntu-py312/urllib3-2.8.0-py3-none-any.whl                                                                         #    0.14 MB  botocore (often already installed)
