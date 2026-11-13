@@ -459,6 +459,7 @@ class FilterSettings:
     id_field: Optional[str] = "id"
     expect_field: Optional[str] = "expect"
     group_field: Optional[str] = "category"
+    early_stop: bool = True         # stop scoring a line once its decision is certain (same decisions, fewer pairs)
 
 
 @dataclass
@@ -507,22 +508,37 @@ class LineFilter:
                 continue
             pending.append((out, hits, open_hits, self.windows.check1(text, open_hits)))
 
-        # check 1: every window x every check-1 hypothesis
-        premises, hyps, owners = [], [], []
-        for n, (out, _, _, wins) in enumerate(pending):
-            for w, (a, b) in enumerate(wins):
-                for key, hyp in s.check1.items():
-                    premises.append(out.text[a:b])
-                    hyps.append(hyp)
-                    owners.append((n, w, key))
+        # check 1: window x check-1 hypothesis. Early stop (default): windows are scored in rounds of 1, 2, 4, ...
+        # windows per line, and a line leaves as soon as one pair reaches the threshold (the decision is the same
+        # as scoring all windows: positive = any pair >= threshold).
         c1_pairs: List[List[Dict[str, Any]]] = [[] for _ in pending]
-        for (n, w, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
-            c1_pairs[n].append({"window": list(pending[n][3][w]), "hyp": key, "fast": _r(f), "judge": _r(j),
-                                "score": _r(final), "_final": final})
+        c1_done = done = [0] * len(pending)            # windows scored so far per line
+        size = 1 if s.early_stop else max((len(p[3]) for p in pending), default=0)
+        while True:
+            premises, hyps, owners = [], [], []
+            for n, (out, _, _, wins) in enumerate(pending):
+                if done[n] >= len(wins) or any(p["_final"] >= s.check1_threshold for p in c1_pairs[n]):
+                    continue
+                for w in range(done[n], min(done[n] + size, len(wins))):
+                    a, b = wins[w]
+                    for key, hyp in s.check1.items():
+                        premises.append(out.text[a:b])
+                        hyps.append(hyp)
+                        owners.append((n, w, key))
+                done[n] = min(done[n] + size, len(wins))
+            if not premises:
+                break
+            for (n, w, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
+                c1_pairs[n].append({"window": list(pending[n][3][w]), "hyp": key, "fast": _r(f), "judge": _r(j),
+                                    "score": _r(final), "_final": final})
+            size *= 2
 
-        # check 2: per open hit of check-1-positive lines, on the sentence around the hit
-        premises, hyps, owners = [], [], []
+        # check 2: per open hit of check-1-positive lines, on the sentence around the hit. Hits in the same
+        # sentence share one scoring. Early stop (default): sentences are scored in rounds of 1, 2, 4, ... per
+        # line, and a line leaves at its first sentence that is not incidental (the line is filtered then anyway;
+        # hits not scored keep check2 = None).
         positive = []
+        sentences: List[List[Tuple[Tuple[int, int], List[Hit]]]] = [[] for _ in pending]
         for n, (out, hits, open_hits, _) in enumerate(pending):
             best = max(c1_pairs[n], key=lambda p: p["_final"])
             is_pos = best["_final"] >= s.check1_threshold
@@ -530,16 +546,43 @@ class LineFilter:
             if not is_pos or not s.check2:
                 continue
             ends = self.windows.sentence_ends(out.text)
+            by_span: Dict[Tuple[int, int], List[Hit]] = {}
             for h in open_hits:
-                a, b = self.windows.check2(out.text, h, ends)
-                for key, hyp in s.check2.items():
-                    premises.append(out.text[a:b])
-                    hyps.append(hyp)
-                    owners.append((h, a, b, key))
-        for (h, a, b, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
-            if h.check2 is None or final > h.check2["_final"]:
-                h.check2 = {"window": [a, b], "hyp": key, "fast": _r(f), "judge": _r(j), "score": _r(final),
-                            "_final": final, "incidental": final >= s.check2_threshold}
+                span = self.windows.check2(out.text, h, ends)
+                if span not in by_span:
+                    by_span[span] = []
+                    sentences[n].append((span, by_span[span]))
+                by_span[span].append(h)
+        done = [0] * len(pending)                      # sentences scored so far per line
+        stopped = [False] * len(pending)
+        size = 1 if s.early_stop else max((len(x) for x in sentences), default=0)
+        while True:
+            premises, hyps, owners = [], [], []
+            for n, sents in enumerate(sentences):
+                if stopped[n] or done[n] >= len(sents):
+                    continue
+                for (a, b), group in sents[done[n]:done[n] + size]:
+                    for key, hyp in s.check2.items():
+                        premises.append(pending[n][0].text[a:b])
+                        hyps.append(hyp)
+                        owners.append((n, a, b, group, key))
+                done[n] = min(done[n] + size, len(sents))
+            if not premises:
+                break
+            best2: Dict[Tuple[int, int, int], Dict[str, Any]] = {}
+            for (n, a, b, group, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
+                cur = best2.get((n, a, b))
+                if cur is None or final > cur["_final"]:
+                    best2[(n, a, b)] = {"window": [a, b], "hyp": key, "fast": _r(f), "judge": _r(j),
+                                        "score": _r(final), "_final": final, "incidental": final >= s.check2_threshold,
+                                        "_group": group}
+            for (n, _, _), res in best2.items():
+                group = res.pop("_group")
+                for h in group:
+                    h.check2 = dict(res)
+                if not res["incidental"] and s.early_stop:
+                    stopped[n] = True
+            size *= 2
 
         for n, (out, hits, open_hits, _) in enumerate(pending):
             pairs = c1_pairs[n]
@@ -547,6 +590,10 @@ class LineFilter:
             out.decision["check1"] = {"score": best["score"], "positive": positive[n], "hyp": best["hyp"],
                                       "window": best["window"],
                                       "pairs": [{k: v for k, v in p.items() if k != "_final"} for p in pairs]}
+            if c1_done[n] < len(pending[n][3]):
+                out.decision["check1"]["skipped"] = len(pending[n][3]) - c1_done[n]  # windows not scored (early stop)
+            if stopped[n] and done[n] < len(sentences[n]):
+                out.decision["check2_skipped"] = sum(len(g) for _, g in sentences[n][done[n]:])  # hits not scored
             if not positive[n]:
                 self._final(out.decision, "keep", "check1_negative", out.text, hits)
             elif s.check2 and all(h.incidental for h in open_hits):
@@ -1049,6 +1096,9 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--check1-chars", type=int, default=1000, help="check-1 window size in characters (~250 tokens)")
     g.add_argument("--check2-chars", type=int, default=300, help="max check-2 window (the sentence) in characters")
     g.add_argument("--max-windows", type=int, default=2, help="check-1 windows per line (default 2)")
+    g.add_argument("--no-early-stop", action="store_true",
+                   help="score every check-1 window and every check-2 sentence even after the decision is certain "
+                        "(same decisions, more model calls; for comparing scores)")
     g = p.add_argument_group("models and parallelism")
     g.add_argument("--fast-model", default="modernbert", help="modernbert | deberta | bge-m3 | folder (default modernbert)")
     g.add_argument("--judge-model", default="deberta", help="deberta | modernbert | bge-m3 | folder | none (default deberta)")
@@ -1193,7 +1243,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         settings = FilterSettings(country, adj, check1, check2, args.check1_threshold, args.check2_threshold,
                                   args.text_field, args.id_field or None, args.expect_field or None,
-                                  args.group_field or None)
+                                  args.group_field or None, early_stop=not args.no_early_stop)
         rules = None if args.no_rules else IncidentalRules(adj, args.language_menu_min, company_names=company_names)
         scorer = CascadeScorer(fast, judge, (lo, hi))
         line_filter = LineFilter(settings, matcher, rules,
@@ -1224,6 +1274,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                      "uncertain_band": [lo, hi], "rules": not args.no_rules,
                      "language_menu_min": args.language_menu_min, "check1_chars": args.check1_chars,
                      "check2_chars": args.check2_chars, "max_windows": args.max_windows,
+                     "early_stop": not args.no_early_stop,
                      "text_field": args.text_field, "id_field": args.id_field, "expect_field": args.expect_field,
                      "chunk_lines": args.chunk_lines, "inflight": inflight, "write_split": args.write_split,
                      "decisions": args.decisions, "limit": args.limit, "shard": args.shard},

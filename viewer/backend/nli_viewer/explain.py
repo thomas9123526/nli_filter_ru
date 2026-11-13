@@ -167,6 +167,10 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
             by = f", decided by the judge {judge}" if best["judged"] else (f", fast model {fast}" if fast else "")
             steps.append(f"check 1: best score {_fmt(best['score'])} {'>=' if best['passed'] else '<'} threshold "
                          f"{t1} for '{best['hyp']}' on characters {best['window'][0]}-{best['window'][1]}{by}")
+        if c1.get("skipped"):
+            n = c1["skipped"]
+            steps.append(f"check 1 stopped early: {n} more window{'s' if n != 1 else ''} not scored "
+                         f"(the line was already over the threshold)")
     if check2_rows:
         inc = [r for r in check2_rows if r["incidental"]]
         not_inc = [r for r in check2_rows if not r["incidental"]]
@@ -175,6 +179,10 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
         if not_inc:
             steps.append("check 2 NOT incidental: " + ", ".join(f"'{r['kw']}' (best {_fmt(r['score'])} < {t2})"
                                                                  for r in not_inc[:6]))
+    if decision.get("check2_skipped"):
+        n = decision["check2_skipped"]
+        steps.append(f"check 2 stopped early: {n} more hit{'s' if n != 1 else ''} not scored "
+                     f"(one hit was already not incidental, so the line is filtered)")
     summary = REASON_TEXT.get(reason, f"{decision.get('decision')}: {reason}")
     expect = decision.get("expect")
     expect_info = None

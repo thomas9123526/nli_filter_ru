@@ -351,3 +351,48 @@ def test_cli_errors(argv, msg, capsys):
 
 def test_report_without_runs(tmp_path):
     assert nf.main(["--report", "--output-dir", str(tmp_path)]) == 2
+
+
+# ---------------------------------------------------------------- early stop (same decisions, fewer pairs)
+
+def _long_filter(early_stop, max_windows=6):
+    s = nf.FilterSettings("Russia", "Russian", nf._render(nf.DEFAULT_CHECK1, "Russia", "Russian", "c1"),
+                          nf._render(nf.DEFAULT_CHECK2, "Russia", "Russian", "c2"), early_stop=early_stop)
+    scorer = nf.CascadeScorer(FakePool("fast"), FakePool("judge"), (0.6, 0.95))
+    return nf.LineFilter(s, nf.KeywordMatcher(RU["keywords"]), nf.IncidentalRules("Russian"),
+                         nf.WindowBuilder(max_windows=max_windows), scorer)
+
+
+def _long_records():
+    from nli_models import Record
+    path = Path(__file__).resolve().parents[1] / "test_russia_long.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return [Record(path.name, i, json.loads(ln), ln.encode()) for i, ln in enumerate(lines, 1)]
+
+
+@pytest.mark.parametrize("max_windows", [1, 2, 6])
+def test_early_stop_same_decisions_fewer_pairs(max_windows):
+    recs = _long_records()
+    full, early = _long_filter(False, max_windows), _long_filter(True, max_windows)
+    a = [o.decision for o in full.process(recs)]
+    b = [o.decision for o in early.process(recs)]
+    assert [(d["decision"], d["reason"]) for d in a] == [(d["decision"], d["reason"]) for d in b]
+    assert early.scorer.fast_pairs < full.scorer.fast_pairs
+    for d in a:
+        assert "skipped" not in d.get("check1", {}) and "check2_skipped" not in d
+    for d in b:
+        c1 = d.get("check1")
+        if c1 and c1.get("skipped"):          # stopped early -> it was positive
+            assert c1["positive"] and c1["score"] >= 0.8
+        if d.get("check2_skipped"):           # only a filtered line stops check 2 early
+            assert d["decision"] == "filter"
+            assert any(h.get("check2") and not h["check2"]["incidental"] for h in d["hits"])
+
+
+def test_check2_hits_in_one_sentence_scored_once():
+    f = _long_filter(False)
+    text = "Russian River Brewing Company of Russia was founded by Russians. Preheat the oven."
+    out = f.process(records([text]))[0].decision
+    c2 = [h["check2"] for h in out["hits"] if "check2" in h]
+    assert len(c2) == 3 and len({tuple(c["window"]) for c in c2}) == 1
+    assert f.scorer.fast_pairs == 1 + 2      # 1 check-1 window + 1 sentence x 2 check-2 hypotheses

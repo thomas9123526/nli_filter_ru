@@ -1,0 +1,34 @@
+# Keywords for --country Russia (picked up automatically from keywords/russia.txt; Russia is the default country).
+# When this file exists it REPLACES the built-in Russia list in nli_filter.py; delete or rename it to go back.
+# One keyword or phrase per line. Case-insensitive, whole words; CJK keywords match anywhere.
+# List every spelling and inflected form you need (Russian + Russians, Moskau + Moscow).
+# Lines starting with # are ignored: remove the # to switch a suggested keyword on.
+
+# English (the built-in list)
+Russia
+Russian
+Russians
+Russian Federation
+Moscow
+Kremlin
+Saint Petersburg
+
+# Russian (the built-in list)
+Россия
+российский
+
+# Japanese (the built-in list)
+ロシア
+
+# Suggestions, off until you remove the #
+# St. Petersburg
+# Soviet Union
+# USSR
+# Siberia
+# Muscovite
+# России
+# русский
+# Москва
+# 俄罗斯
+# 俄羅斯
+# モスクワ
