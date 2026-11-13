@@ -8,10 +8,11 @@
 #   python check_missing.py        (prints the packages that are not installed yet)
 #
 # Install offline (pip uses the torch that is already installed and only adds what is missing):
-#   pip install --no-index --find-links <folder with these wheels> transformers==5.20.2 orjson pyahocorasick zstandard sentencepiece protobuf
+#   pip install --no-index --find-links <folder with these wheels> transformers==5.20.2 orjson pyahocorasick zstandard sentencepiece protobuf pyarrow
+# pyarrow (.parquet / .arrow corpora) is optional: 25.0.1 for Python 3.10 (26 has no 3.10 build), 26.0.1 for 3.12.
 # If pip says "No matching distribution found for X", X was not already installed: copy X's wheel from whl_files.txt too.
 
-[rtx5090-windows-py310]  pkgs/rtx5090-windows-py310/  31 wheels, 25.5 MB
+[rtx5090-windows-py310]  pkgs/rtx5090-windows-py310/  32 wheels, 52.0 MB
 pkgs/rtx5090-windows-py310/annotated_doc-0.0.5-py3-none-any.whl                                                               #    0.01 MB  typer
 pkgs/rtx5090-windows-py310/anyio-4.16.0-py3-none-any.whl                                                                      #    0.13 MB  httpx2
 pkgs/rtx5090-windows-py310/click-8.5.1-py3-none-any.whl                                                                       #    0.12 MB  typer
@@ -43,8 +44,9 @@ pkgs/rtx5090-windows-py310/transformers-5.20.2-py3-none-any.whl                 
 pkgs/rtx5090-windows-py310/truststore-0.10.5-py3-none-any.whl                                                                 #    0.02 MB  httpx2
 pkgs/rtx5090-windows-py310/typer-0.28.0-py3-none-any.whl                                                                      #    0.12 MB  transformers
 pkgs/rtx5090-windows-py310/zstandard-0.25.0-cp310-cp310-win_amd64.whl                                                         #    0.48 MB  scripts (.zst files, make_test_corpus.py)
+pkgs/rtx5090-windows-py310/pyarrow-25.0.1-cp310-cp310-win_amd64.whl                                                           #   26.56 MB  scripts + viewer (.parquet / .arrow corpora; optional)
 
-[windows-py312]  pkgs/windows-py312/  29 wheels, 25.4 MB
+[windows-py312]  pkgs/windows-py312/  30 wheels, 53.2 MB
 pkgs/windows-py312/annotated_doc-0.0.5-py3-none-any.whl                                                                       #    0.01 MB  typer
 pkgs/windows-py312/anyio-4.16.0-py3-none-any.whl                                                                              #    0.13 MB  httpx2
 pkgs/windows-py312/click-8.5.1-py3-none-any.whl                                                                               #    0.12 MB  typer
@@ -74,8 +76,9 @@ pkgs/windows-py312/transformers-5.20.2-py3-none-any.whl                         
 pkgs/windows-py312/truststore-0.10.5-py3-none-any.whl                                                                         #    0.02 MB  httpx2
 pkgs/windows-py312/typer-0.28.0-py3-none-any.whl                                                                              #    0.12 MB  transformers
 pkgs/windows-py312/zstandard-0.25.0-cp312-cp312-win_amd64.whl                                                                 #    0.48 MB  scripts (.zst files, make_test_corpus.py)
+pkgs/windows-py312/pyarrow-26.0.1-cp312-cp312-win_amd64.whl                                                                   #   27.73 MB  scripts + viewer (.parquet / .arrow corpora; optional)
 
-[rtx5090-ubuntu-py310]  pkgs/rtx5090-ubuntu-py310/  30 wheels, 32.4 MB
+[rtx5090-ubuntu-py310]  pkgs/rtx5090-ubuntu-py310/  31 wheels, 80.1 MB
 pkgs/rtx5090-ubuntu-py310/annotated_doc-0.0.5-py3-none-any.whl                                                                #    0.01 MB  typer
 pkgs/rtx5090-ubuntu-py310/anyio-4.16.0-py3-none-any.whl                                                                       #    0.13 MB  httpx2
 pkgs/rtx5090-ubuntu-py310/click-8.5.1-py3-none-any.whl                                                                        #    0.12 MB  typer
@@ -106,8 +109,9 @@ pkgs/rtx5090-ubuntu-py310/transformers-5.20.2-py3-none-any.whl                  
 pkgs/rtx5090-ubuntu-py310/truststore-0.10.5-py3-none-any.whl                                                                  #    0.02 MB  httpx2
 pkgs/rtx5090-ubuntu-py310/typer-0.28.0-py3-none-any.whl                                                                       #    0.12 MB  transformers
 pkgs/rtx5090-ubuntu-py310/zstandard-0.25.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                         #    5.30 MB  scripts (.zst files, make_test_corpus.py)
+pkgs/rtx5090-ubuntu-py310/pyarrow-25.0.1-cp310-cp310-manylinux_2_28_x86_64.whl                                                #   47.75 MB  scripts + viewer (.parquet / .arrow corpora; optional)
 
-[h200-ubuntu-py312]  pkgs/h200-ubuntu-py312/  28 wheels, 32.4 MB
+[h200-ubuntu-py312]  pkgs/h200-ubuntu-py312/  29 wheels, 84.9 MB
 pkgs/h200-ubuntu-py312/annotated_doc-0.0.5-py3-none-any.whl                                                                   #    0.01 MB  typer
 pkgs/h200-ubuntu-py312/anyio-4.16.0-py3-none-any.whl                                                                          #    0.13 MB  httpx2
 pkgs/h200-ubuntu-py312/click-8.5.1-py3-none-any.whl                                                                           #    0.12 MB  typer
@@ -136,6 +140,7 @@ pkgs/h200-ubuntu-py312/transformers-5.20.2-py3-none-any.whl                     
 pkgs/h200-ubuntu-py312/truststore-0.10.5-py3-none-any.whl                                                                     #    0.02 MB  httpx2
 pkgs/h200-ubuntu-py312/typer-0.28.0-py3-none-any.whl                                                                          #    0.12 MB  transformers
 pkgs/h200-ubuntu-py312/zstandard-0.25.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                            #    5.29 MB  scripts (.zst files, make_test_corpus.py)
+pkgs/h200-ubuntu-py312/pyarrow-26.0.1-cp312-cp312-manylinux_2_28_x86_64.whl                                                   #   52.49 MB  scripts + viewer (.parquet / .arrow corpora; optional)
 
 # ---------------------------------------------------------------------------------------------------------
 # OPTIONAL: corpus on a server (nli_filter.py / nli_models.py with sftp:// or s3:// / minio:// input).

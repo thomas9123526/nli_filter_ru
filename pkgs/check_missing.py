@@ -5,7 +5,7 @@ import sys
 
 NAMES = """transformers tokenizers safetensors huggingface_hub hf_xet regex typer click rich shellingham
 annotated_doc markdown_it_py mdurl pygments httpx2 httpcore2 anyio h11 idna truststore packaging pyyaml
-tqdm orjson pyahocorasick zstandard sentencepiece protobuf
+tqdm orjson pyahocorasick zstandard sentencepiece protobuf pyarrow
 torch numpy filelock fsspec jinja2 markupsafe sympy mpmath networkx typing_extensions""".split()
 if sys.version_info < (3, 11):
     NAMES += ["exceptiongroup", "tomli"]
