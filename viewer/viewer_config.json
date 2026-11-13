@@ -19,6 +19,13 @@
       "title": "Germany test",
       "corpus": "../test_corpus_de",
       "output": "../out_test_corpus_de"
+    },
+    {
+      "name": "longtest",
+      "title": "Russia Long test",
+      "corpus": "../test_corpus_long",
+      "output": "../out_test_corpus_long",
+      "editable": true
     }
   ]
 }

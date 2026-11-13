@@ -3,12 +3,63 @@
 // model service nli_playground.py (it has the torch environment); this page shows its output live.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
 import type { RunJob } from "@/lib/types";
 import { RunsProgress } from "./RunsProgress";
+import { Settings, settingsToArgs, useTrySettings } from "./TryPanel";
 import { Crumbs, ErrorBox, Loading } from "./ui";
+
+/** Command line -> tokens. Double quotes group ("D:\my data") and are kept; backslashes stay (Windows paths). */
+function tokenize(cmd: string): string[] {
+  return cmd.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+}
+const quote = (a: string) => (!a || /\s/.test(a) ? `"${a}"` : a);
+
+// options the settings panel sets, with how many values each takes
+const MANAGED: Record<string, number> = {
+  "--country": 1, "--country-adj": 1, "--keywords-file": 1, "--hypotheses-file": 1, "--check1-hyp": 1, "--check2-hyp": 1,
+  "--check1-threshold": 1, "--check2-threshold": 1, "--uncertain-band": 2, "--max-windows": 1,
+  "--no-early-stop": 0, "--no-rules": 0,
+};
+
+/** The command with the panel's options replaced by `args`; everything else (inputs, --device, ...) is kept.
+ *  --judge-model is changed only for on / off: "none" when off, removed when on and it was "none". */
+function applySettings(command: string, args: string[], judge: boolean): string {
+  const toks = tokenize(command);
+  const out: string[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    const name = t.split("=", 1)[0];
+    const inline = t.includes("=");
+    if (name in MANAGED) { i += inline ? 0 : MANAGED[name]; continue; }
+    if (name === "--judge-model") {
+      const value = inline ? t.slice(t.indexOf("=") + 1) : toks[i + 1] || "";
+      if (!inline) i += 1;
+      if (judge && value.replace(/"/g, "") !== "none") out.push("--judge-model", value);  // keep another judge model
+      continue;
+    }
+    out.push(t);
+  }
+  return [...out, ...args.map(quote)].join(" ");
+}
+
+/** The panel's options found in a command, normalised (sorted groups, no quotes): to see if they are applied. */
+function managedPart(command: string): string {
+  const toks = tokenize(command).map((t) => t.replace(/"/g, ""));
+  const groups: string[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    const [name, inl] = toks[i].split(/=(.*)/s, 2);
+    if (name in MANAGED || name === "--judge-model") {
+      const n = name === "--judge-model" ? 1 : MANAGED[name];
+      const vals = inl !== undefined ? [inl] : toks.slice(i + 1, i + 1 + n);
+      if (inl === undefined) i += n;
+      if (name !== "--judge-model" || vals[0] === "none") groups.push([name, ...vals].join(" "));
+    }
+  }
+  return groups.sort().join(" | ");
+}
 
 export function RunView() {
   const sp = useSearchParams();
@@ -19,6 +70,12 @@ export function RunView() {
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const outRef = useRef<HTMLPreElement>(null);
+  // the "Try settings" of this browser (shared with the corpus pages), turned into nli_filter.py options
+  const info = useApi("playground", (s) => api.playground(s));
+  const [st, set] = useTrySettings(info.data);
+  const [showSettings, setShowSettings] = useState(true);
+  const fromSettings = useMemo(() => (st && info.data ? settingsToArgs(st, info.data) : null), [st, info.data]);
+  const applied = !!fromSettings && command !== null && managedPart(command) === managedPart(fromSettings.args.map(quote).join(" "));
 
   useEffect(() => { if (defaults.data && command === null) setCommand(defaults.data.command); }, [defaults.data, command]);
   // a run of this dataset that is still going (e.g. after reloading the page): show it again
@@ -72,6 +129,29 @@ export function RunView() {
               <pre className="json">python nli_playground.py{"\n"}python nli_playground.py --no-models      (only for runs: no models loaded in the service)</pre>{svc.error}</div>
           ) : svc ? <div className="muted">Runs with <span className="mono">{svc.python || "the service's Python"}</span> in <span className="mono">{svc.project_dir}</span>{svc.models ? " (the service also holds its own models in memory)" : ""}.</div> : null}
           {d.problems.map((p) => <div className="alert warn" key={p}>{p}</div>)}
+          <div className="panel try-panel" data-testid="run-settings">
+            <div className="row">
+              <button className="btn small" onClick={() => setShowSettings((o) => !o)}>{showSettings ? "▾" : "▸"} Settings</button>
+              <span className="muted">country, keywords, hypotheses, thresholds: the same as “Try settings” on the corpus pages</span>
+              <span className="spacer" />
+              {fromSettings ? (applied
+                ? <span className="badge keep" data-testid="settings-applied">in the arguments</span>
+                : <span className="badge warn" data-testid="settings-not-applied">not in the arguments yet</span>) : null}
+              {fromSettings ? (
+                <button className={`btn small${applied ? "" : " primary"}`} disabled={running || command === null}
+                  onClick={() => setCommand(applySettings(command || "", fromSettings.args, fromSettings.judge))} data-testid="apply-settings">
+                  Apply to the arguments ↓</button>
+              ) : null}
+            </div>
+            <ErrorBox error={info.error} onRetry={info.reload} />
+            {showSettings && st && info.data ? <Settings info={info.data} st={st} set={set} onSaved={info.reload} /> : null}
+            {fromSettings?.warnings.map((w) => <div className="alert warn" key={w} style={{ marginTop: 8 }}>{w}</div>)}
+            {showSettings && fromSettings ? (
+              <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>
+                Applying replaces only these options in the arguments: <span className="mono">{fromSettings.args.map(quote).join(" ")}</span>. Inputs, --output-dir, --device and the rest stay as they are.
+              </div>
+            ) : null}
+          </div>
           <div className="panel">
             <h2>Arguments <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>python nli_filter.py …</span></h2>
             <div className="editor">

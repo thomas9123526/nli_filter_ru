@@ -4,7 +4,7 @@
 // Changes can be saved one by one, or collected as pending changes and saved together in one rewrite.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
 import type { CorpusLine } from "@/lib/types";
@@ -24,7 +24,11 @@ export function CorpusView() {
   const dir = sp.get("dir") || "";
   const file = sp.get("file") || "";
   if (!ds) return <div className="alert error">Missing ?ds=</div>;
-  return file ? <FileLines ds={ds} file={file} member={sp.get("member") || ""} start={Math.max(1, Number(sp.get("start")) || 1)} />
+  // ?line=N: open the page at line N (2 lines of context above), highlight it; &edit=1 also opens its editor
+  const target = Math.max(0, Math.floor(Number(sp.get("line")) || 0));
+  const start = Number(sp.get("start")) || (target ? Math.max(1, target - 2) : 1);
+  return file ? <FileLines ds={ds} file={file} member={sp.get("member") || ""} start={Math.max(1, start)}
+    target={target || null} editTarget={sp.get("edit") === "1"} />
     : <Folder ds={ds} dir={dir} />;
 }
 
@@ -92,7 +96,12 @@ function EditBanner({ status }: { status: { editable: boolean; problem: string |
 
 type Pending = { text: string; sha1: string; saved: string; id: unknown };
 
-function FileLines({ ds, file, member: wanted, start }: { ds: string; file: string; member: string; start: number }) {
+function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
+  ds: string; file: string; member: string; start: number; target: number | null; editTarget: boolean;
+}) {
+  // the target line's editor opens once on arrival, not again after a save or reload
+  const [autoEditDone, setAutoEditDone] = useState(false);
+  useEffect(() => setAutoEditDone(false), [ds, file, target]);
   const router = useRouter();
   const [version, setVersion] = useState(0);
   const res = useApi(`lines:${ds}:${file}:${wanted}:${start}:${version}`,
@@ -224,6 +233,8 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
             <LineCard ds={ds} file={file} member={member} fileKey={data.file_key} l={l} editable={editable}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
               onChanged={reload} structural={structural} tried={tried[l.line]}
+              isTarget={l.line === target} autoEdit={l.line === target && editTarget && !autoEditDone} onAutoEdit={() => setAutoEditDone(true)}
+              editProblem={status.data ? status.data.problem : "checking…"}
               onInsertBelow={() => setInserting(l.line)}
               onDelete={async () => { try { if (await deleteLine(ds, file, member, l.line, l.sha1, l.id)) reload(); } catch (e) { setSaveError(e instanceof ApiError ? e : new ApiError((e as Error).message, 0)); } }} />
             {inserting === l.line && l.line !== total ? (
@@ -245,16 +256,30 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
   );
 }
 
-function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete, tried }: {
+function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete, tried,
+  isTarget, autoEdit, onAutoEdit, editProblem }: {
   ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
   structural: boolean; onInsertBelow: () => void; onDelete: () => void; tried?: TryResult;
+  isTarget?: boolean; autoEdit?: boolean; onAutoEdit?: () => void; editProblem?: string | null;
 }) {
   const [full, setFull] = useState<CorpusLine | null>(null);
   const [mode, setMode] = useState<"view" | "full" | "edit">("view");
   const [error, setError] = useState<ApiError | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const card = useRef<HTMLDivElement>(null);
   useEffect(() => setFull(null), [l.sha1]);
+  useEffect(() => {
+    if (isTarget) card.current?.scrollIntoView({ block: "center" });
+  }, [isTarget]);
+  useEffect(() => {
+    // editable comes from a second request: wait for it, then open the editor once
+    if (autoEdit && editable && l.text !== null && !pending) {
+      onAutoEdit?.();
+      load("edit");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoEdit, editable]);
 
   async function load(next: "full" | "edit") {
     setError(null);
@@ -271,7 +296,7 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
   const saved = () => { setMode("view"); setFull(null); setHistoryVersion((v) => v + 1); onChanged(); };
 
   return (
-    <div className={`panel line-card${pending ? " pending" : ""}`} data-testid={`line-${l.line}`}>
+    <div className={`panel line-card${pending ? " pending" : ""}${isTarget ? " target" : ""}`} data-testid={`line-${l.line}`} ref={card}>
       <div className="row">
         <strong className="mono">line {l.line}</strong>
         {l.id !== null && l.id !== undefined ? <span className="muted mono">id {String(l.id)}</span> : null}
@@ -279,10 +304,11 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         {l.inserted ? <span className="badge keep" title="added in the viewer after the filter run: no decision yet">new</span> : null}
         {pending ? <span className="badge accent">unsaved change</span> : null}
         {l.row && fileKey ? <Link className="btn small" href={href("/record", { ds, f: fileKey, row: l.row })}>decision ›</Link> : null}
+        {editable && l.text !== null && mode !== "edit" ? <button className="btn small" onClick={() => load("edit")} data-testid={`edit-${l.line}`}>{pending ? "Edit again" : "Edit"}</button> : null}
+        {!editable && l.text !== null ? <button className="btn small" disabled title={`Editing is off: ${editProblem || "this file cannot be edited"}`}>Edit</button> : null}
         <span className="spacer" />
         {l.truncated && mode === "view" && !pending ? <button className="btn small ghost" onClick={() => load("full")}>Show all ({num(l.text_length)} chars)</button> : null}
         {mode === "full" ? <button className="btn small ghost" onClick={() => setMode("view")}>Show less</button> : null}
-        {editable && l.text !== null && mode !== "edit" ? <button className="btn small" onClick={() => load("edit")}>{pending ? "Edit again" : "Edit"}</button> : null}
         {pending && mode !== "edit" ? <button className="btn small ghost" onClick={onDiscard}>Discard change</button> : null}
         {editable && mode !== "edit" && !pending ? <>
           <button className="btn small ghost" disabled={!structural} title={structural ? "insert a new line after this one" : "save or discard the pending changes first"} onClick={onInsertBelow}>Insert below</button>

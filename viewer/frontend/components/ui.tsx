@@ -49,6 +49,16 @@ export function ScoreBar({ value, threshold, kind = "pass" }: { value: number | 
   );
 }
 
+/** Table header that sorts by `col` when clicked; shows ↑ / ↓ on the active column. `children` go after the label. */
+export function SortTh({ col, label, sort, desc, onSort, num: isNum, children }: { col: string; label: string; sort: string; desc: boolean; onSort: (c: string) => void; num?: boolean; children?: ReactNode }) {
+  const on = sort === col;
+  return (
+    <th className={`sortable${isNum ? " num" : ""}`} onClick={() => onSort(col)} aria-sort={on ? (desc ? "descending" : "ascending") : "none"}>
+      {label}{on ? (desc ? " ↓" : " ↑") : ""}{children}
+    </th>
+  );
+}
+
 export function Loading({ what = "Loading" }: { what?: string }) {
   return <div className="loading"><span className="spinner" />{what}…</div>;
 }
@@ -63,20 +73,41 @@ export function ErrorBox({ error, onRetry }: { error: ApiError | Error | null; o
   );
 }
 
-export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [done, setDone] = useState(false);
+/** Copy text to the clipboard. navigator.clipboard exists only on https:// or localhost, so a viewer opened
+ *  from another machine over http:// falls back to a hidden textarea + execCommand("copy"). */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall back below */ }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+export function CopyButton({ text, label = "Copy", title, testid }: { text: string; label?: string; title?: string; testid?: string }) {
+  const [state, setState] = useState<"" | "done" | "failed">("");
   return (
     <button
       className="btn small ghost"
-      title={text}
-      onClick={() => {
-        navigator.clipboard?.writeText(text).then(() => {
-          setDone(true);
-          setTimeout(() => setDone(false), 1200);
-        });
+      title={title ?? (text.length > 300 ? `${text.slice(0, 300)}…` : text)}
+      data-testid={testid}
+      onClick={async () => {
+        setState((await copyText(text)) ? "done" : "failed");
+        setTimeout(() => setState(""), 1500);
       }}
     >
-      {done ? "Copied" : label}
+      {state === "done" ? "Copied" : state === "failed" ? "Copy failed" : label}
     </button>
   );
 }

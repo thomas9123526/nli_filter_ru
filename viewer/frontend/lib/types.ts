@@ -201,6 +201,7 @@ export type RecordResp = {
     available: boolean;
     path: string | null;
     member?: string | null;
+    line?: number | null;         // where the line is now in the corpus file (null = deleted in the viewer)
     raw?: string;
     raw_truncated?: boolean;
     record?: Record<string, unknown>;

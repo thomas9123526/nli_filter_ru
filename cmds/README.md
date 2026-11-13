@@ -17,6 +17,8 @@
 | | `../keywords/russia.txt` | Russia keyword list (used automatically for `--country Russia`; replaces the built-in list) |
 | | `germany_big_keywords.md` | Example: Germany with a 10,000+ keyword list, commands for each purpose |
 | | `offline_wheels.md` | Which wheels each machine needs (`pkgs/`), offline install, transformers 4.x vs 5.x |
+| | `wheels_check.md` | Are the `pkgs` wheels enough for another computer with torch (Python 3.10 / 3.12, Windows / Ubuntu): checked, install command |
+| | `pycharm.md` | PyCharm: `nli_viewer` imports shown as errors (mark `viewer\backend` as Sources Root) |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
 | | `h200_readiness.md` | Review of the scripts for multi-GPU runs |
 | `testing/` | `test_corpus.md` | Make and filter `test_corpus` (`make_test_corpus.py`); long texts in every file (`--long-lines`) |
@@ -36,5 +38,6 @@
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |
 | | `how_it_works.md` | How keywords, country, hypotheses and models decide a line; what the output files contain |
+| | `devices_and_progress.md` | `--device` / `--mode` / workers, how well it scales on many GPUs or CPUs, progress in the viewer |
 
 Run every command from the project folder `D:\hkc\nli_filter2`, not from `cmds`.

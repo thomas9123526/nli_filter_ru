@@ -114,7 +114,7 @@ def test_corpus_pages_and_editing_render(edit_server, tmp_path):
     assert "Editing is on" in folder and "a/" in folder and "b/" in folder
     lines = dom(edit_server + "/corpus/?ds=e&file=a/x.jsonl.zst", tmp_path)
     assert 'data-testid="line-1"' in lines and "ax-5" in lines and "Preheat the oven" in lines
-    assert ">Edit</button>" in lines and "decision ›" in lines
+    assert 'data-testid="edit-1"' in lines and "decision ›" in lines
     rec = dom(edit_server + "/record/?ds=e&f=a/x&line=1", tmp_path)
     assert 'data-testid="edit-text"' in rec and 'data-testid="edited-after-filter"' not in rec
     # edit line 1 through the API, as the editor does
@@ -132,7 +132,9 @@ def test_corpus_pages_and_editing_render(edit_server, tmp_path):
 
 def test_read_only_dataset_has_no_edit_buttons(server, tmp_path):
     lines = dom(server + "/corpus/?ds=t&file=a/x.jsonl.zst", tmp_path)
-    assert "read-only" in lines and "editing is off" in lines and ">Edit</button>" not in lines
+    assert "read-only" in lines and "editing is off" in lines
+    # only a disabled Edit button (with the reason), never a working one
+    assert 'data-testid="edit-1"' not in lines and "Editing is off:" in lines
     rec = dom(server + "/record/?ds=t&f=a/x&line=1", tmp_path)
     assert 'data-testid="edit-text"' not in rec
 
@@ -177,7 +179,9 @@ def test_run_filter_page_and_bottom_button(edit_server, tmp_path):
     run = dom(edit_server + "/run/?ds=e", tmp_path)
     assert 'data-testid="run-command"' in run and "--output-dir" in run and ">Start</button>" in run
     corpus = dom(edit_server + "/corpus/?ds=e&file=a/x.jsonl.zst", tmp_path)
-    assert corpus.count("Run on the 5 lines of this page") == 1  # the bottom one (the panel's own is folded)
+    # the panel is folded: its Run button moves into the header row; plus the one at the bottom of the page
+    assert corpus.count("Run on the 5 lines of this page") == 2
+    assert 'data-testid="try-run-collapsed"' in corpus and 'data-testid="try-run"' not in corpus
 
 
 def test_runs_progress_renders(edit_server, tmp_path):

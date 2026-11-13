@@ -3,11 +3,11 @@
 // Keyboard: j / → next match, k / ← previous match, Esc back to the list.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { RULE_LABEL, href, pickFilters, score } from "@/lib/format";
 import type { RecordResp } from "@/lib/types";
-import { HighlightedText, Legend, initialFocus, type Focus, type TextOptions } from "./HighlightedText";
+import { HighlightedText, Legend, documentText, findMatches, initialFocus, type Focus, type TextOptions } from "./HighlightedText";
 import { EditHistory, TextEditor } from "./TextEditor";
 import { CopyButton, Crumbs, DecisionBadge, ErrorBox, Loading, ReasonBadge, ScoreBar } from "./ui";
 
@@ -38,6 +38,27 @@ export function RecordView() {
     res.reload();
   };
   useEffect(() => setEditing(false), [key]);
+  // the text as it is now in the corpus file (after any edits), and where that line is on the corpus page
+  const recText = rec?.original.record?.[rec.text_field];
+  const copyable = edit?.text ?? (typeof recText === "string" ? recText : null);
+  const corpusPath = edit?.path || rec?.original.path || null;
+  const corpusLine = edit?.line ?? rec?.original.line ?? null;
+  const corpusLink = rec && corpusPath && corpusLine
+    ? href("/corpus", { ds, file: corpusPath, member: edit?.member || rec.original.member || null, line: corpusLine, edit: canEdit ? 1 : null })
+    : null;
+  // Find in the text. Runs in the browser on the whole text (also the parts a long text leaves out), so it
+  // costs the server nothing. The query is kept when going to the next / previous line.
+  const [query, setQuery] = useState("");
+  const [cur, setCur] = useState({ i: 0, n: 1 });
+  const doc = useMemo(() => {
+    if (!rec || !rec.explanation.text_available) return null;
+    const t = rec.edit?.edited_after_filter && rec.edit.filtered_text !== null ? rec.edit.filtered_text
+      : rec.original.record?.[rec.text_field];
+    return documentText(rec.explanation.segments, typeof t === "string" ? t : null);
+  }, [rec]);
+  const ranges = useMemo(() => (doc ? findMatches(doc.cps, query) : []), [doc, query]);
+  useEffect(() => setCur({ i: 0, n: 1 }), [ranges]);
+  const step = (d: number) => ranges.length && setCur((c) => ({ i: (c.i + d + ranges.length) % ranges.length, n: c.n + 1 }));
   const jump = (id: number | null) => {
     if (id === null) return;
     setFocus((f) => ({ id, n: (f?.n || 1) + 1 }));
@@ -105,7 +126,10 @@ export function RecordView() {
                 <span className="muted">field “{rec.text_field}”{rec.explanation.text_length !== null ? ` · ${rec.explanation.text_length.toLocaleString("en-US")} characters` : ""}</span>
                 <span className="spacer" />
                 {rec.explanation.excerpted ? <span className="badge warn">long text: only the parts around the marks are shown</span> : null}
+                {copyable !== null ? <CopyButton text={copyable} label="Copy text" title="Copy the text of this line (as it is now in the corpus file)" testid="copy-text" /> : null}
                 {canEdit && !editing ? <button className="btn small" onClick={() => setEditing(true)} data-testid="edit-text">Edit text</button> : null}
+                {corpusLink ? <Link className="btn small" href={corpusLink} data-testid="open-in-corpus"
+                  title={`Open ${corpusPath} at line ${corpusLine} on the corpus page${canEdit ? " with its editor open" : ""}`}>{canEdit ? "Edit in corpus ›" : "Open in corpus ›"}</Link> : null}
                 {!canEdit && editProblem && status.data?.dataset_editable ? <span className="faint" title={editProblem}>read-only</span> : null}
               </div>
               {edit?.moved ? (
@@ -136,8 +160,25 @@ export function RecordView() {
               <div className="panel-body" style={{ paddingBottom: 0 }}>
                 <Legend options={opts} setOptions={setOpts} hasCheck1={!!rec.explanation.check1} hasCheck2={!!rec.explanation.check2} />
               </div>
+              {doc ? (
+                <div className="panel-body findbar" style={{ paddingBottom: 0 }}>
+                  <input type="search" placeholder="Find in text…" value={query} aria-label="Find in text" data-testid="find-in-text"
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+                      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setQuery(""); }
+                    }} />
+                  <button className="btn small" onClick={() => step(-1)} disabled={!ranges.length} title="Previous match (Shift+Enter)">‹</button>
+                  <button className="btn small" onClick={() => step(1)} disabled={!ranges.length} title="Next match (Enter)">›</button>
+                  <span className="muted" data-testid="find-count">
+                    {query ? (ranges.length ? `${cur.i + 1} of ${ranges.length}${ranges.length >= 2000 ? "+" : ""}` : "no match") : ""}
+                  </span>
+                  {query && !doc.complete ? <span className="faint">searching the shown parts only</span> : null}
+                </div>
+              ) : null}
               {rec.explanation.text_available ? (
-                <HighlightedText segments={rec.explanation.segments} marks={rec.explanation.marks} active={active} options={opts} onHover={setActive} focus={focus} />
+                <HighlightedText segments={rec.explanation.segments} marks={rec.explanation.marks} active={active} options={opts} onHover={setActive} focus={focus}
+                  find={ranges.length ? { ranges, current: cur.i, n: cur.n } : null} text={doc?.complete ? doc.cps : null} />
               ) : (
                 <div className="panel-body"><div className="alert warn">Original text not available: {rec.original.error || `no “${rec.text_field}” field`}</div></div>
               )}

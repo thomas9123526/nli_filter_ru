@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { REASON_LABEL, REASON_ORDER, RULE_LABEL, href, num, pct, score, seconds } from "@/lib/format";
 import type { Overview } from "@/lib/types";
-import { Bars, Crumbs, DecisionBadge, ErrorBox, Loading, ReasonBadge, Stat } from "./ui";
+import { Bars, Crumbs, DecisionBadge, ErrorBox, Loading, ReasonBadge, SortTh, Stat } from "./ui";
 
 export function DatasetView() {
   const sp = useSearchParams();
@@ -154,7 +154,37 @@ function FilesTable({ ds }: { ds: string }) {
   const [only, setOnly] = useState("");
   const files = useApi(`files:${ds}:${only}`, (s) => api.files(ds, { only }, s));
   const router = useRouter();
-  const rows = useMemo(() => (files.data?.files || []).filter((f) => !q || f.key.toLowerCase().includes(q.toLowerCase())), [files.data, q]);
+  // Sorting is done here, on the rows already loaded: every column comes from the small per-file
+  // summaries, so it never reads the corpus. Empty values (no accuracy, corpus not found) always go last.
+  const [sort, setSort] = useState("file");
+  const [desc, setDesc] = useState(false);
+  const [reason, setReason] = useState("about_country");
+  const toggleSort = (col: string) => {
+    if (sort === col) setDesc(!desc);
+    else { setSort(col); setDesc(col !== "file" && col !== "corpus"); }  // numbers: biggest first
+  };
+  const rows = useMemo(() => {
+    const shown = (files.data?.files || []).filter((f) => !q || f.key.toLowerCase().includes(q.toLowerCase()));
+    const value = (f: (typeof shown)[number]): string | number | null => {
+      switch (sort) {
+        case "lines": return f.lines;
+        case "filtered": return f.filtered;
+        case "reasons": return f.reasons[reason] || 0;
+        case "accuracy": return f.accuracy ?? null;
+        case "mistakes": return f.mistakes ?? null;
+        case "corpus": return f.corpus_path || null;
+        default: return f.key;
+      }
+    };
+    const keyed = shown.map((f) => ({ f, v: value(f) }));
+    keyed.sort((a, b) => {
+      if (a.v === null || b.v === null) return a.v === b.v ? a.f.key.localeCompare(b.f.key) : a.v === null ? 1 : -1;
+      const c = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v));
+      return (desc ? -c : c) || a.f.key.localeCompare(b.f.key);
+    });
+    return keyed.map((k) => k.f);
+  }, [files.data, q, sort, desc, reason]);
+  const th = { sort, desc, onSort: toggleSort };
   return (
     <div className="panel flush">
       <div className="panel-head"><h2>Files</h2><span className="muted">{rows.length} shown</span></div>
@@ -172,7 +202,22 @@ function FilesTable({ ds }: { ds: string }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>File</th><th className="num">Lines</th><th className="num">Filtered</th><th>Reasons</th><th className="num">Accuracy</th><th className="num">Mistakes</th><th>Corpus file</th></tr>
+            <tr>
+              <SortTh col="file" label="File" {...th} />
+              <SortTh col="lines" label="Lines" num {...th} />
+              <SortTh col="filtered" label="Filtered" num {...th} />
+              <SortTh col="reasons" label="Reasons" {...th}>
+                {" "}
+                <select value={reason} aria-label="Sort Reasons by the count of" title="Reasons: sort by the count of this reason"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => { setReason(e.target.value); setSort("reasons"); setDesc(true); }}>
+                  {REASON_ORDER.map((r) => <option key={r} value={r}>{shortReason(r)}</option>)}
+                </select>
+              </SortTh>
+              <SortTh col="accuracy" label="Accuracy" num {...th} />
+              <SortTh col="mistakes" label="Mistakes" num {...th} />
+              <SortTh col="corpus" label="Corpus file" {...th} />
+            </tr>
           </thead>
           <tbody>
             {rows.map((f) => {

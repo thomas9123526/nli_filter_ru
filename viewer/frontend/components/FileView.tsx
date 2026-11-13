@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { FILTER_KEYS, REASON_LABEL, REASON_ORDER, href, num, pickFilters, score } from "@/lib/format";
 import type { DecisionRow } from "@/lib/types";
-import { Crumbs, DecisionBadge, ErrorBox, ExpectBadge, Loading, ReasonBadge, RuleChip, ScoreBar } from "./ui";
+import { Crumbs, DecisionBadge, ErrorBox, ExpectBadge, Loading, ReasonBadge, RuleChip, ScoreBar, SortTh } from "./ui";
 
 const PAGE = 50;
 
@@ -140,11 +140,3 @@ export function FileView() {
   );
 }
 
-function SortTh({ col, label, sort, desc, onSort, num: isNum }: { col: string; label: string; sort: string; desc: boolean; onSort: (c: string) => void; num?: boolean }) {
-  const on = sort === col;
-  return (
-    <th className={`sortable${isNum ? " num" : ""}`} onClick={() => onSort(col)} aria-sort={on ? (desc ? "descending" : "ascending") : "none"}>
-      {label}{on ? (desc ? " ↓" : " ↑") : ""}
-    </th>
-  );
-}

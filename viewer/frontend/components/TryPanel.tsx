@@ -16,7 +16,7 @@ export type TrySettings = {
 };
 
 const STORE = "nli-viewer-try-settings";
-const BUILTIN = "(built-in)";
+export const BUILTIN = "(built-in)";
 
 function load(): Partial<TrySettings> {
   try {
@@ -24,6 +24,71 @@ function load(): Partial<TrySettings> {
   } catch {
     return {};
   }
+}
+
+/**
+ * The "Try settings" of this browser, shared by the corpus page (try on a few lines) and the Run filter page
+ * (run on the whole dataset). First use: Russia + keywords/russia.txt + hypotheses/russia.json if they exist.
+ */
+export function useTrySettings(info: PlaygroundInfo | null | undefined): [TrySettings | null, (p: Partial<TrySettings>) => void] {
+  const [st, setSt] = useState<TrySettings | null>(null);
+  const set = useCallback((p: Partial<TrySettings>) => setSt((s) => (s ? { ...s, ...p } : s)), []);
+  useEffect(() => {
+    if (!info || st) return;
+    const saved = load();
+    const country = saved.country || "Russia";
+    const adj = saved.adj || info.countries.find((c) => c.name === country)?.adj || "";
+    const kw = info.keywords.find((k) => k.name === (saved.kwFile || country.toLowerCase()));
+    const hf = info.hypotheses.find((h) => h.name === (saved.hypFile || country.toLowerCase()) && h.data);
+    setSt({
+      country, adj,
+      kwFile: kw ? kw.name : BUILTIN, keywords: saved.keywords ?? (kw ? kw.text : ""),
+      hypFile: hf ? hf.name : BUILTIN, hyp: saved.hyp || (hf?.data as HypothesesData) || info.builtin_hypotheses,
+      useJudge: saved.useJudge ?? true, check1: saved.check1 ?? 0.8, check2: saved.check2 ?? 0.8,
+      bandLo: saved.bandLo ?? 0.6, bandHi: saved.bandHi ?? 0.95, maxWindows: saved.maxWindows ?? 2,
+      earlyStop: saved.earlyStop ?? true, rules: saved.rules ?? true,
+    });
+  }, [info, st]);
+  useEffect(() => {
+    if (!st) return;
+    try { localStorage.setItem(STORE, JSON.stringify(st)); } catch { /* storage off: fine */ }
+  }, [st]);
+  return [st, set];
+}
+
+const sameHyp = (a: HypothesesData | undefined, b: HypothesesData | undefined) =>
+  JSON.stringify({ c1: a?.check1, c2: a?.check2 }) === JSON.stringify({ c1: b?.check1, c2: b?.check2 });
+const sameText = (a: string, b: string) => a.replace(/\r\n/g, "\n").trim() === b.replace(/\r\n/g, "\n").trim();
+
+/**
+ * nli_filter.py options for these settings. A run reads keywords and hypotheses from files, so edits not yet
+ * saved with "Save" are not in the run: they come back as warnings. `judge` false = --judge-model none.
+ */
+export function settingsToArgs(st: TrySettings, info: PlaygroundInfo): { args: string[]; judge: boolean; warnings: string[] } {
+  const args = ["--country", st.country];
+  if (st.adj) args.push("--country-adj", st.adj);
+  const warnings: string[] = [];
+  const kw = info.keywords.find((k) => k.name === st.kwFile);
+  if (kw) {
+    args.push("--keywords-file", `keywords/${kw.file}`);
+    if (!sameText(kw.text, st.keywords)) warnings.push(`the keywords were changed but not saved: the run uses keywords/${kw.file} as saved (Save them first)`);
+  } else if (st.keywords.trim()) {
+    warnings.push("the keyword list is not saved in a file: the run uses the country's default list (Save it first)");
+  }
+  const hf = info.hypotheses.find((h) => h.name === st.hypFile);
+  if (hf) {
+    args.push("--hypotheses-file", `hypotheses/${hf.file}`);
+    if (!sameHyp(hf.data as HypothesesData, st.hyp)) warnings.push(`the hypotheses were changed but not saved: the run uses hypotheses/${hf.file} as saved (Save them first)`);
+  } else {
+    args.push("--hypotheses-file", "hypotheses/default.json");
+    if (!sameHyp(info.builtin_hypotheses, st.hyp)) warnings.push("the hypotheses were changed but not saved: the run uses hypotheses/default.json (Save them first)");
+  }
+  args.push("--check1-threshold", String(st.check1), "--check2-threshold", String(st.check2),
+    "--uncertain-band", String(st.bandLo), String(st.bandHi), "--max-windows", String(st.maxWindows));
+  if (!st.earlyStop) args.push("--no-early-stop");
+  if (!st.rules) args.push("--no-rules");
+  if (!st.useJudge) args.push("--judge-model", "none");
+  return { args, judge: st.useJudge, warnings };
 }
 
 export type TryControl = { run: () => void; ready: boolean; running: boolean; count: number };
@@ -35,34 +100,10 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl }: {
 }) {
   const info = useApi("playground", (s) => api.playground(s));
   const [open, setOpen] = useState(false);
-  const [st, setSt] = useState<TrySettings | null>(null);
+  const [st, set] = useTrySettings(info.data);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [last, setLast] = useState<PlaygroundRun | null>(null);
-  const set = (p: Partial<TrySettings>) => setSt((s) => (s ? { ...s, ...p } : s));
-
-  // first settings: what this browser used last, else Russia + keywords/russia.txt + hypotheses/russia.json
-  useEffect(() => {
-    if (!info.data || st) return;
-    const d = info.data;
-    const saved = load();
-    const country = saved.country || "Russia";
-    const adj = saved.adj || d.countries.find((c) => c.name === country)?.adj || "";
-    const kw = d.keywords.find((k) => k.name === (saved.kwFile || country.toLowerCase()));
-    const hf = d.hypotheses.find((h) => h.name === (saved.hypFile || country.toLowerCase()) && h.data);
-    setSt({
-      country, adj,
-      kwFile: kw ? kw.name : BUILTIN, keywords: saved.keywords ?? (kw ? kw.text : ""),
-      hypFile: hf ? hf.name : BUILTIN, hyp: saved.hyp || (hf?.data as HypothesesData) || d.builtin_hypotheses,
-      useJudge: saved.useJudge ?? true, check1: saved.check1 ?? 0.8, check2: saved.check2 ?? 0.8,
-      bandLo: saved.bandLo ?? 0.6, bandHi: saved.bandHi ?? 0.95, maxWindows: saved.maxWindows ?? 2,
-      earlyStop: saved.earlyStop ?? true, rules: saved.rules ?? true,
-    });
-  }, [info.data, st]);
-  useEffect(() => {
-    if (!st) return;
-    try { localStorage.setItem(STORE, JSON.stringify(st)); } catch { /* storage off: fine */ }
-  }, [st]);
   useEffect(() => { onResults(null); setLast(null); }, [path, member]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run() {
@@ -100,11 +141,20 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl }: {
     return c;
   }, [last]);
   const changed = (last?.results || []).filter((r) => r.previous && r.previous.decision !== r.decision.decision).length;
+  const runButton = (small: boolean) => (
+    <button className={`btn primary${small ? " small" : ""}`} onClick={run} disabled={running || !svc?.running || !lines.length}
+      title={!svc?.running ? "the model service is not running (open Try settings to see how to start it)" : undefined}
+      data-testid={small ? "try-run-collapsed" : "try-run"}>
+      {running ? "Running…" : `Run on the ${lines.length} line${lines.length === 1 ? "" : "s"} of this page`}
+    </button>
+  );
 
   return (
     <div className="panel try-panel" data-testid="try-panel">
       <div className="row">
         <button className="btn small" onClick={() => setOpen((o) => !o)}>{open ? "▾" : "▸"} Try settings</button>
+        {/* collapsed: the Run button stays reachable, with the settings last used (kept in this browser) */}
+        {!open && st ? runButton(true) : null}
         <span className="muted">run the filter on these lines with other keywords / hypotheses</span>
         <span className="spacer" />
         {svc ? (svc.running
@@ -120,9 +170,7 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl }: {
       {open && st && info.data ? <Settings info={info.data} st={st} set={set} onSaved={info.reload} /> : null}
       {open && st ? (
         <div className="row">
-          <button className="btn primary" onClick={run} disabled={running || !svc?.running || !lines.length}>
-            {running ? "Running…" : `Run on the ${lines.length} line${lines.length === 1 ? "" : "s"} of this page`}
-          </button>
+          {runButton(false)}
           <span className="faint">results appear on each line; “was” = the decision of the saved filter run</span>
         </div>
       ) : null}
@@ -131,7 +179,7 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl }: {
   );
 }
 
-function Settings({ info, st, set, onSaved }: {
+export function Settings({ info, st, set, onSaved }: {
   info: PlaygroundInfo; st: TrySettings; set: (p: Partial<TrySettings>) => void; onSaved: () => void;
 }) {
   const kwCount = st.keywords.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).length;
@@ -240,7 +288,7 @@ function SaveBox({ kind, defaultName, save, onSaved }: {
     setMsg(null);
     try {
       const r = await save(name, overwrite);
-      setMsg(`saved ${r.file}${r.backup ? ` (old version: ${r.backup})` : ""}`);
+      setMsg(`${kind === "keywords" ? "Keywords" : "Hypotheses"} saved to ${r.file}${r.backup ? ` · old version kept in ${r.backup}` : ""}`);
       onSaved(name);
     } catch (e) {
       const m = (e as Error).message;
@@ -248,7 +296,7 @@ function SaveBox({ kind, defaultName, save, onSaved }: {
         setBusy(false);
         return go(true);
       }
-      setMsg(m);
+      setMsg(`Not saved: ${m}`);  // e.g. "exists" and Cancel in the overwrite question
     } finally {
       setBusy(false);
     }
@@ -257,8 +305,11 @@ function SaveBox({ kind, defaultName, save, onSaved }: {
     <div className="row" style={{ marginTop: 6 }}>
       <span className="faint">{kind}/</span>
       <input type="text" className="mono" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 140 }} />
-      <button className="btn small" disabled={busy || !name} onClick={() => go(false)}>Save</button>
-      {msg ? <span className="faint" style={{ fontSize: 12 }}>{msg}</span> : null}
+      <span className="faint">.{kind === "keywords" ? "txt" : "json"}</span>
+      <button className="btn small" disabled={busy || !name} onClick={() => go(false)} data-testid={`save-${kind}`}
+        title={`write ${kind}/${name || "…"}.${kind === "keywords" ? "txt" : "json"} in the project folder`}>
+        {busy ? "Saving…" : `Save ${kind}`}</button>
+      {msg ? <span className="faint mono" style={{ fontSize: 12, wordBreak: "break-all" }}>{msg}</span> : null}
     </div>
   );
 }
