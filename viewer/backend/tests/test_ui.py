@@ -83,7 +83,11 @@ def edit_server(tmp_path_factory):
     from conftest import build_tree
     root = tmp_path_factory.mktemp("uiedit")
     tree = build_tree(root / "tree")
-    cfg = ViewerConfig(datasets=[DatasetConfig(name="e", title="Editable data", corpus=str(tree / "corpus"),
+    import nli_playground
+    from test_playground import StandIn
+    pg_server = nli_playground.serve(nli_playground.Playground(StandIn("fast"), StandIn("judge")), "127.0.0.1", 0)
+    cfg = ViewerConfig(playground_url=f"http://127.0.0.1:{pg_server.server_address[1]}",
+                       datasets=[DatasetConfig(name="e", title="Editable data", corpus=str(tree / "corpus"),
                                                output=str(tree / "out"), editable=True),
                                  DatasetConfig(name="raw", title="Corpus only", corpus=str(tree / "corpus"),
                                                output=str(root / "not_yet"), editable=True)],
@@ -158,3 +162,39 @@ def test_insert_delete_buttons_render(edit_server, tmp_path):
     assert "ui-new" in page and 'data-testid="file-changes"' in page and "Recent changes in this file (1)" in page
     rec = dom(edit_server + "/record/?ds=e&f=b/z&line=1", tmp_path)  # decision line 1 is now line 2
     assert 'data-testid="line-moved"' in rec and "bz-1" in rec
+
+
+def test_try_panel_renders(edit_server, server, tmp_path):
+    page = dom(edit_server + "/corpus/?ds=e&file=a/x.jsonl.zst", tmp_path)
+    assert 'data-testid="try-panel"' in page and "Try settings" in page and "models: fast + judge" in page
+    page = dom(server + "/corpus/?ds=t&file=a/x.jsonl.zst", tmp_path)  # no model service configured / running
+    assert "model service not running" in page
+
+
+def test_run_filter_page_and_bottom_button(edit_server, tmp_path):
+    page = dom(edit_server + "/dataset/?ds=e", tmp_path)
+    assert ">Run filter</a>" in page
+    run = dom(edit_server + "/run/?ds=e", tmp_path)
+    assert 'data-testid="run-command"' in run and "--output-dir" in run and ">Start</button>" in run
+    corpus = dom(edit_server + "/corpus/?ds=e&file=a/x.jsonl.zst", tmp_path)
+    assert corpus.count("Run on the 5 lines of this page") == 1  # the bottom one (the panel's own is folded)
+
+
+def test_runs_progress_renders(edit_server, tmp_path):
+    import json as _json
+    import httpx
+    out = httpx.get(edit_server + "/api/datasets/e").json()["output"]
+    prog = Path(out) / "progress"
+    prog.mkdir(exist_ok=True)
+    now = time.time()
+    (prog / "ui.json").write_text(_json.dumps({
+        "run_id": "ui", "state": "running", "host": "gpu-box", "pid": 7, "shard": "0/8", "started": "2026-11-13 17:00:00",
+        "started_ts": now - 30, "updated_ts": now, "files_total": 8, "files_needed": 8, "files_done": 3,
+        "bytes_total": 1000, "bytes_done": 375, "percent": 37.5, "lines": 1200, "lines_per_second": 40.0,
+        "eta_seconds": 50, "current": {"input": "books/part-01/shard-00003.jsonl.zst", "size": 100}}))
+    try:
+        page = dom(edit_server + "/dataset/?ds=e", tmp_path)
+        assert 'data-testid="runs-progress"' in page and "Runs in progress" in page
+        assert "gpu-box" in page and "shard 0/8" in page and "37.5%" in page and "3/8 files" in page
+    finally:
+        (prog / "ui.json").unlink()

@@ -320,3 +320,67 @@ export type BatchResp = { changed: number; entries: EditEntry[]; seconds: number
 export type BrowseEntry = { name: string; path: string; is_dir: boolean; size: number | null; mtime: number | null };
 
 export type EditStatus = { editable: boolean; problem: string | null; dataset_editable: boolean };
+
+// ---- try settings (nli_playground.py) ----
+
+export type HypothesesData = { description?: string; check1: Record<string, string>; check2: Record<string, string> };
+
+export type PlaygroundInfo = {
+  service: { url: string; running: boolean; fast?: string; judge?: string | null; devices?: string[]; error?: string; start?: string };
+  countries: { name: string; adj: string | null }[];
+  project_dir: string;
+  hypotheses: { name: string; file: string; data?: HypothesesData; error?: string }[];
+  builtin_hypotheses: HypothesesData;
+  keywords: { name: string; file: string; text: string; count: number }[];
+  can_save: boolean;
+};
+
+export type TryResult = {
+  line: number;
+  decision: Record<string, unknown> & { id?: string; decision: string; reason: string };
+  explanation: Explanation;
+  previous: { decision: string; reason: string; row: number; check1: number | null } | null;
+};
+
+export type PlaygroundRun = {
+  results: TryResult[];
+  seconds: number;
+  pairs: { fast: number; judge: number };
+  keywords: string[];
+  country: { name: string; adj: string };
+  hypotheses: { check1: Record<string, string>; check2: Record<string, string> };
+  previous_pending: boolean;
+};
+
+// ---- run nli_filter.py (started by nli_playground.py) ----
+
+export type RunJob = {
+  id: string; label: string; args: string[]; state: "running" | "done" | "failed" | "stopped";
+  returncode: number | null; started: string; ended: string | null; seconds: number;
+  output: string[]; output_lines: number; log_file: string;
+};
+
+export type RunDefaults = {
+  args: string[]; command: string; env_names: string[]; notes: string[]; problems: string[];
+  output_dir: string | null; last_command: string | null;
+  service: { running: boolean; error?: string; python?: string; project_dir?: string; models?: boolean; url: string };
+};
+
+// ---- runs in progress (OUTPUT/progress/<run>.json written by nli_filter.py) ----
+
+export type RunProgress = {
+  run_id: string; state: "running" | "done" | "failed" | "stopped"; stale: boolean; age_seconds: number | null;
+  every_seconds?: number; stale_after?: number;
+  host: string; pid: number; shard?: string | null; command?: string; started: string; ended?: string;
+  seconds?: number; files_total?: number; files_needed?: number; files_done?: number; files_skipped?: number;
+  files_failed?: number; bytes_total?: number; bytes_done?: number; percent?: number | null; lines?: number;
+  lines_per_second?: number | null; eta_seconds?: number | null; current?: { input: string; size: number } | null;
+  error?: string;
+};
+
+export type ProgressResp = {
+  runs: RunProgress[];
+  combined: { runs: number; percent: number | null; files_done: number; files_needed: number; lines: number;
+    lines_per_second: number; eta_seconds: number | null; bytes_total: number; bytes_done: number } | null;
+  stale_seconds: number;
+};

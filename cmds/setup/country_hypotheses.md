@@ -1,5 +1,9 @@
 # Changing the country, keywords, hypotheses and labels
 
+> Since 2026-11-13 hypotheses can also live in a file: `hypotheses\<name>.json`, used with
+> `--hypotheses-file`, or automatically as `hypotheses\<country>.json`. Try and save them on the viewer's
+> Corpus page ("Try settings"): see `cmdsiewer	ry_settings.md`.
+
 There are two ways to change these: with command-line options for one run, or by editing the defaults at
 the top of `nli_filter.py` to make the change permanent.
 

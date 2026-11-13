@@ -773,6 +773,50 @@ class Dataset:
                 "file_key": fr.key if fr else None, "editable": self.edit_problem(path, member) is None,
                 "problem": self.edit_problem(path, member), "decisions_pending": decisions_pending, "lines": rows}
 
+    # ---- runs in progress (nli_filter.py writes OUTPUT/progress/<run>.json) ----------------------------
+
+    def progress(self, stale_seconds: float = 120.0, keep_hours: float = 24.0) -> Dict[str, Any]:
+        """The progress files of nli_filter.py runs writing into this output folder: running ones, and finished
+        ones of the last keep_hours. A 'running' file not updated for stale_seconds is marked stale (the run was
+        killed, crashed, or its machine is gone)."""
+        now = time.time()
+        runs = []
+        try:
+            entries = [e for e in self.output.list("progress") if e.name.endswith(".json") and not e.is_dir]
+        except (FileNotFoundError, NotADirectoryError):
+            entries = []
+        for e in entries:
+            try:
+                d = json.loads(self.output.read_bytes(e.path).decode("utf-8"))
+            except (ValueError, FileNotFoundError, OSError):
+                continue
+            updated = max(float(d.get("updated_ts") or 0), float(e.mtime or 0))
+            d["age_seconds"] = round(now - updated, 1) if updated else None
+            # a run writes every `every_seconds`: warn only after 3 missed writes (and not before stale_seconds)
+            limit = max(stale_seconds, 3 * float(d.get("every_seconds") or 10))
+            d["stale_after"] = limit
+            d["stale"] = d.get("state") == "running" and updated > 0 and now - updated > limit
+            if d.get("state") != "running" and updated and now - updated > keep_hours * 3600:
+                continue
+            runs.append(d)
+        runs.sort(key=lambda d: d.get("started_ts") or 0, reverse=True)
+        live = [d for d in runs if d.get("state") == "running" and not d["stale"]]
+        combined = None
+        if live:
+            total = sum(d.get("bytes_total") or 0 for d in live)
+            done = sum(d.get("bytes_done") or 0 for d in live)
+            etas = [d["eta_seconds"] for d in live if d.get("eta_seconds") is not None]
+            combined = {"runs": len(live), "bytes_total": total, "bytes_done": done,
+                        "percent": round(100 * done / total, 1) if total else None,
+                        "files_needed": sum(d.get("files_needed") or 0 for d in live),
+                        "files_done": sum(d.get("files_done") or 0 for d in live),
+                        "lines": sum(d.get("lines") or 0 for d in live),
+                        "lines_per_second": round(sum(d.get("lines_per_second") or 0 for d in live), 1),
+                        "eta_seconds": max(etas) if etas else None}
+        if live and self._files is not None:
+            self.refresh()  # finished files appear while the run goes (rescan at most every refresh_seconds)
+        return {"runs": runs, "combined": combined, "stale_seconds": stale_seconds}
+
     def simulate(self, check1: float, check2: float, max_flips: int = 300,
                  sweep: Iterable[float] = ()) -> Dict[str, Any]:
         """

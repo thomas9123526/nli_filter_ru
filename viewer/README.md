@@ -105,6 +105,23 @@ folder of the corpus (`books/part-00/shard-00000.jsonl.zst`), so point `corpus` 
 Long texts (over 30,000 characters) are shown as the parts around the hits and windows, with the
 skipped stretches marked.
 
+## Try settings (keywords, hypotheses, models)
+
+The Corpus page's **Try settings** panel runs `nli_filter.py`'s decision on the lines of the page with other
+keywords / hypotheses / thresholds and shows each result next to the saved run's decision ("was keep" ->
+changed). The models run in `nli_playground.py` (project folder, torch environment):
+`python nli_playground.py` -> `http://127.0.0.1:8100` (`"playground_url"` in the config). Keyword files
+(`keywords/*.txt`) and hypothesis files (`hypotheses/*.json`, also read by `nli_filter.py --hypotheses-file`)
+can be edited and saved from the panel (`"project_dir"`, default `..`). Guide: `cmds/viewer/try_settings.md`.
+
+**Run filter** (dataset page) runs `nli_filter.py` on the dataset with editable arguments (corpus, output folder, the
+last run's settings, `--overwrite`) and shows the output live; the run is started by `nli_playground.py`
+(`--no-models` if it is only for runs).
+
+**Runs in progress** (dataset page): every `nli_filter.py` run, however it was started, writes
+`OUTPUT/progress/<run>.json` every 60 s (`--progress-every`); the viewer shows one row per run / shard with progress, files, speed and time
+left, a combined bar, and "no update" for runs that went silent (`"progress_stale_seconds"`, default 120).
+
 ## Editing corpus lines
 
 The text field of a corpus line can be changed in the viewer, also inside `.zst` and `.gz` files. It is off

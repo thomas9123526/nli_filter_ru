@@ -191,7 +191,7 @@ function Verdict({ rec }: { rec: RecordResp }) {
 
 type Jump = (id: number | null) => void;
 
-function Check1Table({ rec, setActive, jump }: { rec: RecordResp; setActive: (ids: number[]) => void; jump: Jump }) {
+export function Check1Table({ rec, setActive, jump }: { rec: RecordResp; setActive: (ids: number[]) => void; jump: Jump }) {
   const c1 = rec.explanation.check1;
   if (!c1) return null;
   return (
@@ -221,7 +221,7 @@ function Check1Table({ rec, setActive, jump }: { rec: RecordResp; setActive: (id
   );
 }
 
-function Check2Table({ rec, setActive, jump }: { rec: RecordResp; setActive: (ids: number[]) => void; jump: Jump }) {
+export function Check2Table({ rec, setActive, jump }: { rec: RecordResp; setActive: (ids: number[]) => void; jump: Jump }) {
   const c2 = rec.explanation.check2;
   if (!c2) return null;
   const winOf = (hit: number) => rec.explanation.marks.filter((m) => m.kind === "check2_window" && m.hit === hit).map((m) => m.id);

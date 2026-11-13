@@ -25,3 +25,6 @@ out**
 pkgs/**
 # snapshot_changes.py
 .snapshots/
+
+# nli_playground.py run logs
+.playground_jobs/

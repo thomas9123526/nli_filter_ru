@@ -1,0 +1,10 @@
+{
+  "description": "built-in default hypotheses of nli_filter.py",
+  "check1": {
+    "topic": "This text is about {country}, a {country_adj} person, a {country_adj} film, a {country_adj} song, the lyrics of a {country_adj} song, or the history of {country}."
+  },
+  "check2": {
+    "company_name": "This text mentions {country} or {country_adj} only as part of a company or brand name.",
+    "language_setting": "This text mentions the {country_adj} language only as a language option or setting."
+  }
+}

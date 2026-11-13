@@ -24,6 +24,8 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .config import DatasetRegistry, ViewerConfig, load_config
 from .edit import EditConflict
+from .playground import Playground, PlaygroundError
+from . import runs as runs_mod
 from .results import Dataset
 from .storage import StorageError, clean_path
 
@@ -62,6 +64,30 @@ class DeleteBody(BaseModel):
     member: Optional[str] = None  # null or "" = not an archive
 
 
+class RunBody(BaseModel):
+    path: str
+    member: Optional[str] = None
+    lines: List[int]                    # corpus line numbers to run
+    settings: Dict[str, Any] = {}       # keywords, check1, check2, thresholds, use_judge, ... (see nli_playground.py)
+
+
+class StartRunBody(BaseModel):
+    args: Optional[List[str]] = None    # nli_filter.py arguments, or
+    command: Optional[str] = None       # the same as one command line
+
+
+class SaveHypBody(BaseModel):
+    name: str
+    data: Dict[str, Any]
+    overwrite: bool = False
+
+
+class SaveKwBody(BaseModel):
+    name: str
+    text: str
+    overwrite: bool = False
+
+
 class BatchBody(BaseModel):
     path: str
     changes: List[LineChange]
@@ -98,6 +124,10 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     async def _bad(_: Request, exc: ValueError):
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
+    @app.exception_handler(PlaygroundError)
+    async def _pg(_: Request, exc: PlaygroundError):
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status)
+
     @app.exception_handler(EditConflict)
     async def _conflict(_: Request, exc: EditConflict):
         return JSONResponse({"detail": str(exc)}, status_code=409)
@@ -108,6 +138,15 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
 
     def ds(name: str) -> Dataset:
         return reg.get(name)
+
+    project = Path(cfg.project_dir)
+    if not project.is_absolute():
+        project = Path(cfg.base_dir) / project
+    edits = Path(cfg.edits_dir)
+    if not edits.is_absolute():
+        edits = Path(cfg.base_dir) / edits
+    pg = Playground(cfg.playground_url, str(project), str(edits / "_project"))
+    app.state.playground = pg
 
     def filters(decision, reason, q, kw, rule, min_score, max_score, mismatch, judged) -> Dict[str, Any]:
         return {"decision": decision or None, "reason": reason or None, "q": q or None, "kw": kw or None,
@@ -281,6 +320,91 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             raise KeyError(f"unknown edit '{edit_id}'")
         guard(request, d, entry["file"], entry.get("member"))
         return d.editor.undo(edit_id, client=request.client.host if request.client else None)
+
+    # ---- try settings: model service + shared hypothesis / keyword files ----------------------
+
+    @app.get("/api/playground", tags=["playground"])
+    def playground():
+        """Model service status, the hypothesis and keyword files of the project, the known countries."""
+        status = pg.status()
+        countries = pg.info().get("countries") or [{"name": "Russia", "adj": "Russian"}]
+        return {"service": status, "countries": countries, "can_save": True, **pg.resources()}
+
+    @app.post("/api/datasets/{name}/playground/run", tags=["playground"])
+    def playground_run(name: str, body: RunBody):
+        """nli_filter.py's decision for these lines with these settings (through nli_playground.py)."""
+        if len(body.lines) > 200:
+            raise HTTPException(400, "at most 200 lines per run")
+        return pg.run(ds(name), body.path, body.member, body.lines, body.settings)
+
+    # ---- run nli_filter.py on a dataset (started by nli_playground.py, which has the torch environment) ----
+
+    job_dataset: Dict[str, str] = {}  # job id -> dataset name (rescan its output when the job ends)
+
+    @app.get("/api/datasets/{name}/run/defaults", tags=["runs"])
+    def run_defaults(name: str):
+        """Suggested nli_filter.py arguments for this dataset (corpus, output folder, the last run's settings)."""
+        info = pg.info()
+        out = runs_mod.default_args(reg.config(name), ds(name), info.get("options"))
+        out["service"] = pg.status()
+        return out
+
+    @app.post("/api/datasets/{name}/run", tags=["runs"])
+    def run_start(name: str, body: StartRunBody, request: Request):
+        """Start nli_filter.py with these arguments (only from this PC: it starts a program)."""
+        save_guard(request)
+        args = body.args if body.args is not None else runs_mod.split_command(body.command or "")
+        if not args:
+            raise HTTPException(400, "no arguments")
+        if "<output folder>" in args:
+            raise HTTPException(400, "set the output folder (--output-dir) first")
+        job = pg.start_job(args, runs_mod.run_env(reg.config(name), ds(name)), name)
+        job_dataset[job["id"]] = name
+        return job
+
+    def _job_done(job: Dict[str, Any]) -> Dict[str, Any]:
+        name = job_dataset.get(job.get("id"))
+        if name and job.get("state") != "running":
+            with contextlib.suppress(Exception):
+                ds(name).refresh(force=True)  # the new results show up at once
+        return job
+
+    @app.get("/api/datasets/{name}/progress", tags=["runs"])
+    def progress(name: str):
+        """nli_filter.py runs writing into this dataset's output folder (however they were started)."""
+        return ds(name).progress(float(cfg.progress_stale_seconds))
+
+    @app.get("/api/runs", tags=["runs"])
+    def run_list():
+        return pg.jobs()
+
+    @app.get("/api/runs/{jid}", tags=["runs"])
+    def run_get(jid: str):
+        return _job_done(pg.job(jid))
+
+    @app.post("/api/runs/{jid}/stop", tags=["runs"])
+    def run_stop(jid: str, request: Request):
+        save_guard(request)
+        return pg.stop_job(jid)
+
+    def save_guard(request: Request) -> None:
+        if request.headers.get(EDIT_HEADER) != "1":
+            raise HTTPException(403, f"saving needs the header {EDIT_HEADER}: 1")
+        why = client_problem(request)
+        if why:
+            raise HTTPException(403, why.replace("editing", "saving"))
+
+    @app.post("/api/playground/hypotheses", tags=["playground"])
+    def save_hypotheses(body: SaveHypBody, request: Request):
+        """Save hypotheses/<name>.json of the project (the old file is backed up)."""
+        save_guard(request)
+        return pg.save_hypotheses(body.name, body.data, body.overwrite)
+
+    @app.post("/api/playground/keywords", tags=["playground"])
+    def save_keywords(body: SaveKwBody, request: Request):
+        """Save keywords/<name>.txt of the project (the old file is backed up)."""
+        save_guard(request)
+        return pg.save_keywords(body.name, body.text, body.overwrite)
 
     @app.get("/api/cache", tags=["meta"])
     def cache():

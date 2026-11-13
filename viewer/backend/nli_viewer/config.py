@@ -70,6 +70,9 @@ class ViewerConfig:
     edits_dir: str = ".viewer_edits"    # original copies of edited files + edit log, per dataset
     edit_zstd_level: int = 3
     edit_allow_remote: bool = False     # False: only requests from this PC (127.0.0.1 / ::1) may edit
+    playground_url: str = "http://127.0.0.1:8100"  # nli_playground.py (models) for the "Try settings" panel
+    project_dir: str = ".."             # folder with nli_filter.py, hypotheses/, keywords/ (relative to the config)
+    progress_stale_seconds: float = 120.0  # a running nli_filter.py whose progress file is older: "no update"
 
 
 def _expand(value: Any) -> Any:
@@ -114,7 +117,7 @@ def load_config(path: str) -> ViewerConfig:
         raise ValueError(f"{p}: no datasets")
     cfg = ViewerConfig(datasets=datasets, base_dir=str(p.parent))
     for k in ("cache_dir", "cache_max_gb", "cors_origins", "frontend_dir", "edits_dir", "edit_zstd_level",
-              "edit_allow_remote"):
+              "edit_allow_remote", "playground_url", "project_dir", "progress_stale_seconds"):
         if k in data:
             setattr(cfg, k, data[k])
     return cfg

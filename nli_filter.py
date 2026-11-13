@@ -22,7 +22,9 @@ Outputs in --output-dir, per input file (folder structure mirrored):
   <name>.summary.json            counts for that file (also marks the file as done -> resumable)
   <name>.kept.jsonl[.zst]        original lines kept       (with --write-split)
   <name>.filtered.jsonl[.zst]    original lines filtered   (with --write-split)
-and summary.json for the whole run; the summary is also printed. If the lines carry an "expect"
+and summary.json for the whole run; the summary is also printed. While a run goes, it rewrites
+progress/<run>.json every 60 s (--progress-every; state, files and bytes done, current file, lines/s, time
+left): the viewer's "Runs in progress" (--no-progress-file turns it off). If the lines carry an "expect"
 field ("filter"/"keep"), precision / recall / F1 and the mistakes are reported too.
 
 Examples
@@ -84,14 +86,9 @@ COUNTRIES: Dict[str, Dict[str, Any]] = {
                            "中华人民共和国", "Китай"]},
 }
 
-DEFAULT_CHECK1 = {
-    "topic": "This text is about {country}, a {country_adj} person, a {country_adj} film, a {country_adj} song, "
-             "the lyrics of a {country_adj} song, or the history of {country}.",
-}
-DEFAULT_CHECK2 = {
-    "company_name": "This text mentions {country} or {country_adj} only as part of a company or brand name.",
-    "language_setting": "This text mentions the {country_adj} language only as a language option or setting.",
-}
+# built-in hypotheses (also hypotheses/default.json); hypothesis files: see nli_hypotheses.py
+from nli_hypotheses import DEFAULT_CHECK1, DEFAULT_CHECK2  # noqa: E402
+import nli_hypotheses  # noqa: E402
 
 LANGUAGE_NAMES = [
     # English names
@@ -795,11 +792,74 @@ class Prefetcher:
             self.folder.rmdir()  # only when empty
 
 
+class ProgressFile:
+    """
+    <output>/progress/<run id>.json, rewritten every `every` seconds (--progress-every, default 60; only the first
+    and the last write are immediate) while a run goes: what it does, how far it is,
+    whether it is still alive. The viewer shows these files ("Runs in progress"); every copy of a sharded run writes
+    its own. state: running | done | failed | stopped. A run that is killed cannot write "stopped": its file just
+    stops being updated (the viewer marks it as stale).
+    """
+
+    def __init__(self, output_dir: Path, info: Dict[str, Any], every: float = 60.0):
+        import socket
+        host = socket.gethostname()
+        shard = (info.get("shard") or "").replace("/", "of")
+        import uuid
+        self.run_id = (f"{time.strftime('%Y%m%d-%H%M%S')}-{host}-{os.getpid()}-{uuid.uuid4().hex[:4]}"
+                       + (f"-shard{shard}" if shard else ""))
+        self.path = Path(output_dir) / "progress" / f"{self.run_id}.json"
+        self.every = every
+        self._last = 0.0
+        self._t0 = time.time()
+        self.data: Dict[str, Any] = {"version": 1, "run_id": self.run_id, "state": "running", "host": host,
+                                     "pid": os.getpid(), "started": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                     "started_ts": self._t0, "every_seconds": every, **info}
+        with contextlib.suppress(OSError):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def update(self, force: bool = False, **fields: Any) -> None:
+        self.data.update(fields)
+        now = time.time()
+        if not force and now - self._last < self.every:
+            return
+        self._last = now
+        d = self.data
+        d["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        d["updated_ts"] = now
+        d["seconds"] = round(now - self._t0, 1)
+        done, total = d.get("bytes_done", 0), d.get("bytes_total") or 0
+        rate = done / d["seconds"] if d["seconds"] > 0 else 0
+        d["percent"] = round(100 * done / total, 1) if total else None
+        d["eta_seconds"] = round((total - done) / rate) if rate > 0 and total and d["state"] == "running" else None
+        d["lines_per_second"] = round(d.get("lines", 0) / d["seconds"], 1) if d["seconds"] > 0 else None
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        try:
+            tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+            os.replace(tmp, self.path)
+        except OSError as exc:  # progress is a nicety: never stop a run for it
+            log.debug("cannot write %s: %s", self.path, exc)
+
+    def finish(self, state: str, error: Optional[str] = None) -> None:
+        self.update(force=True, state=state, ended=time.strftime("%Y-%m-%d %H:%M:%S"), current=None,
+                    **({"error": error} if error else {}))
+
+
+def _size(f: Any) -> int:
+    """Size of an input file in bytes (0 when unknown)."""
+    if hasattr(f, "storage"):
+        return int(getattr(f, "size", 0) or 0)
+    try:
+        return os.path.getsize(f)
+    except OSError:
+        return 0
+
+
 class FilterRunner:
     def __init__(self, line_filter: LineFilter, output_dir: Path, compress: str = "none", write_split: bool = False,
                  decisions: str = "all", chunk_lines: int = 512, inflight: int = 2, limit: Optional[int] = None,
                  overwrite: bool = False, progress_seconds: float = 10.0, retries: int = 3,
-                 download_dir: Optional[Path] = None):
+                 download_dir: Optional[Path] = None, progress_file: Optional[ProgressFile] = None):
         self.f = line_filter
         self.output_dir = output_dir
         self.compress = compress
@@ -818,6 +878,9 @@ class FilterRunner:
         self._seen = 0
         self._t0 = time.perf_counter()
         self._last_progress = self._t0
+        self.pf = progress_file
+        self._bytes_finished = 0  # bytes of the files finished in this run
+        self._source: Optional[JsonlSource] = None  # the file being read (its bytes_read = progress inside it)
 
     def _ext(self, path: str) -> str:
         if self.compress == "auto":
@@ -829,6 +892,11 @@ class FilterRunner:
     def run(self, files: List[str]) -> None:
         bases = [self.output_dir / os.path.dirname(rel) / _stem(os.path.basename(rel)) for rel in _layout(files)]
         needed = [self.overwrite or not self._done(b) for b in bases]
+        sizes = [_size(f) for f in files]
+        if self.pf:
+            self.pf.update(force=True, files_total=len(files), files_needed=sum(needed),
+                           files_skipped=len(files) - sum(needed), files_done=0, files_failed=0,
+                           bytes_total=sum(s for s, n in zip(sizes, needed) if n), bytes_done=0, lines=0)
         fetch = Prefetcher(files, needed, self.download_dir, self.retries) if any(
             hasattr(f, "storage") for f in files) else None
         executor = ThreadPoolExecutor(self.inflight, thread_name_prefix="chunk") if self.inflight > 1 else None
@@ -842,15 +910,25 @@ class FilterRunner:
                         local = fetch.get(i)
                     except Exception as exc:  # download failed after the retries: go on with the other files
                         self.failed += 1
+                        if self.pf:
+                            self._bytes_finished += sizes[i]
+                            self.pf.update(files_failed=self.failed, bytes_done=self._bytes_finished)
                         self.files.append({"input": path, "status": f"failed: {exc}", "lines": 0, "filtered": 0,
                                            "seconds": None})
                         log.error("skip %s: %s", path, exc)
                         continue
+                if self.pf and needed[i]:
+                    self.pf.update(current={"input": mask_uri(str(path)), "size": sizes[i]})
                 try:
                     self._run_file(path, base, executor, local)
                 finally:
                     if local:
                         fetch.release(local)
+                if self.pf and needed[i]:
+                    self._bytes_finished += sizes[i]
+                    self._source = None
+                    self.pf.update(files_done=self.pf.data.get("files_done", 0) + 1,
+                                   bytes_done=self._bytes_finished, lines=self._seen)
         finally:
             if executor:
                 executor.shutdown(wait=True)
@@ -888,7 +966,8 @@ class FilterRunner:
         def limited_records() -> Iterator[Record]:
             """All lines of the file, or the first `remaining`; notes whether the limit cut the file short."""
             nonlocal truncated
-            for i, rec in enumerate(JsonlSource(path, local=local).records()):
+            self._source = JsonlSource(path, local=local)
+            for i, rec in enumerate(self._source.records()):
                 if remaining is not None and i >= remaining:
                     truncated = True
                     return
@@ -944,6 +1023,11 @@ class FilterRunner:
             dt = now - self._t0
             log.warning("progress: %d lines (%.0f lines/s), NLI pairs fast %d judge %d",
                         self._seen, self._seen / dt if dt else 0, self.f.scorer.fast_pairs, self.f.scorer.judge_pairs)
+        if self.pf:
+            src = self._source
+            inside = min(src.bytes_read, (self.pf.data.get("current") or {}).get("size") or src.bytes_read) if src else 0
+            self.pf.update(bytes_done=self._bytes_finished + inside, lines=self._seen,
+                           pairs={"fast": self.f.scorer.fast_pairs, "judge": self.f.scorer.judge_pairs})
 
 
 def _file_row(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -1073,6 +1157,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--keyword", action="append", default=[], help="extra keyword (repeatable)")
     g.add_argument("--exclude-pattern", action="append", default=[], help="regex; hits inside a match are ignored")
     g = p.add_argument_group("hypotheses and thresholds")
+    g.add_argument("--hypotheses-file", help="JSON file with check1 / check2 hypotheses (default: hypotheses/<country>.json "
+                                             "if it exists, else the built-in ones = hypotheses/default.json)")
     g.add_argument("--check1-hyp", action="append", default=[], metavar="KEY=TEMPLATE",
                    help="check-1 hypothesis with {country}/{country_adj}; replaces the default (repeatable)")
     g.add_argument("--check2-hyp", action="append", default=[], metavar="KEY=TEMPLATE",
@@ -1117,6 +1203,10 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--compress", choices=["auto", "zst", "gz", "none"], default="auto",
                    help="output compression (default auto = .zst if the input was compressed)")
     g.add_argument("--overwrite", action="store_true", help="redo files that already have a .summary.json")
+    g.add_argument("--no-progress-file", action="store_true",
+                   help="do not write OUTPUT_DIR/progress/<run>.json (the viewer's 'Runs in progress')")
+    g.add_argument("--progress-every", type=float, default=60.0, metavar="SECONDS",
+                   help="how often the progress file is rewritten (default 60; the viewer warns after 3x this)")
     g.add_argument("--retries", type=int, default=3,
                    help="server input: download attempts after the first one fails (default 3)")
     g.add_argument("--download-dir", help="server input: folder for the downloaded files "
@@ -1167,8 +1257,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     for w in matcher.warnings:
         log.warning(w)
-    check1 = _render(_kv(args.check1_hyp, "--check1-hyp") or DEFAULT_CHECK1, country, adj, "check-1")
-    check2 = {} if args.no_check2 else _render(_kv(args.check2_hyp, "--check2-hyp") or DEFAULT_CHECK2,
+    hyp_file = args.hypotheses_file or (str(nli_hypotheses.find_file(country)) if nli_hypotheses.find_file(country)
+                                        else None)
+    base1, base2 = DEFAULT_CHECK1, DEFAULT_CHECK2
+    if hyp_file:
+        try:
+            data = nli_hypotheses.load(hyp_file)
+        except (OSError, ValueError) as exc:
+            print(f"error: --hypotheses-file: {exc}", file=sys.stderr)
+            return 2
+        base1, base2 = data["check1"], data["check2"]
+        log.warning("hypotheses from %s", hyp_file)
+    check1 = _render(_kv(args.check1_hyp, "--check1-hyp") or base1, country, adj, "check-1")
+    check2 = {} if args.no_check2 else _render(_kv(args.check2_hyp, "--check2-hyp") or base2,
                                                country, adj, "check-2")
     lo, hi = args.uncertain_band
     if not (0 <= lo < hi <= 1):
@@ -1243,14 +1344,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                  WindowBuilder(args.check1_chars, args.check2_chars, args.max_windows), scorer)
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+        pf = None if args.no_progress_file else ProgressFile(out_dir, {
+            "command": mask_uri(" ".join([Path(sys.argv[0]).name] + list(argv if argv is not None else sys.argv[1:]))),
+            "country": country, "shard": args.shard, "fast_model": fast.name,
+            "judge_model": judge.name if judge else None, "devices": list(fast.devices), "mode": fast.mode},
+            every=max(1.0, float(args.progress_every)))
         runner = FilterRunner(line_filter, out_dir, args.compress, args.write_split, args.decisions,
                               args.chunk_lines, inflight, args.limit, args.overwrite, retries=args.retries,
-                              download_dir=Path(args.download_dir) if args.download_dir else None)
+                              download_dir=Path(args.download_dir) if args.download_dir else None, progress_file=pf)
         log.warning("filtering %d file(s) for %s: fast %s, judge %s, mode %s, devices %s, inflight %d, keywords %d (%s)",
                     len(files), country, fast.name, judge.name if judge else "none", fast.mode,
                     ",".join(fast.devices), inflight, len(matcher.keywords), matcher.engine)
         t_run = time.perf_counter()
-        runner.run(files)
+        try:
+            runner.run(files)
+        except KeyboardInterrupt:
+            if pf:
+                pf.finish("stopped")
+            raise
+        except BaseException as exc:
+            if pf:
+                pf.finish("failed", f"{type(exc).__name__}: {exc}")
+            raise
+        if pf:
+            pf.finish("failed" if runner.failed else "done",
+                      f"{runner.failed} file(s) could not be read" if runner.failed else None)
         run_seconds = time.perf_counter() - t_run
     finally:
         fast.close()
@@ -1262,7 +1380,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     summary = {
         "country": {"name": country, "adj": adj, "keywords": matcher.keywords, "keywords_file": kw_file,
                     "exclude_patterns": excludes},
-        "hypotheses": {"check1": check1, "check2": check2},
+        "hypotheses": {"check1": check1, "check2": check2, "file": hyp_file},
         "settings": {"check1_threshold": args.check1_threshold, "check2_threshold": args.check2_threshold,
                      "uncertain_band": [lo, hi], "rules": not args.no_rules,
                      "language_menu_min": args.language_menu_min, "check1_chars": args.check1_chars,

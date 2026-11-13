@@ -1,4 +1,5 @@
 "use client";
+import { RunsProgress } from "./RunsProgress";
 // One dataset: totals, reasons, evaluation, run settings and the list of result files.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,10 +25,12 @@ export function DatasetView() {
         <span className="spacer" />
         <Link className="btn" href={href("/tune", { ds })}>Tune thresholds</Link>
         <Link className="btn" href={href("/corpus", { ds })}>Browse corpus</Link>
+        <Link className="btn" href={href("/run", { ds })} title="run nli_filter.py on this dataset (arguments shown and editable)">Run filter</Link>
         <FindById ds={ds} />
       </div>
       <ErrorBox error={ov.error} onRetry={ov.reload} />
       {ov.loading && !ov.data ? <Loading what="Reading summaries" /> : null}
+      {ov.data ? <RunsProgress ds={ds} /> : null}
       {ov.data && ov.data.files === 0 ? <NoResults ds={ds} ov={ov.data} /> : null}
       {ov.data && ov.data.files > 0 ? <OverviewPanels ds={ds} ov={ov.data} /> : null}
       {ov.data && ov.data.files > 0 ? <FilesTable ds={ds} /> : null}
@@ -47,7 +50,10 @@ function NoResults({ ds, ov }: { ds: string; ov: Overview }) {
         You can browse{ov.corpus ? <> the corpus <span className="mono">{ov.corpus}</span></> : " the corpus"} and, when editing is on, change its text now.
         Results appear here by themselves (within 30 s) once <span className="mono">nli_filter.py</span> has written them to the output folder.
       </p>
-      <Link className="btn primary" href={href("/corpus", { ds })}>Browse corpus</Link>
+      <div className="row">
+        <Link className="btn primary" href={href("/corpus", { ds })}>Browse corpus</Link>
+        <Link className="btn" href={href("/run", { ds })}>Run filter</Link>
+      </div>
     </div>
   );
 }

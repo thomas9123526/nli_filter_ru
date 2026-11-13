@@ -10,6 +10,9 @@ import { href, num } from "@/lib/format";
 import type { CorpusLine } from "@/lib/types";
 import { EditHistory, TextEditor } from "./TextEditor";
 import { FileChanges, InsertForm, deleteLine, fieldTemplate } from "./LineInsert";
+import { TryPanel, type TryControl } from "./TryPanel";
+import { TryLineResult } from "./TryResult";
+import type { TryResult } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 
 const PAGE = 20;
@@ -111,6 +114,8 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [inserting, setInserting] = useState<number | null>(null);  // insert after this line (0 = at the top)
   const [changesVersion, setChangesVersion] = useState(0);
+  const [tried, setTried] = useState<Record<number, TryResult>>({});  // "Try settings" results by line
+  const [tryCtl, setTryCtl] = useState<TryControl | null>(null);
   const nPending = Object.keys(pending).length;
   const reload = () => { setInserting(null); setVersion((v) => v + 1); setChangesVersion((v) => v + 1); };
   const lastPage = !!data && start + PAGE > total;
@@ -204,6 +209,9 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
       <ErrorBox error={res.error} onRetry={res.reload} />
       {res.loading && !data ? <Loading what="Reading the file (a .zst file is decompressed once into the cache)" /> : null}
       {data ? <FileChanges ds={ds} path={file} member={member} version={changesVersion} onChanged={reload} /> : null}
+      {data ? <TryPanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
+        onResults={(r) => setTried(r ? Object.fromEntries(r.results.map((x) => [x.line, x])) : {})}
+        onControl={setTryCtl} /> : null}
       {data && inserting !== null && (inserting === 0 || inserting === total) ? (
         <InsertForm ds={ds} path={file} member={member} after={inserting} idField={data.id_field} textField={data.text_field}
           sha1={(inserting === 0 ? data.lines[0]?.sha1 : data.lines[data.lines.length - 1]?.sha1) || ""}
@@ -215,7 +223,7 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
           {data.lines.map((l) => (<div key={`${member || ""}:${l.line}:${l.sha1}`} className="stack" style={{ gap: 8 }}>
             <LineCard ds={ds} file={file} member={member} fileKey={data.file_key} l={l} editable={editable}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
-              onChanged={reload} structural={structural}
+              onChanged={reload} structural={structural} tried={tried[l.line]}
               onInsertBelow={() => setInserting(l.line)}
               onDelete={async () => { try { if (await deleteLine(ds, file, member, l.line, l.sha1, l.id)) reload(); } catch (e) { setSaveError(e instanceof ApiError ? e : new ApiError((e as Error).message, 0)); } }} />
             {inserting === l.line && l.line !== total ? (
@@ -224,16 +232,23 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
             ) : null}
           </div>))}
           {data.lines.length === 0 ? <div className="muted">The file is empty.</div> : null}
+          {tryCtl?.ready && data.lines.length > 3 ? (
+            <div className="row try-bottom">
+              <button className="btn primary" onClick={() => { tryCtl.run(); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={tryCtl.running}>
+                {tryCtl.running ? "Running…" : `Run on the ${tryCtl.count} line${tryCtl.count === 1 ? "" : "s"} of this page`}</button>
+              <span className="faint">with the settings of “Try settings” above</span>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </>
   );
 }
 
-function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete }: {
+function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete, tried }: {
   ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
-  structural: boolean; onInsertBelow: () => void; onDelete: () => void;
+  structural: boolean; onInsertBelow: () => void; onDelete: () => void; tried?: TryResult;
 }) {
   const [full, setFull] = useState<CorpusLine | null>(null);
   const [mode, setMode] = useState<"view" | "full" | "edit">("view");
@@ -287,6 +302,7 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
       ) : line.text !== null ? (
         <div className="current-text">{mode === "full" ? line.text : l.text}{mode === "view" && l.truncated ? "…" : ""}</div>
       ) : !l.error ? <div className="muted">(no text field)</div> : null}
+      {tried && tried.decision ? <TryLineResult r={tried} /> : null}
       {error ? <ErrorBox error={error} /> : null}
       {l.edits ? <EditHistory ds={ds} path={file} member={member} line={l.line} version={historyVersion} onChanged={saved} /> : null}
     </div>

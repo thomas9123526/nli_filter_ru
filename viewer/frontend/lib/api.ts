@@ -2,7 +2,7 @@
 // Small typed client for the nli_viewer backend + a data-loading hook.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  BatchResp, BrowseEntry, CorpusLines, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
+  BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   RecordResp, SimResp,
 } from "./types";
 
@@ -86,6 +86,19 @@ export const api = {
     postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/insert`, body),
   deleteLine: (ds: string, body: { path: string; member: string | null; line: number; sha1: string }) =>
     postJSON<{ deleted: number; total_lines: number }>(`/api/datasets/${enc(ds)}/corpus/delete`, body),
+  playground: (s?: AbortSignal) => getJSON<PlaygroundInfo>("/api/playground", undefined, s),
+  playgroundRun: (ds: string, body: { path: string; member: string | null; lines: number[]; settings: Record<string, unknown> }) =>
+    postJSON<PlaygroundRun>(`/api/datasets/${enc(ds)}/playground/run`, body),
+  saveHypotheses: (body: { name: string; data: HypothesesData; overwrite: boolean }) =>
+    postJSON<{ file: string; backup: string | null }>("/api/playground/hypotheses", body),
+  saveKeywords: (body: { name: string; text: string; overwrite: boolean }) =>
+    postJSON<{ file: string; backup: string | null }>("/api/playground/keywords", body),
+  runDefaults: (ds: string, s?: AbortSignal) => getJSON<RunDefaults>(`/api/datasets/${enc(ds)}/run/defaults`, undefined, s),
+  startRun: (ds: string, command: string) => postJSON<RunJob>(`/api/datasets/${enc(ds)}/run`, { command }),
+  run: (id: string, s?: AbortSignal) => getJSON<RunJob>(`/api/runs/${enc(id)}`, undefined, s),
+  runs: (s?: AbortSignal) => getJSON<{ jobs: RunJob[] }>("/api/runs", undefined, s),
+  stopRun: (id: string) => postJSON<RunJob>(`/api/runs/${enc(id)}/stop`),
+  progress: (ds: string, s?: AbortSignal) => getJSON<ProgressResp>(`/api/datasets/${enc(ds)}/progress`, undefined, s),
   undoEdit: (ds: string, edit: string) => postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edits/${enc(edit)}/undo`),
 };
 

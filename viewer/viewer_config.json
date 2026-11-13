@@ -3,16 +3,22 @@
   // Paths are relative to this file. Remote examples: see viewer_config.example.json
   "cache_dir": ".viewer_cache",
   "cache_max_gb": 20,
-  "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+  "cors_origins": [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+  ],
   "datasets": [
     {
-      "name": "sftp_test_corpus",
-      "title": "Test corpus on SFTP (192.168.170.200)",
-      "corpus": "sftp://download@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/test_corpus",
-      "output": "sftp://download@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/out_test_corpus",
-      "corpus_options": {"password": "download"},
-      "output_options": {"password": "download"}
+      "name": "test_corpus",
+      "corpus": "../test_corpus",
+      "output": "../out_test_corpus",
+      "editable": true
+    },
+    {
+      "name": "germany",
+      "title": "Germany test",
+      "corpus": "../test_corpus_de",
+      "output": "../out_test_corpus_de"
     }
-
   ]
 }

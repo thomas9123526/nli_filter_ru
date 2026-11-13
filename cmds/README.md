@@ -28,6 +28,7 @@
 | | `viewer_report.md` | Overnight report: what the viewer does, tests, fixes |
 | | `check_results.md` | Check a filter run in the viewer; running `start_viewer.ps1` on Windows 10/11 |
 | | `edit_corpus.md` | Edit the text of corpus lines (also in .zst files) in the viewer: turn on, backup, undo |
+| | `try_settings.md` | Try keywords / hypotheses on the Corpus page (model service `nli_playground.py`); shared `hypotheses\*.json` |
 | | `move_viewer.md` | Copy the viewer to another computer: what to copy, what to leave out |
 | | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
 | | `sftp_192.168.170.200.md` | Filter and view `test_corpus` on the SFTP server 192.168.170.200 |

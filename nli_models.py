@@ -811,6 +811,23 @@ def _decoded(name: str, raw: BinaryIO) -> BinaryIO:
     return raw
 
 
+class _Counting(io.RawIOBase):
+    """Passes reads through and adds their size to owner.bytes_read."""
+
+    def __init__(self, fh: BinaryIO, owner: Any):
+        self._fh, self._owner = fh, owner
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, b) -> int:
+        data = self._fh.read(len(b))
+        n = len(data)
+        b[:n] = data
+        self._owner.bytes_read += n
+        return n
+
+
 @dataclass
 class Record:
     """One input line. data is the parsed object (None for blank or broken lines, see error)."""
@@ -837,21 +854,24 @@ class JsonlSource:
         self.path = str(path)
         self.remote = path if hasattr(path, "storage") and local is None else None
         self.local = str(local) if local is not None else None
+        self.bytes_read = 0  # bytes of the (compressed) file read so far: progress of a run
 
     @contextlib.contextmanager
     def _open_raw(self) -> Iterator[BinaryIO]:
         if self.remote is not None:
             with self.remote.open() as fh:
-                yield fh
+                yield io.BufferedReader(_Counting(fh, self), buffer_size=1 << 18)
         else:
             with open(self.local or self.path, "rb") as fh:
-                yield fh
+                yield io.BufferedReader(_Counting(fh, self), buffer_size=1 << 18)
 
     @contextlib.contextmanager
     def _local_file(self) -> Iterator[str]:
         """A real file for the formats that need one (.zip / .rar / .parquet): downloaded first if remote."""
         if self.remote is None:
             yield self.local or self.path
+            with contextlib.suppress(OSError):
+                self.bytes_read = os.path.getsize(self.local or self.path)  # read as a whole: done at the end
             return
         import tempfile
         from nli_storage import download

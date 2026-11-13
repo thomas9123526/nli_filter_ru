@@ -305,3 +305,21 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
 .file-changes summary { cursor: pointer; font-weight: 600; }
 .file-changes table { margin-top: 8px; }
 .btn.danger { color: var(--filter); }
+.try-panel { display: grid; gap: 10px; margin-bottom: 16px; border-color: var(--accent); }
+.try-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; }
+@media (max-width: 900px) { .try-grid { grid-template-columns: minmax(0, 1fr); } }
+.try-grid fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; min-width: 0; display: grid; gap: 6px; align-content: start; }
+.try-grid legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+.try-grid input[type="number"] { width: 64px; }
+.hyp-editor .hyp-text { flex: 1; min-width: 0; font: 13px/1.45 var(--sans); padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); resize: vertical; }
+.try-result { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 6px; }
+.try-result.changed { border-left-color: var(--warn); }
+.try-bottom { padding: 12px 0; }
+.run-output { max-height: 520px; min-height: 120px; }
+.runs-progress { display: grid; gap: 8px; margin-bottom: 16px; }
+.runs-progress table td { padding: 4px 8px; vertical-align: middle; }
+.progress-bar { position: relative; width: 160px; height: 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); overflow: hidden; display: inline-block; vertical-align: middle; }
+.progress-bar > div { height: 100%; background: var(--accent); transition: width 0.6s; }
+.progress-bar.done > div { background: var(--keep); }
+.progress-bar.failed > div, .progress-bar.stopped > div { background: var(--filter); }
+.progress-bar.stale > div { background: var(--warn); }
