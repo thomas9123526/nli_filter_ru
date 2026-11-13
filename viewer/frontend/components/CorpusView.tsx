@@ -20,7 +20,8 @@ export function CorpusView() {
   const dir = sp.get("dir") || "";
   const file = sp.get("file") || "";
   if (!ds) return <div className="alert error">Missing ?ds=</div>;
-  return file ? <FileLines ds={ds} file={file} start={Math.max(1, Number(sp.get("start")) || 1)} /> : <Folder ds={ds} dir={dir} />;
+  return file ? <FileLines ds={ds} file={file} member={sp.get("member") || ""} start={Math.max(1, Number(sp.get("start")) || 1)} />
+    : <Folder ds={ds} dir={dir} />;
 }
 
 function pathCrumbs(ds: string, path: string, last?: string) {
@@ -87,15 +88,16 @@ function EditBanner({ status }: { status: { editable: boolean; problem: string |
 
 type Pending = { text: string; sha1: string; saved: string; id: unknown };
 
-function FileLines({ ds, file, start }: { ds: string; file: string; start: number }) {
+function FileLines({ ds, file, member: wanted, start }: { ds: string; file: string; member: string; start: number }) {
   const router = useRouter();
   const [version, setVersion] = useState(0);
-  const res = useApi(`lines:${ds}:${file}:${start}:${version}`,
-    (s) => api.corpusLines(ds, { path: file, start, count: PAGE, preview: PREVIEW }, s));
-  const status = useApi(`es:${ds}:${file}`, (s) => api.editStatus(ds, file, s));
+  const res = useApi(`lines:${ds}:${file}:${wanted}:${start}:${version}`,
+    (s) => api.corpusLines(ds, { path: file, member: wanted, start, count: PAGE, preview: PREVIEW }, s));
   const data = res.data;
+  const member = data?.member || null;  // .zip / .rar: the member shown (the first one unless chosen)
+  const status = useApi(data ? `es:${ds}:${file}:${member || ""}` : null, (s) => api.editStatus(ds, file, s, member));
   const total = data?.total_lines ?? 0;
-  const go = (n: number) => router.push(href("/corpus", { ds, file, start: Math.min(Math.max(1, n), Math.max(1, total)) }));
+  const go = (n: number) => router.push(href("/corpus", { ds, file, member: wanted || null, start: Math.min(Math.max(1, n), Math.max(1, total)) }));
   const [jumpTo, setJumpTo] = useState("");
   const folder = file.split("/").slice(0, -1).join("/");
   const name = file.split("/").slice(-1)[0];
@@ -107,7 +109,7 @@ function FileLines({ ds, file, start }: { ds: string; file: string; start: numbe
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const nPending = Object.keys(pending).length;
-  useEffect(() => { setPending({}); setSavedNote(null); setSaveError(null); }, [ds, file]);
+  useEffect(() => { setPending({}); setSavedNote(null); setSaveError(null); }, [ds, file, member]);
   useEffect(() => {
     if (!nPending) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
@@ -136,7 +138,7 @@ function FileLines({ ds, file, start }: { ds: string; file: string; start: numbe
     setSavedNote(null);
     try {
       const changes = Object.entries(pending).map(([line, p]) => ({ line: Number(line), text: p.text, sha1: p.sha1 }));
-      const r = await api.editBatch(ds, { path: file, changes });
+      const r = await api.editBatch(ds, { path: file, member, changes });
       setPending({});
       setSavedNote(`${r.changed} line${r.changed === 1 ? "" : "s"} saved in ${r.seconds.toFixed(1)} s (one rewrite of the file).`);
       setVersion((v) => v + 1);
@@ -153,6 +155,16 @@ function FileLines({ ds, file, start }: { ds: string; file: string; start: numbe
         <div style={{ minWidth: 0 }}>
           <Crumbs items={pathCrumbs(ds, folder, name)} />
           <h1 className="mono" style={{ fontSize: 18 }}>{file}</h1>
+          {data?.members ? (
+            <div className="row" style={{ margin: "6px 0" }}>
+              <span className="muted">archive member</span>
+              <select value={member || ""} disabled={nPending > 0} title={nPending ? "save or discard the pending changes first" : ""}
+                onChange={(e) => router.push(href("/corpus", { ds, file, member: e.target.value }))} data-testid="member-select">
+                {data.members.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <span className="faint">{data.members.length} member{data.members.length === 1 ? "" : "s"}</span>
+            </div>
+          ) : null}
           {data ? <div className="muted">{num(total)} lines · field “{data.text_field}”{data.file_key ? <> · <Link href={href("/file", { ds, f: data.file_key })}>filter results of this file</Link></> : " · no filter results for this file"}</div> : null}
         </div>
       </div>
@@ -184,7 +196,7 @@ function FileLines({ ds, file, start }: { ds: string; file: string; start: numbe
       {data ? (
         <div className="stack" style={{ opacity: res.loading && !data.decisions_pending ? 0.6 : 1 }}>
           {data.lines.map((l) => (
-            <LineCard key={`${l.line}:${l.sha1}`} ds={ds} file={file} fileKey={data.file_key} l={l} editable={editable}
+            <LineCard key={`${member || ""}:${l.line}:${l.sha1}`} ds={ds} file={file} member={member} fileKey={data.file_key} l={l} editable={editable}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
               onChanged={() => setVersion((v) => v + 1)} />
           ))}
@@ -195,8 +207,8 @@ function FileLines({ ds, file, start }: { ds: string; file: string; start: numbe
   );
 }
 
-function LineCard({ ds, file, fileKey, l, editable, pending, onStage, onDiscard, onChanged }: {
-  ds: string; file: string; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
+function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged }: {
+  ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
 }) {
   const [full, setFull] = useState<CorpusLine | null>(null);
@@ -209,7 +221,7 @@ function LineCard({ ds, file, fileKey, l, editable, pending, onStage, onDiscard,
     setError(null);
     if (!l.truncated || full) { setMode(next); return; }
     try {
-      const r = await api.corpusLines(ds, { path: file, start: l.line, count: 1 });
+      const r = await api.corpusLines(ds, { path: file, member, start: l.line, count: 1 });
       setFull(r.lines[0]);
       setMode(next);
     } catch (e) {
@@ -235,7 +247,7 @@ function LineCard({ ds, file, fileKey, l, editable, pending, onStage, onDiscard,
       </div>
       {l.error ? <div className="alert warn">{l.error}{l.raw ? <pre className="json">{l.raw}</pre> : null}</div> : null}
       {mode === "edit" && line.text !== null ? (
-        <TextEditor ds={ds} path={file} line={l.line} text={line.text} sha1={line.sha1} initial={pending?.text}
+        <TextEditor ds={ds} path={file} member={member} line={l.line} text={line.text} sha1={line.sha1} initial={pending?.text}
           onSaved={() => { onDiscard(); saved(); }} onCancel={() => setMode("view")}
           onStage={(v) => { onStage(line.sha1, line.text as string, v); setMode("view"); }} />
       ) : pending ? (
@@ -247,7 +259,7 @@ function LineCard({ ds, file, fileKey, l, editable, pending, onStage, onDiscard,
         <div className="current-text">{mode === "full" ? line.text : l.text}{mode === "view" && l.truncated ? "…" : ""}</div>
       ) : !l.error ? <div className="muted">(no text field)</div> : null}
       {error ? <ErrorBox error={error} /> : null}
-      {l.edits ? <EditHistory ds={ds} path={file} line={l.line} version={historyVersion} onChanged={saved} /> : null}
+      {l.edits ? <EditHistory ds={ds} path={file} member={member} line={l.line} version={historyVersion} onChanged={saved} /> : null}
     </div>
   );
 }

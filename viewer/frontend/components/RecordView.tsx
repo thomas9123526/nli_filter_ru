@@ -124,7 +124,7 @@ export function RecordView() {
               ) : null}
               {editing && edit && edit.text !== null && edit.path && edit.line ? (
                 <div className="panel-body">
-                  <TextEditor ds={ds} path={edit.path} line={edit.line} text={edit.text} sha1={edit.sha1 || ""}
+                  <TextEditor ds={ds} path={edit.path} member={edit.member} line={edit.line} text={edit.text} sha1={edit.sha1 || ""}
                     onSaved={afterSave} onCancel={() => setEditing(false)} />
                 </div>
               ) : null}
@@ -138,7 +138,7 @@ export function RecordView() {
               )}
               {edit && edit.edits > 0 && edit.path && edit.line ? (
                 <div className="panel-body">
-                  <EditHistory ds={ds} path={edit.path} line={edit.line} version={version} onChanged={afterSave} />
+                  <EditHistory ds={ds} path={edit.path} member={edit.member} line={edit.line} version={version} onChanged={afterSave} />
                 </div>
               ) : null}
             </div>

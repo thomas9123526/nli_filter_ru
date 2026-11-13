@@ -40,6 +40,7 @@ import re
 import shutil
 import socket
 import threading
+import uuid
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -83,9 +84,10 @@ def clean_path(path: str) -> str:
 
 
 class Storage(abc.ABC):
-    """Read-only file tree."""
+    """File tree: reading for every storage; replace_file() (whole-file upload) where `writable` is True."""
 
     uri: str = ""
+    writable: bool = False  # replace_file() is implemented (used by the viewer's corpus editing)
 
     @property
     def display_uri(self) -> str:
@@ -135,8 +137,22 @@ class Storage(abc.ABC):
     def close(self) -> None:
         pass
 
+    def replace_file(self, path: str, local_file: str) -> None:
+        """
+        Replace the existing file `path` with the content of local_file, so that readers see either the old or the
+        new file, never a half-written one: upload under a temporary name next to it, then rename it over the
+        original (S3: one PUT, which is atomic per object). Raises StorageError (e.g. no write permission).
+        """
+        raise StorageError(f"{type(self).__name__} cannot write files")
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.display_uri!r})"
+
+
+def _upload_name(full: str) -> str:
+    """Temporary name next to the target: same folder, hidden, unique."""
+    folder, name = posixpath.split(full)
+    return posixpath.join(folder, f".{name}.upload-{os.getpid()}-{uuid.uuid4().hex[:8]}")
 
 
 def _sorted(entries: List[Entry]) -> List[Entry]:
@@ -188,6 +204,21 @@ class LocalStorage(Storage):
 
     def local_path(self, path: str) -> Optional[str]:
         return str(self._full(path))
+
+    writable = True
+
+    def replace_file(self, path: str, local_file: str) -> None:
+        full = self._full(path)
+        tmp = full.with_name(f".{full.name}.upload-{os.getpid()}-{uuid.uuid4().hex[:8]}")
+        try:
+            shutil.copyfile(local_file, tmp)
+            os.replace(tmp, full)
+        except PermissionError as exc:
+            raise StorageError(f"cannot replace {path}: no permission or the file is open in another program "
+                               f"({exc})") from exc
+        finally:
+            with _suppress():
+                tmp.unlink()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -348,6 +379,46 @@ class FTPStorage(Storage):
             conn.close()
             raise FileNotFoundError(path) from exc
         return io.BufferedReader(_FTPStream(conn, sock), buffer_size=1 << 20)
+
+    writable = True
+
+    def replace_file(self, path: str, local_file: str) -> None:
+        full = self._full(path)
+        tmp = _upload_name(full)
+        conn = self._connect()  # own control connection for the transfer
+        try:
+            try:
+                with open(local_file, "rb") as fh:
+                    conn.storbinary("STOR " + tmp, fh, blocksize=1 << 20)
+            except ftplib.error_perm as exc:
+                raise StorageError(f"FTP upload to {posixpath.dirname(full)} refused (no write permission?): "
+                                   f"{exc}") from exc
+            try:
+                conn.rename(tmp, full)  # most servers replace the target in one step
+            except ftplib.error_perm:
+                # servers that refuse to rename over an existing file: move the old one aside first
+                old = _upload_name(full) + ".old"
+                try:
+                    conn.rename(full, old)
+                except ftplib.error_perm as exc:
+                    raise StorageError(f"FTP server refuses to replace {path}: {exc}") from exc
+                try:
+                    conn.rename(tmp, full)
+                except ftplib.error_perm as exc:
+                    with _suppress():
+                        conn.rename(old, full)  # put the original back
+                    raise StorageError(f"FTP server refuses to replace {path}: {exc}") from exc
+                with _suppress():
+                    conn.delete(old)
+            tmp = None
+        except (OSError, EOFError, ftplib.error_temp) as exc:
+            raise StorageError(f"FTP upload of {path} failed: {exc}") from exc
+        finally:
+            if tmp is not None:
+                with _suppress():
+                    conn.delete(tmp)
+            with _suppress():
+                conn.quit()
 
     def close(self) -> None:
         with self._lock:
@@ -569,6 +640,48 @@ class SFTPStorage(Storage):
             self._missing(exc, clean_path(path))
         return io.BufferedReader(_SFTPStream(sftp, fh), buffer_size=1 << 20)
 
+    writable = True
+
+    def replace_file(self, path: str, local_file: str) -> None:
+        full = self._full(path)
+        tmp = _upload_name(full)
+        with self._lock:
+            sftp = self._ensure().open_sftp()  # own channel for the transfer
+        try:
+            try:
+                sftp.put(local_file, tmp, confirm=True)  # confirm: compares the size after the upload
+            except PermissionError as exc:
+                raise StorageError(f"SFTP upload to {posixpath.dirname(full)} refused (no write permission): "
+                                   f"{exc}") from exc
+            try:
+                sftp.posix_rename(tmp, full)  # OpenSSH: replaces the target in one step
+            except OSError:
+                # server without posix-rename: move the old file aside, put the new one in place, remove the old
+                old = _upload_name(full) + ".old"
+                try:
+                    sftp.rename(full, old)
+                except OSError as exc:
+                    raise StorageError(f"SFTP server refuses to replace {path}: {exc}") from exc
+                try:
+                    sftp.rename(tmp, full)
+                except OSError as exc:
+                    with _suppress():
+                        sftp.rename(old, full)
+                    raise StorageError(f"SFTP server refuses to replace {path}: {exc}") from exc
+                with _suppress():
+                    sftp.remove(old)
+            tmp = None
+        except StorageError:
+            raise
+        except (OSError, EOFError) as exc:
+            raise StorageError(f"SFTP upload of {path} failed: {exc}") from exc
+        finally:
+            if tmp is not None:
+                with _suppress():
+                    sftp.remove(tmp)
+            with _suppress():
+                sftp.close()
+
     def close(self) -> None:
         with self._lock:
             self._drop()
@@ -689,6 +802,16 @@ class S3Storage(Storage):
     def open(self, path: str) -> BinaryIO:
         resp = self._call(self.client.get_object, Bucket=self.bucket, Key=self._key(path))
         return io.BufferedReader(_BodyStream(resp["Body"]), buffer_size=1 << 20)
+
+    writable = True
+
+    def replace_file(self, path: str, local_file: str) -> None:
+        # one PUT (multipart for big files): readers see the old object until the new one is complete
+        from boto3.exceptions import S3UploadFailedError
+        try:
+            self._call(self.client.upload_file, Filename=local_file, Bucket=self.bucket, Key=self._key(path))
+        except S3UploadFailedError as exc:
+            raise StorageError(f"S3 upload of {path} failed (no write permission?): {exc}") from exc
 
 
 class _BodyStream(io.RawIOBase):

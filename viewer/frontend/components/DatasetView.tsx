@@ -28,9 +28,27 @@ export function DatasetView() {
       </div>
       <ErrorBox error={ov.error} onRetry={ov.reload} />
       {ov.loading && !ov.data ? <Loading what="Reading summaries" /> : null}
-      {ov.data ? <OverviewPanels ds={ds} ov={ov.data} /> : null}
-      {ov.data ? <FilesTable ds={ds} /> : null}
+      {ov.data && ov.data.files === 0 ? <NoResults ds={ds} ov={ov.data} /> : null}
+      {ov.data && ov.data.files > 0 ? <OverviewPanels ds={ds} ov={ov.data} /> : null}
+      {ov.data && ov.data.files > 0 ? <FilesTable ds={ds} /> : null}
     </>
+  );
+}
+
+/** Corpus only (no nli_filter.py output yet): browsing and editing the corpus still work. */
+function NoResults({ ds, ov }: { ds: string; ov: Overview }) {
+  return (
+    <div className="panel" data-testid="no-results">
+      <h2>No filter results yet</h2>
+      <p className="muted">
+        {ov.output_ready === false
+          ? <>The output folder <span className="mono">{ov.output}</span> does not exist yet. </>
+          : <>The output folder <span className="mono">{ov.output}</span> has no results yet. </>}
+        You can browse{ov.corpus ? <> the corpus <span className="mono">{ov.corpus}</span></> : " the corpus"} and, when editing is on, change its text now.
+        Results appear here by themselves (within 30 s) once <span className="mono">nli_filter.py</span> has written them to the output folder.
+      </p>
+      <Link className="btn primary" href={href("/corpus", { ds })}>Browse corpus</Link>
+    </div>
   );
 }
 

@@ -38,6 +38,7 @@ class EditBody(BaseModel):
     line: int
     text: str
     sha1: str = ""  # sha1 of the line as loaded; a different current line = 409 conflict
+    member: str = ""  # .zip / .rar: the member file the line is in
 
 
 class LineChange(BaseModel):
@@ -49,6 +50,7 @@ class LineChange(BaseModel):
 class BatchBody(BaseModel):
     path: str
     changes: List[LineChange]
+    member: str = ""
 
 DEFAULT_FRONTEND = Path(__file__).resolve().parent.parent.parent / "frontend" / "out"
 
@@ -193,23 +195,24 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
                     'set "edit_allow_remote": true in viewer_config.json to allow other PCs)')
         return None
 
-    def guard(request: Request, d: Dataset, path: Optional[str] = None) -> None:
+    def guard(request: Request, d: Dataset, path: Optional[str] = None, member: Optional[str] = None) -> None:
         if request.headers.get(EDIT_HEADER) != "1":
             raise HTTPException(403, f"editing requests need the header {EDIT_HEADER}: 1")
-        why = client_problem(request) or d.edit_problem(path)
+        why = client_problem(request) or d.edit_problem(path, member)
         if why:
             raise HTTPException(403, why)
 
     @app.get("/api/datasets/{name}/corpus/lines", tags=["corpus"])
     def corpus_lines(name: str, path: str, start: int = Query(1, ge=1), count: int = Query(20, ge=1, le=200),
-                     preview: int = Query(0, ge=0)):
-        """Lines of a corpus file: text, id, sha1, number of edits, decision row (if the file has results)."""
-        return ds(name).corpus_lines(path, start, count, preview)
+                     preview: int = Query(0, ge=0), member: str = ""):
+        """Lines of a corpus file (or of one member of a .zip / .rar): text, id, sha1, number of edits, decision row
+        (if the file has results). For an archive, `members` lists its members (default: the first)."""
+        return ds(name).corpus_lines(path, start, count, preview, member or None)
 
     @app.get("/api/datasets/{name}/corpus/edit-status", tags=["corpus"])
-    def edit_status(name: str, request: Request, path: str = ""):
+    def edit_status(name: str, request: Request, path: str = "", member: str = ""):
         d = ds(name)
-        problem = d.edit_problem(clean_path(path) if path else None) or client_problem(request)
+        problem = d.edit_problem(clean_path(path) if path else None, member or None) or client_problem(request)
         return {"editable": problem is None, "problem": problem, "dataset_editable": d.editor is not None}
 
     @app.post("/api/datasets/{name}/corpus/edit", tags=["corpus"])
@@ -217,23 +220,24 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         """Replace the text field of one line; the corpus file (.zst / .gz / plain) is rewritten safely."""
         d = ds(name)
         path = clean_path(body.path)
-        guard(request, d, path)
+        guard(request, d, path, body.member or None)
         host = request.client.host if request.client else None
-        return d.editor.edit_text(path, body.line, body.text, body.sha1 or None, client=host)
+        return d.editor.edit_text(path, body.line, body.text, body.sha1 or None, client=host, member=body.member or None)
 
     @app.post("/api/datasets/{name}/corpus/edit-batch", tags=["corpus"])
     def corpus_edit_batch(name: str, body: BatchBody, request: Request):
         """Several lines of one file in one rewrite (all or nothing)."""
         d = ds(name)
         path = clean_path(body.path)
-        guard(request, d, path)
+        guard(request, d, path, body.member or None)
         host = request.client.host if request.client else None
-        return d.editor.edit_texts(path, [c.model_dump() for c in body.changes], client=host)
+        return d.editor.edit_texts(path, [c.model_dump() for c in body.changes], client=host,
+                                   member=body.member or None)
 
     @app.get("/api/datasets/{name}/corpus/edits", tags=["corpus"])
-    def corpus_edits(name: str, path: str = "", line: Optional[int] = None):
+    def corpus_edits(name: str, path: str = "", line: Optional[int] = None, member: str = ""):
         d = ds(name)
-        return {"edits": d.editor.history(path or None, line) if d.editor is not None else []}
+        return {"edits": d.editor.history(path or None, line, member or None) if d.editor is not None else []}
 
     @app.post("/api/datasets/{name}/corpus/edits/{edit_id}/undo", tags=["corpus"])
     def corpus_undo(name: str, edit_id: str, request: Request):
@@ -242,7 +246,7 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         entry = next((e for e in d.editor.history() if e["edit"] == edit_id), None)
         if entry is None:
             raise KeyError(f"unknown edit '{edit_id}'")
-        guard(request, d, entry["file"])
+        guard(request, d, entry["file"], entry.get("member"))
         return d.editor.undo(edit_id, client=request.client.host if request.client else None)
 
     @app.get("/api/cache", tags=["meta"])

@@ -6,8 +6,8 @@ import { ApiError, api, useApi } from "@/lib/api";
 import type { EditResp } from "@/lib/types";
 import { ErrorBox } from "./ui";
 
-export function TextEditor({ ds, path, line, text, sha1, onSaved, onCancel, initial, onStage }: {
-  ds: string; path: string; line: number; text: string; sha1: string;
+export function TextEditor({ ds, path, member, line, text, sha1, onSaved, onCancel, initial, onStage }: {
+  ds: string; path: string; member?: string | null; line: number; text: string; sha1: string;
   onSaved: (r: EditResp) => void; onCancel: () => void;
   initial?: string;                    // start from this (an unsaved change) instead of the saved text
   onStage?: (value: string) => void;   // "Add to pending changes": saved later with others in one rewrite
@@ -26,7 +26,7 @@ export function TextEditor({ ds, path, line, text, sha1, onSaved, onCancel, init
     setSaving(true);
     setError(null);
     try {
-      onSaved(await api.editText(ds, { path, line, text: value, sha1 }));
+      onSaved(await api.editText(ds, { path, member: member || null, line, text: value, sha1 }));
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError((e as Error).message, 0));
     } finally {
@@ -53,7 +53,7 @@ export function TextEditor({ ds, path, line, text, sha1, onSaved, onCancel, init
         <span className="faint">{value.length.toLocaleString("en-US")} characters{changed ? ` (was ${text.length.toLocaleString("en-US")})` : ""} · <span className="kbd">Ctrl</span>+<span className="kbd">Enter</span> save · <span className="kbd">Esc</span> cancel</span>
       </div>
       <div className="faint" style={{ fontSize: 12 }}>
-        Saving rewrites <span className="mono">{path}</span> (line {line}, text only; id and other fields stay). The first edit of a file keeps a copy of the original; every edit can be undone.
+        Saving rewrites <span className="mono">{path}</span>{member ? <> (member <span className="mono">{member}</span>)</> : null} (line {line}, text only; id and other fields stay). The first edit of a file keeps a copy of the original; every edit can be undone.
       </div>
       {error ? (
         error.status === 409
@@ -65,10 +65,11 @@ export function TextEditor({ ds, path, line, text, sha1, onSaved, onCancel, init
 }
 
 /** Edits of one line (newest first) with an Undo button; Undo only works for the line's latest change. */
-export function EditHistory({ ds, path, line, version, onChanged }: {
-  ds: string; path: string; line: number; version: number; onChanged: (r: EditResp) => void;
+export function EditHistory({ ds, path, member, line, version, onChanged }: {
+  ds: string; path: string; member?: string | null; line: number; version: number; onChanged: (r: EditResp) => void;
 }) {
-  const res = useApi(`edits:${ds}:${path}:${line}:${version}`, (s) => api.edits(ds, { path, line }, s));
+  const res = useApi(`edits:${ds}:${path}:${member || ""}:${line}:${version}`,
+    (s) => api.edits(ds, { path, line, member: member || null }, s));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const edits = [...(res.data?.edits || [])].reverse();

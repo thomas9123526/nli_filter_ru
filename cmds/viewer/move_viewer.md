@@ -15,7 +15,7 @@ Notes from 2026-11-10. The viewer works on another computer as long as you leave
 | Copy? | Folder | Size | Why |
 |---|---|---|---|
 | Yes | `viewer\` without the three below | small | The program and `viewer_config.json` |
-| Yes | `nli_storage.py` (project root) | small | The viewer's file access (local / FTP / SFTP / S3). Keep it in the folder above `viewer\`, as in the project |
+| Yes | `nli_storage.py` and `nli_formats.py` (project root) | small | The viewer's file access (local / FTP / SFTP / S3) and file formats (.rar / .parquet). Keep them in the folder above `viewer\`, as in the project |
 | Yes | `viewer\frontend\out` | 1 MB | The built web pages. With it, the new PC doesn't need Node.js. |
 | No | `viewer\backend\.venv` | 324 MB | Only works on the PC that made it. The script makes a new one on first start. |
 | No | `viewer\frontend\node_modules` | 351 MB | Only needed to rebuild the web pages |

@@ -137,7 +137,8 @@ def test_api_edit_flow(tree, tmp_path):
         r = c.post("/api/datasets/t/corpus/edit", json=body, headers=H)
         assert r.status_code == 200 and r.json()["text"] == "new text"
         assert c.post("/api/datasets/t/corpus/edit", json=body, headers=H).status_code == 409  # stale sha1
-        assert c.post("/api/datasets/t/corpus/edit", json=dict(body, path="c/w.zip"), headers=H).status_code == 403
+        # an archive needs the member: 400 without it
+        assert c.post("/api/datasets/t/corpus/edit", json=dict(body, path="c/w.zip"), headers=H).status_code == 400
         edits = c.get("/api/datasets/t/corpus/edits", params={"path": "a/x.jsonl.zst"}).json()["edits"]
         assert len(edits) == 1
         r = c.post(f"/api/datasets/t/corpus/edits/{edits[0]['edit']}/undo", headers=H)
@@ -213,3 +214,41 @@ def test_api_batch(tree, tmp_path):
         assert r.status_code == 200 and r.json()["changed"] == 3
         assert [x["text"] for x in r.json()["lines"]] == ["t1", "t2", "t3"]
         assert c.post("/api/datasets/t/corpus/edit-batch", json=body, headers=H).status_code == 409
+
+
+def test_corpus_only_dataset(tree, tmp_path):
+    """No output yet: browse and edit the corpus before running nli_filter.py; results appear later."""
+    import shutil
+    later = tmp_path / "out_later"
+    cfg = ViewerConfig(datasets=[DatasetConfig(name="none", corpus=str(tree / "corpus"), editable=True),
+                                 DatasetConfig(name="later", corpus=str(tree / "corpus"), output=str(later),
+                                               editable=True)],
+                       cache_dir=str(tmp_path / "cache"), edits_dir=str(tmp_path / "edits"),
+                       frontend_dir=str(tmp_path / "nofrontend"), base_dir=str(tmp_path))
+    with TestClient(create_app(cfg), client=("127.0.0.1", 50000)) as c:
+        assert [d["error"] for d in c.get("/api/datasets").json()["datasets"]] == [None, None]
+        for name in ("none", "later"):
+            ov = c.get(f"/api/datasets/{name}").json()
+            assert ov["files"] == 0 and ov["output_ready"] is False
+            lines = c.get(f"/api/datasets/{name}/corpus/lines", params={"path": "a/x.jsonl.zst", "count": 2}).json()
+            assert lines["total_lines"] == 5 and lines["file_key"] is None and not lines["decisions_pending"]
+        r = c.post("/api/datasets/later/corpus/edit", headers=H,
+                   json={"path": "a/x.jsonl.zst", "line": 1, "text": "edited before filtering"})
+        assert r.status_code == 200
+        # nli_filter.py writes the output folder: the dataset picks it up (rescan forced here)
+        shutil.copytree(tree / "out", later)
+        c.post("/api/datasets/later/refresh")
+        ov = c.get("/api/datasets/later").json()
+        assert ov["files"] == 4 and ov["output_ready"] is True
+        rec = c.get("/api/datasets/later/record", params={"file": "a/x", "line": 1}).json()
+        assert rec["edit"]["text"] == "edited before filtering"
+
+
+def test_config_without_output(tmp_path, tree):
+    from nli_viewer.config import load_config
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps({"datasets": [{"name": "c", "corpus": str(tree / "corpus")}]}))
+    assert load_config(str(p)).datasets[0].output == ""
+    p.write_text(json.dumps({"datasets": [{"name": "c"}]}))
+    with pytest.raises(ValueError, match="corpus"):
+        load_config(str(p))

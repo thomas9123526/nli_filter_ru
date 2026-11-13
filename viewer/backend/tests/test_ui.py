@@ -84,7 +84,9 @@ def edit_server(tmp_path_factory):
     root = tmp_path_factory.mktemp("uiedit")
     tree = build_tree(root / "tree")
     cfg = ViewerConfig(datasets=[DatasetConfig(name="e", title="Editable data", corpus=str(tree / "corpus"),
-                                               output=str(tree / "out"), editable=True)],
+                                               output=str(tree / "out"), editable=True),
+                                 DatasetConfig(name="raw", title="Corpus only", corpus=str(tree / "corpus"),
+                                               output=str(root / "not_yet"), editable=True)],
                        cache_dir=str(root / "cache"), edits_dir=str(root / "edits"))
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
@@ -129,3 +131,16 @@ def test_read_only_dataset_has_no_edit_buttons(server, tmp_path):
     assert "read-only" in lines and "editing is off" in lines and ">Edit</button>" not in lines
     rec = dom(server + "/record/?ds=t&f=a/x&line=1", tmp_path)
     assert 'data-testid="edit-text"' not in rec
+
+
+def test_corpus_only_dataset_renders(edit_server, tmp_path):
+    page = dom(edit_server + "/dataset/?ds=raw", tmp_path)
+    assert 'data-testid="no-results"' in page and "does not exist yet" in page and "Browse corpus" in page
+    lines = dom(edit_server + "/corpus/?ds=raw&file=b/z.jsonl", tmp_path)
+    assert "Editing is on" in lines and "bz-1" in lines and "decision ›" not in lines
+
+
+def test_archive_member_picker_renders(edit_server, tmp_path):
+    page = dom(edit_server + "/corpus/?ds=e&file=c/w.zip", tmp_path)
+    assert 'data-testid="member-select"' in page and "w1.jsonl" in page and "cw-1" in page
+    assert ">Edit</button>" in page  # .zip members are editable now

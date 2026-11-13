@@ -75,12 +75,12 @@ export const api = {
   browse: (ds: string, path: string, s?: AbortSignal) =>
     getJSON<{ root: string; path: string; entries: BrowseEntry[] }>(`/api/datasets/${enc(ds)}/browse`, { root: "corpus", path }, s),
   corpusLines: (ds: string, p: Params, s?: AbortSignal) => getJSON<CorpusLines>(`/api/datasets/${enc(ds)}/corpus/lines`, p, s),
-  editStatus: (ds: string, path: string, s?: AbortSignal) =>
-    getJSON<EditStatus>(`/api/datasets/${enc(ds)}/corpus/edit-status`, { path }, s),
+  editStatus: (ds: string, path: string, s?: AbortSignal, member?: string | null) =>
+    getJSON<EditStatus>(`/api/datasets/${enc(ds)}/corpus/edit-status`, { path, member }, s),
   edits: (ds: string, p: Params, s?: AbortSignal) => getJSON<{ edits: EditEntry[] }>(`/api/datasets/${enc(ds)}/corpus/edits`, p, s),
-  editText: (ds: string, body: { path: string; line: number; text: string; sha1: string }) =>
+  editText: (ds: string, body: { path: string; line: number; text: string; sha1: string; member?: string | null }) =>
     postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edit`, body),
-  editBatch: (ds: string, body: { path: string; changes: { line: number; text: string; sha1: string }[] }) =>
+  editBatch: (ds: string, body: { path: string; member?: string | null; changes: { line: number; text: string; sha1: string }[] }) =>
     postJSON<BatchResp>(`/api/datasets/${enc(ds)}/corpus/edit-batch`, body),
   undoEdit: (ds: string, edit: string) => postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edits/${enc(edit)}/undo`),
 };

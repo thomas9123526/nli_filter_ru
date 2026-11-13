@@ -7,7 +7,8 @@ plain `.jsonl`) is rewritten safely. Everything the viewer did before works as b
 ## 1. Turn it on for a dataset
 
 Editing is off until a dataset has `"editable": true` in `viewer\viewer_config.json`. The corpus must be on a
-local, mapped or UNC drive (`D:\...`, `Z:\...`, `\\server\share\...`); FTP / SFTP / S3 corpora stay read-only.
+local, mapped or UNC drive (`D:\...`, `Z:\...`, `\\server\share\...`) or on an FTP / SFTP / S3 / MinIO server
+(the account in the config must be allowed to write there; see section 7).
 
 ```json
 {
@@ -21,7 +22,24 @@ local, mapped or UNC drive (`D:\...`, `Z:\...`, `\\server\share\...`); FTP / SFT
 
 Restart the viewer after editing the config (`Ctrl+C`, then `.\start_viewer.ps1`).
 
+**Edit before filtering:** the corpus can be edited before `nli_filter.py` has run. Leave out `"output"`, or
+give the folder the run will write to even if it does not exist yet:
+
+```json
+{"name": "my_corpus", "corpus": "D:/data/my_corpus", "output": "../out_my_corpus", "editable": true}
+```
+
+The dataset page then says "No filter results yet" with a **Browse corpus** button. After
+`python nli_filter.py D:\data\my_corpus --output-dir out_my_corpus`, the results show up by themselves
+(within 30 s), and since the edits came before the run, the decisions are for the edited text.
+
 ## 2. Edit
+
+Files that can be edited: `.jsonl` (also `.gz` / `.zst`), members of `.zip` and `.rar` archives, and rows of
+`.parquet` and `.arrow` / `.feather` tables (also Hugging Face `datasets` `.arrow` files). For an archive, choose the member at the top of the Corpus page; the archive is rebuilt with
+the new member and the other members stay as they were. For tables, only the text column changes (schema, metadata,
+compression and batch sizes stay). `.rar` needs WinRAR (`Rar.exe`, `UnRAR.exe`), `.parquet` / `.arrow` the `pyarrow`
+package.
 
 | Where | How |
 |---|---|
@@ -84,3 +102,26 @@ A save rewrites the whole file. Measured on a file with 3,000,000 lines (287 MB 
 | Save 20 lines together | about 10 s |
 
 A 70 MB `.zst` should take roughly half of that or less; the test corpus files save in under a second.
+
+## 7. Corpus on a server (FTP / SFTP / S3 / MinIO)
+
+Editing works the same way: `"editable": true` on a dataset whose `corpus` is an `ftp://`, `sftp://`, `s3://`
+or `minio://` address. What is different:
+
+| | |
+|---|---|
+| Write permission | The account (`user` / `access_key` in the config) must be allowed to write in the corpus folder. A read-only account (for example a "download" user) can view but not save: the save says "upload failed, the file on the server was not changed" |
+| How a save works | The new file is made and checked on this PC, then uploaded under a temporary name next to the original and renamed over it (S3: one upload). Readers on the server see the old or the new file, never half of one |
+| Someone else changed the file | Just before the upload the viewer checks that the file on the server is still the one it read; if not, nothing is uploaded ("changed on the server ... reload and edit again") |
+| Backup | The original is downloaded once into `viewer\.viewer_edits\<dataset>\originals\` on this PC. Undo uploads the old text again |
+| Time | Each save uploads the whole compressed file (a 70 MB `.zst` = 70 MB upload). Collect changes and use **Save all** |
+
+Example (SFTP with a user that may write):
+
+```json
+{"name": "server_corpus", "corpus": "sftp://editor@192.168.170.200/mnt/disk1/HKC_123/nli_filter2/test_corpus",
+ "corpus_options": {"password": "${SFTP_PASSWORD}"}, "output": "../out_server_corpus", "editable": true}
+```
+
+Tested with local FTP, SFTP (with and without the one-step rename) and S3 test servers; not yet on
+192.168.170.200 (the `download` user there is probably read-only).

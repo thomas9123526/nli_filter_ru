@@ -1,5 +1,6 @@
 """
-lines.py - jump to line N of a JSONL file, also when it is .gz / .zst / inside a .zip / on FTP or S3.
+lines.py - jump to line N of a JSONL file, also when it is .gz / .zst / inside a .zip or .rar / a .parquet table
+(row n = line n) / on FTP, SFTP or S3.
 
 Compressed streams have no random access, so the first request for a file decompresses it once into a
 disk cache together with an index of line start offsets; later requests seek straight to the line.
@@ -33,12 +34,14 @@ from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
 
 from .storage import Storage
 
+import nli_formats  # noqa: E402  (project root, put on sys.path by .storage)
+
 try:
     import zstandard
 except ImportError:  # pragma: no cover
     zstandard = None
 
-__all__ = ["LineCache", "LineFile", "decompressed_stream", "is_compressed", "CHUNK"]
+__all__ = ["LineCache", "LineFile", "decompressed_stream", "is_compressed", "archive_members", "CHUNK"]
 
 CHUNK = 8 << 20
 _COMPRESSED = (".zst", ".zstd", ".gz")
@@ -46,6 +49,36 @@ _COMPRESSED = (".zst", ".zstd", ".gz")
 
 def is_compressed(name: str) -> bool:
     return name.lower().endswith(_COMPRESSED)
+
+
+def _usable_member(name: str) -> bool:
+    """Archive members the viewer reads: (compressed) JSONL, not archives or tables inside archives."""
+    return name.lower().endswith(nli_formats.INPUT_SUFFIXES) and not nli_formats.needs_local_file(name)
+
+
+def archive_members(local_path: str, kind: Optional[str] = None) -> List[str]:
+    """Readable members of a local .zip / .rar file, in archive order ('/' separators). kind: '.zip' / '.rar' when
+    the file name does not say it (e.g. a temporary file)."""
+    if (kind or local_path).lower().endswith(".rar"):
+        return [n for n in nli_formats.rar_members(local_path) if _usable_member(n)]
+    with zipfile.ZipFile(local_path) as zf:
+        return [i.filename for i in zf.infolist() if not i.is_dir() and _usable_member(i.filename)]
+
+
+@contextlib.contextmanager
+def open_member(local_path: str, member: str, kind: Optional[str] = None) -> Iterator[BinaryIO]:
+    """Raw (still compressed if the member is .zst / .gz) bytes of one archive member."""
+    if (kind or local_path).lower().endswith(".rar"):
+        with nli_formats.open_rar_member(local_path, member) as fh:
+            yield fh
+    else:
+        with zipfile.ZipFile(local_path) as zf:
+            try:
+                info = zf.getinfo(member)
+            except KeyError:
+                raise FileNotFoundError(f"{local_path}!{member}") from None
+            with zf.open(info) as fh:
+                yield fh
 
 
 @contextlib.contextmanager
@@ -172,7 +205,7 @@ class LineFile:
             idx, meta_p = d / "lines.idx", d / "meta.json"
             local = self.storage.local_path(self.path)
             direct = local is not None and self.member is None and not is_compressed(self.path) \
-                and not self.path.lower().endswith(".zip")
+                and not nli_formats.needs_local_file(self.path)
             with self.cache.lock(key):
                 if not meta_p.exists():
                     self._build(d, local if direct else None)
@@ -191,8 +224,10 @@ class LineFile:
         if direct_path is not None:
             with open(direct_path, "rb") as fh:
                 starts, size = _scan_offsets(_read_chunks(fh), None)
-        elif self.path.lower().endswith(".zip") or self.member:
-            starts, size = self._build_zip(d, tmp_data)
+        elif nli_formats.is_archive(self.path) or self.member:
+            starts, size = self._build_archive(d, tmp_data)
+        elif nli_formats.is_table(self.path):
+            starts, size = self._build_table(d, tmp_data)
         else:
             with self.storage.open(self.path) as raw, decompressed_stream(raw, self.path) as fh, \
                     open(tmp_data, "wb") as sink:
@@ -207,27 +242,35 @@ class LineFile:
         (d / "meta.json").write_text(json.dumps(meta), "utf-8")
         self.cache.trim(keep=d.name)
 
-    def _build_zip(self, d: Path, tmp_data: Path) -> Tuple[array.array, int]:
+    @contextlib.contextmanager
+    def _local(self, d: Path) -> Iterator[str]:
+        """A real file (archives and tables need one): the local file, or a download into the cache entry."""
         local = self.storage.local_path(self.path)
-        downloaded = None
-        if local is None:  # zipfile needs a seekable file: download the archive first
-            downloaded = d / "archive.zip.tmp"
+        if local is not None:
+            yield local
+            return
+        downloaded = d / ("download.tmp" + Path(self.path).suffix)
+        try:
             with self.storage.open(self.path) as src, open(downloaded, "wb") as dst:
                 shutil.copyfileobj(src, dst, CHUNK)
-            local = str(downloaded)
-        try:
-            with zipfile.ZipFile(local) as zf:
-                names = [i.filename for i in zf.infolist() if not i.is_dir()]
-                member = self.member or next((n for n in names if n.lower().endswith((".jsonl", ".json", ".ndjson",
-                                                                                      ".zst", ".gz"))), None)
-                if member is None or member not in names:
-                    raise FileNotFoundError(f"{self.path}!{self.member}")
-                with zf.open(member) as raw, decompressed_stream(raw, member) as fh, open(tmp_data, "wb") as sink:
-                    return _scan_offsets(_read_chunks(fh), sink)
+            yield str(downloaded)
         finally:
-            if downloaded is not None:
-                with contextlib.suppress(OSError):
-                    os.remove(downloaded)
+            with contextlib.suppress(OSError):
+                os.remove(downloaded)
+
+    def _build_archive(self, d: Path, tmp_data: Path) -> Tuple[array.array, int]:
+        with self._local(d) as local:
+            names = archive_members(local)
+            member = self.member or (names[0] if names else None)
+            if member is None or member not in names:
+                raise FileNotFoundError(f"{self.path}!{self.member}")
+            with open_member(local, member) as raw, decompressed_stream(raw, member) as fh, \
+                    open(tmp_data, "wb") as sink:
+                return _scan_offsets(_read_chunks(fh), sink)
+
+    def _build_table(self, d: Path, tmp_data: Path) -> Tuple[array.array, int]:
+        with self._local(d) as local, open(tmp_data, "wb") as sink:
+            return _scan_offsets(nli_formats.table_lines(local), sink)  # the download keeps the suffix
 
     # ---- access ---------------------------------------------------------------------------------
 

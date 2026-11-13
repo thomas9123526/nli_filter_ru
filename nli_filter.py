@@ -61,6 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nli_storage import StorageError, download, mask_uri  # noqa: E402
 from nli_models import (MODEL_SPECS, AtomicOutput, JsonlSource, NLIPool, Record, expand_inputs,  # noqa: E402
                         json_dumps, quiet_transformers, zstd_available)
+import nli_formats  # noqa: E402  (.rar / .parquet input, output names)
 
 try:
     import ahocorasick  # pyahocorasick
@@ -713,17 +714,8 @@ class RunStats:
 # Runner: files -> chunks -> decisions -> outputs + summary
 # --------------------------------------------------------------------------------------------------
 
-_INPUT_SUFFIXES = (".zst", ".zstd", ".gz", ".zip", ".jsonl", ".json", ".ndjson")
-
-
-def _stem(name: str) -> str:
-    changed = True
-    while changed:
-        changed = False
-        for suf in _INPUT_SUFFIXES:
-            if name.lower().endswith(suf) and len(name) > len(suf):
-                name, changed = name[: -len(suf)], True
-    return name
+_INPUT_SUFFIXES = nli_formats.INPUT_SUFFIXES  # .jsonl .json .ndjson .gz .zst .zstd .zip .rar .parquet .arrow
+_stem = nli_formats.stem  # 'shard-00000.jsonl.zst' / 'x.parquet' -> output base name
 
 
 def _chunks(it: Iterator[Record], size: int) -> Iterator[List[Record]]:
@@ -829,7 +821,8 @@ class FilterRunner:
 
     def _ext(self, path: str) -> str:
         if self.compress == "auto":
-            compressed = path.lower().endswith((".zst", ".zstd", ".gz", ".zip"))
+            compressed = path.lower().endswith((".zst", ".zstd", ".gz") + nli_formats.ARCHIVE_SUFFIXES
+                                               + nli_formats.TABLE_SUFFIXES)
             return ".zst" if compressed and zstd_available() else ""
         return {"zst": ".zst", "gz": ".gz", "none": ""}[self.compress]
 
@@ -1062,7 +1055,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="nli_filter.py", description=__doc__.split("\n\n")[0].split(" - ", 1)[1],
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
                                 epilog=__doc__.split("Examples\n--------\n", 1)[1])
-    p.add_argument("inputs", nargs="*", help="JSONL files, folders or globs (.jsonl .json .gz .zst .zip); "
+    p.add_argument("inputs", nargs="*", help="JSONL files, folders or globs (.jsonl .json .gz .zst .zip .rar .parquet .arrow); "
                                              "default test_russia.jsonl next to this script")
     g = p.add_argument_group("data")
     g.add_argument("--text-field", default="text")

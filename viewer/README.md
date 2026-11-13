@@ -12,7 +12,7 @@ decompressed by hand. Corpus and results can be on local disk, FTP(S), SFTP or S
  FastAPI backend  (python -m nli_viewer serve)
    api ── results (output folder <-> corpus folder) ── explain (highlights, verdict)
              │
-           lines (jump to line N of .jsonl/.gz/.zst/.zip; disk cache + offset index + SQLite)
+           lines (jump to line N of .jsonl/.gz/.zst/.zip/.rar/.parquet/.arrow; disk cache + offset index + SQLite)
              │
            storage (local | ftp:// | sftp:// | s3:// | minio://)
 ```
@@ -77,6 +77,15 @@ A dataset = one `nli_filter.py` output folder + the corpus folder it was made fr
 `${VAR}` is replaced by the environment variable, so passwords need not be in the file. Passwords are never
 shown in the UI or the API. More examples: `viewer_config.example.json`.
 
+**Corpus only, no results yet:** leave out `"output"`, or point it at a local folder that `nli_filter.py` will
+create later. The Corpus page (browse, read, edit) works right away; the dataset page says "No filter
+results yet" and shows the results by itself once the folder has them (rescanned every 30 s). A remote output
+(FTP / SFTP / S3) that cannot be reached is still an error.
+
+```json
+{"name": "my_corpus", "corpus": "D:/data/my_corpus", "output": "../out_my_corpus", "editable": true}
+```
+
 How results are matched to corpus files: the output path without its suffix
 (`books/part-00/shard-00000.summary.json` → `books/part-00/shard-00000`) is looked up in the same sub
 folder of the corpus (`books/part-00/shard-00000.jsonl.zst`), so point `corpus` at the folder you gave to
@@ -111,9 +120,11 @@ decision). `Ctrl+Enter` saves, `Esc` cancels.
 | What | How |
 |---|---|
 | What can change | Only the text field (`text`, or the run's `--text-field`). The `id` and all other fields stay; the line keeps the JSON style of the file |
-| Which corpora | Local, mapped-drive or UNC folders (`D:\...`, `Z:\...`, `\\server\share\...`). FTP, SFTP and S3 corpora, and lines inside `.zip` files, stay read-only |
+| Which corpora | Local, mapped-drive or UNC folders (`D:\...`, `Z:\...`, `\\server\share\...`), and FTP / SFTP / S3 / MinIO servers when the account may write there (a read-only account: the save fails, nothing changes) |
+| Which files | `.jsonl` / `.json` / `.ndjson`, also `.gz` / `.zst`; members of `.zip` and `.rar` archives (choose the member on the Corpus page; the archive is rebuilt with the new member, the other members unchanged); rows of `.parquet` and `.arrow` / `.feather` tables (row n = line n; the text column is replaced; schema with its metadata, other columns, compression and row groups / record batches stay; `.arrow` in Arrow's file or stream format, e.g. Hugging Face `datasets` files). `.rar` needs WinRAR's `Rar.exe` / `UnRAR.exe` (Linux: `rar` / `unrar`, or `NLI_RAR` / `NLI_UNRAR` = their paths); without `Rar` a `.rar` is read-only. `.parquet` / `.arrow` need `pyarrow` |
 | Who may edit | Only a browser on the PC the viewer runs on (`http://127.0.0.1:8000`, or the PC's own network address), also with `-Public` (other PCs see the pages read-only). `"edit_allow_remote": true` at the top of the config allows other PCs |
 | How a save works | The whole file is written again, compressed like the original, to a temporary file next to it; that file is decompressed and checked; then it replaces the original in one step. A crash or power cut leaves the old file complete |
+| On a server | The new file is made and checked on this PC. Just before the upload the viewer checks that the file on the server was not changed since it was read (else: conflict, nothing uploaded). Upload under a temporary name in the same folder, then renamed over the original (SFTP: one step where the server supports it, else old file aside → new file in place → old file removed; FTP the same; S3: one upload, atomic per object). The backup of the original is downloaded to this PC (`.viewer_edits`). Each save uploads the whole compressed file: save several lines together |
 | Conflicts | The save sends a fingerprint (sha1) of the line as it was loaded. If the line changed in the meantime (another tab or person), the save is refused: reload and edit again |
 | Backup | The first edit of a file copies the untouched original to `.viewer_edits/<dataset>/originals/<same path>`. Later edits keep that first copy. To go back completely, copy it over the corpus file |
 | Log and undo | Every edit (time, file, line, id, old and new text) is appended to `.viewer_edits/<dataset>/edits.jsonl`. **Undo** in the line's edit history puts the old text back (latest change first). `python -m nli_viewer edits` lists them |
@@ -145,7 +156,7 @@ keyword hit's character span really contains the keyword. Run it after a big fil
 
 ## Cache
 
-`.zst` / `.gz` / `.zip` files and remote files have no random access, so the first look at a file
+`.zst` / `.gz` / `.zip` / `.rar` / `.parquet` / `.arrow` files and remote files have no random access, so the first look at a file
 decompresses it once into `cache_dir` and builds a line index (and a SQLite table of its decisions). After
 that every line opens instantly. The cache is trimmed to `cache_max_gb` (least recently used first) and
 notices when a file changes (size / modification time). `python -m nli_viewer index` fills it in advance;

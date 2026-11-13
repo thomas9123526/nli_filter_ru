@@ -5,6 +5,7 @@ zstandard>=0.22        # .zst files
 orjson>=3.9            # faster JSON (optional)
 boto3>=1.34            # S3 / MinIO storage (optional if you only use local disk / FTP)
 paramiko>=3.4          # SFTP storage (optional if you do not use sftp://)
+pyarrow>=14            # .parquet / .arrow corpora (optional if you have none); .rar needs WinRAR's Rar / UnRAR tools
 
 # tests only
 pytest>=8

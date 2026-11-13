@@ -25,7 +25,7 @@ Library use
         future = pool.submit(premises, hypotheses)   # non-blocking, concurrent.futures.Future
         scores = pool.score(premises, hypotheses)    # blocking
 
-    # read .jsonl / .json / .gz / .zst / .zip files, folders and globs
+    # read .jsonl / .json / .gz / .zst / .zip / .rar / .parquet / .arrow files, folders and globs
     for rec in iter_records(["data/", "more/*.jsonl.zst"]):
         rec.source, rec.line, rec.data["text"]
 
@@ -765,10 +765,16 @@ class NLIPool:
 
 
 # --------------------------------------------------------------------------------------------------
-# Reading JSONL (plain, .gz, .zst, .zip; files, folders, globs)
+# Reading JSONL (plain, .gz, .zst, .zip, .rar, .parquet; files, folders, globs)
 # --------------------------------------------------------------------------------------------------
 
-SUPPORTED_SUFFIXES = (".jsonl", ".json", ".ndjson", ".zst", ".zstd", ".gz", ".zip")
+try:
+    import nli_formats
+except ImportError:  # pragma: no cover - nli_formats.py lives next to this file
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import nli_formats
+
+SUPPORTED_SUFFIXES = nli_formats.INPUT_SUFFIXES  # .jsonl .json .ndjson (+ .gz .zst .zstd) .zip .rar .parquet
 
 
 def zstd_available() -> bool:
@@ -820,10 +826,11 @@ class Record:
 
 class JsonlSource:
     """
-    One input file: .jsonl/.json/.ndjson, the same compressed with .gz or .zst, or a .zip of them.
+    One input file: .jsonl/.json/.ndjson, the same compressed with .gz or .zst, a .zip or .rar of them, or a
+    .parquet table (row n = line n, see nli_formats.py).
     path may be a local path or a RemoteFile (nli_storage.expand_remote: a file on FTP / SFTP / S3), which is
-    streamed from the server (a .zip is downloaded to a temporary file first). local = an already downloaded
-    copy to read instead; Record.source still names path.
+    streamed from the server (a .zip / .rar / .parquet is downloaded to a temporary file first). local = an
+    already downloaded copy to read instead; Record.source still names path.
     """
 
     def __init__(self, path: PathLike, local: Optional[PathLike] = None):
@@ -841,13 +848,14 @@ class JsonlSource:
                 yield fh
 
     @contextlib.contextmanager
-    def _zip_path(self) -> Iterator[str]:
+    def _local_file(self) -> Iterator[str]:
+        """A real file for the formats that need one (.zip / .rar / .parquet): downloaded first if remote."""
         if self.remote is None:
             yield self.local or self.path
             return
         import tempfile
         from nli_storage import download
-        fd, tmp = tempfile.mkstemp(suffix=".zip", prefix="nli_")
+        fd, tmp = tempfile.mkstemp(suffix=Path(self.path).suffix, prefix="nli_")
         os.close(fd)
         try:
             download(self.remote, tmp)
@@ -858,15 +866,38 @@ class JsonlSource:
 
     @contextlib.contextmanager
     def _open_members(self) -> Iterator[Iterator[Tuple[str, BinaryIO]]]:
-        if self.path.lower().endswith(".zip"):
-            with self._zip_path() as zpath, zipfile.ZipFile(zpath) as zf:
+        low = self.path.lower()
+
+        def usable(name: str) -> bool:  # members: (compressed) JSONL, not archives / tables inside archives
+            return _is_supported(name) and not nli_formats.needs_local_file(name)
+
+        if low.endswith(".zip"):
+            with self._local_file() as zpath, zipfile.ZipFile(zpath) as zf:
                 def members():
                     for info in zf.infolist():
-                        if info.is_dir() or not _is_supported(info.filename) or info.filename.lower().endswith(".zip"):
+                        if info.is_dir() or not usable(info.filename):
                             continue
                         with zf.open(info) as raw, contextlib.closing(_decoded(info.filename, raw)) as fh:
                             yield f"{self.path}!{info.filename}", fh
                 yield members()
+        elif low.endswith(".rar"):
+            with self._local_file() as rpath:
+                def members():
+                    for name in nli_formats.rar_members(rpath):
+                        if not usable(name):
+                            continue
+                        with nli_formats.open_rar_member(rpath, name) as raw, \
+                                contextlib.closing(_decoded(name, raw)) as fh:
+                            yield f"{self.path}!{name}", fh
+                yield members()
+        elif nli_formats.is_table(low):  # .parquet / .arrow / .feather
+            with self._local_file() as ppath:
+                lines = (nli_formats.parquet_lines(ppath) if low.endswith(".parquet")
+                         else nli_formats.arrow_lines(ppath))
+                stream = io.BufferedReader(nli_formats.IterStream(lines),
+                                           buffer_size=1 << 20)
+                with contextlib.closing(stream) as fh:
+                    yield iter([(self.path, fh)])
         else:
             with self._open_raw() as raw, contextlib.closing(_decoded(self.path, raw)) as fh:
                 yield iter([(self.path, fh)])
@@ -1038,7 +1069,8 @@ def _build_parser() -> argparse.ArgumentParser:
     g.add_argument("--check", metavar="MODELS", help="load models (comma list or 'all'), score sample pairs, exit")
     g = p.add_argument_group("what to score")
     g.add_argument("--text", action="append", default=[], help="a text to score (repeatable)")
-    g.add_argument("--input", action="append", default=[], help="JSONL file / folder / glob; .gz .zst .zip ok (repeatable)")
+    g.add_argument("--input", action="append", default=[],
+                   help="JSONL file / folder / glob; .gz .zst .zip .rar .parquet .arrow ok (repeatable)")
     g.add_argument("--text-field", default="text", help="JSON field with the text (default text)")
     g.add_argument("--id-field", default="id", help="JSON field copied to the output (default id)")
     g.add_argument("--limit", type=int, help="stop after this many input lines")

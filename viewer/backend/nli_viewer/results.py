@@ -14,6 +14,9 @@ the same sub folder of the corpus by its name without .jsonl/.zst/... (or by the
 """
 from __future__ import annotations
 
+import contextlib
+import os
+import shutil
 import hashlib
 import json
 import posixpath
@@ -26,12 +29,14 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .explain import explain
-from .lines import LineCache, LineFile
+from .lines import LineCache, LineFile, archive_members
 from .storage import Entry, Storage, clean_path
+
+import nli_formats  # noqa: E402  (project root, put on sys.path by .storage)
 
 __all__ = ["Dataset", "FileResult", "DecisionIndex", "stem", "REASONS"]
 
-_SUFFIXES = (".zst", ".zstd", ".gz", ".zip", ".jsonl", ".json", ".ndjson")
+_SUFFIXES = nli_formats.INPUT_SUFFIXES  # .jsonl .json .ndjson .gz .zst .zstd .zip .rar .parquet
 REASONS = ["blank", "bad_json", "no_text", "no_keyword", "rules_incidental", "check1_negative",
            "check2_incidental", "about_country"]
 _RUN_PREFIX = "summary"
@@ -383,6 +388,7 @@ class Dataset:
         self._line_files: "OrderedDict[Tuple[str, str, Optional[str]], LineFile]" = OrderedDict()
         self._fps: Dict[str, Tuple] = {}
         self.editor = None  # CorpusEditor when the dataset is editable (set by DatasetRegistry)
+        self._members: Dict[str, Tuple[str, List[str]]] = {}  # archive path -> (fingerprint, member names)
 
     # ---- loading --------------------------------------------------------------------------------
 
@@ -522,6 +528,8 @@ class Dataset:
             "corpus": self.corpus.display_uri, "output": self.output.display_uri,
             "files": len(files), "files_complete": sum(1 for f in files if f.summary.get("complete", True)),
             "files_without_corpus": [f.key for f in files if not f.corpus_path],
+            # False: no output folder yet (corpus only); the corpus can still be browsed and edited
+            "output_ready": getattr(self.output, "ready", True),
             "totals": totals, "evaluation": evaluation,
             "run": {k: latest.get(k) for k in ("country", "hypotheses", "settings", "models", "timing", "command",
                                                "finished")} if latest else None,
@@ -633,28 +641,65 @@ class Dataset:
     def _edit_info(self, fr: FileResult, decision: Dict[str, Any], original: Dict[str, Any],
                    text: Optional[str]) -> Dict[str, Any]:
         """Can this line be edited, and was it edited after the filter run (then: the text the run saw)."""
-        member = decision.get("source") if fr.corpus_path and fr.corpus_path.lower().endswith(".zip") else None
+        member = decision.get("source") if fr.corpus_path and nli_formats.is_archive(fr.corpus_path) else None
         problem = self.edit_problem(fr.corpus_path, member) if fr.corpus_path else "corpus file not found"
         if problem is None and (not original.get("available") or text is None):
             problem = original.get("error") or "the line has no text field"
         info: Dict[str, Any] = {"editable": problem is None, "problem": problem, "path": fr.corpus_path,
-                                "line": decision.get("line"), "text": text, "edits": 0,
+                                "member": member, "line": decision.get("line"), "text": text, "edits": 0,
                                 "edited_after_filter": False, "filtered_text": None}
         if original.get("raw") is not None:
             info["sha1"] = hashlib.sha1(original["raw"].encode("utf-8")).hexdigest()
         if self.editor is not None and fr.corpus_path and decision.get("line"):
-            edits, before = self.editor.since(fr.corpus_path, int(decision["line"]), self._decisions_time(fr))
-            info["edits"] = len(self.editor.history(fr.corpus_path, int(decision["line"])))
+            edits, before = self.editor.since(fr.corpus_path, int(decision["line"]), self._decisions_time(fr), member)
+            info["edits"] = len(self.editor.history(fr.corpus_path, int(decision["line"]), member))
             if edits:
                 info.update(edited_after_filter=True, edits_after_filter=len(edits), filtered_text=before,
                             last_edit=edits[-1]["time"])
         return info
 
-    def corpus_lines(self, path: str, start: int = 1, count: int = 20, preview: int = 0) -> Dict[str, Any]:
-        """Lines of a corpus file for the corpus page: text, id, sha1, edits, link to the decision record."""
+    def members(self, path: str) -> List[str]:
+        """Readable members of a .zip / .rar corpus file (remembered per file version; a server file is downloaded
+        once to list them)."""
+        path = clean_path(path)
+        fp = self.corpus.fingerprint(path)
+        hit = self._members.get(path)
+        if hit and hit[0] == fp:
+            return hit[1]
+        local = self.corpus.local_path(path)
+        if local is not None:
+            names = archive_members(local)
+        else:
+            import tempfile
+            fd, tmp = tempfile.mkstemp(suffix=Path(path).suffix, prefix="nli_members_")
+            os.close(fd)
+            try:
+                with self.corpus.open(path) as src, open(tmp, "wb") as dst:
+                    shutil.copyfileobj(src, dst, 8 << 20)
+                names = archive_members(tmp)
+            finally:
+                with contextlib.suppress(OSError):
+                    os.remove(tmp)
+        self._members[path] = (fp, names)
+        return names
+
+    def corpus_lines(self, path: str, start: int = 1, count: int = 20, preview: int = 0,
+                     member: Optional[str] = None) -> Dict[str, Any]:
+        """Lines of a corpus file (or of one member of a .zip / .rar) for the corpus page: text, id, sha1, edits,
+        link to the decision record."""
         from .edit import line_sha1
         path = clean_path(path)
-        lf = self._line_file(self.corpus, path, None)
+        members: Optional[List[str]] = None
+        if nli_formats.is_archive(path):
+            members = self.members(path)
+            if not members:
+                raise KeyError(f"{path} has no readable member (.jsonl / .json / .gz / .zst)")
+            member = member or members[0]
+            if member not in members:
+                raise KeyError(f"{path} has no member '{member}'")
+        else:
+            member = None
+        lf = self._line_file(self.corpus, path, member)
         total = len(lf)
         if total and not 1 <= start <= total:
             raise KeyError(f"line {start} out of range 1..{total}")
@@ -668,7 +713,7 @@ class Dataset:
             # building the decisions table of a big file takes a while: show the lines now, links when it is done
             idx.build_in_background()
             decisions_pending, idx = True, None
-        edited = self.editor.edited_lines(path) if self.editor is not None else {}
+        edited = self.editor.edited_lines(path, member) if self.editor is not None else {}
         rows = []
         for k, raw in enumerate(lf.lines(start, count) if total else []):
             n = start + k
@@ -689,13 +734,14 @@ class Dataset:
                 row["text"] = row["text"][:preview]
                 row["truncated"] = True
             if idx is not None:
-                r = idx.find_row(n)
+                r = idx.find_row(n, member)
                 if r is not None:
                     row["row"] = r
             rows.append(row)
-        return {"path": path, "total_lines": total, "start": start, "count": len(rows), "text_field": text_field,
-                "file_key": fr.key if fr else None, "editable": self.edit_problem(path) is None,
-                "problem": self.edit_problem(path), "decisions_pending": decisions_pending, "lines": rows}
+        return {"path": path, "member": member, "members": members, "total_lines": total, "start": start,
+                "count": len(rows), "text_field": text_field,
+                "file_key": fr.key if fr else None, "editable": self.edit_problem(path, member) is None,
+                "problem": self.edit_problem(path, member), "decisions_pending": decisions_pending, "lines": rows}
 
     def simulate(self, check1: float, check2: float, max_flips: int = 300,
                  sweep: Iterable[float] = ()) -> Dict[str, Any]:

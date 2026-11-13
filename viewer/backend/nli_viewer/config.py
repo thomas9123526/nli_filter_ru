@@ -21,6 +21,9 @@ Editing (see edit.py): "editable": true on a dataset whose corpus is on a local 
 keys: "edits_dir" (backups of the original files + edit log, default ".viewer_edits"), "edit_zstd_level" (3),
 "edit_allow_remote" (false: only a browser on the viewer's own PC may edit, also when started with -Public).
 
+"output" may be left out, or be a local folder that does not exist yet (corpus only, e.g. to browse or edit it
+before running nli_filter.py): the viewer shows "no filter results yet" and picks the folder up once it appears.
+
 ${VAR} is replaced with the environment variable VAR, so passwords need not be written in the file.
 Comments (// ...) are allowed.
 """
@@ -32,11 +35,11 @@ import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, BinaryIO, Dict, List, Optional
 
 from .lines import LineCache
 from .results import Dataset
-from .storage import open_storage
+from .storage import Entry, LocalStorage, Storage, clean_path, open_storage
 
 __all__ = ["DatasetConfig", "ViewerConfig", "load_config", "quick_config", "DatasetRegistry"]
 
@@ -45,7 +48,7 @@ __all__ = ["DatasetConfig", "ViewerConfig", "load_config", "quick_config", "Data
 class DatasetConfig:
     name: str
     corpus: str
-    output: str
+    output: str = ""                # "" = no filter results (yet): corpus only
     title: Optional[str] = None
     description: str = ""
     corpus_options: Dict[str, Any] = field(default_factory=dict)
@@ -99,8 +102,8 @@ def load_config(path: str) -> ViewerConfig:
     names = set()
     datasets = []
     for d in data.get("datasets", []):
-        if not d.get("name") or not d.get("corpus") or not d.get("output"):
-            raise ValueError(f"{p}: every dataset needs name, corpus and output: {d}")
+        if not d.get("name") or not d.get("corpus"):
+            raise ValueError(f"{p}: every dataset needs name and corpus (output is optional): {d}")
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", d["name"]):
             raise ValueError(f"{p}: dataset name '{d['name']}' may use only letters, digits, _ . -")
         if d["name"] in names:
@@ -154,7 +157,7 @@ class DatasetRegistry:
                 return self._open[name]
             try:
                 corpus = open_storage(c.corpus, self.cfg.base_dir, **c.corpus_options)
-                output = open_storage(c.output, self.cfg.base_dir, **c.output_options)
+                output = _open_output(c.output, self.cfg.base_dir, c.output_options)
             except Exception as exc:
                 self._errors[name] = str(exc)
                 raise
@@ -204,6 +207,70 @@ class DatasetRegistry:
         for ds in self._open.values():
             ds.corpus.close()
             ds.output.close()
+
+
+class PendingOutput(Storage):
+    """
+    Output location without results yet: no "output" in the config, or a local folder that does not exist yet.
+    Looks like an empty folder; a local folder is used as soon as it appears (nli_filter.py creates it).
+    """
+
+    def __init__(self, path: Optional[str]):
+        self.path = Path(path).expanduser().resolve() if path else None
+        self.uri = str(self.path) if self.path else "(none)"
+        self._real: Optional[LocalStorage] = None
+
+    @property
+    def ready(self) -> bool:
+        return self._get() is not None
+
+    def _get(self) -> Optional[LocalStorage]:
+        if self._real is None and self.path is not None and self.path.is_dir():
+            self._real = LocalStorage(str(self.path))
+        return self._real
+
+    @property
+    def display_uri(self) -> str:
+        if self.path is None:
+            return "(no output folder configured)"
+        return self.uri if self.ready else f"{self.uri} (not created yet)"
+
+    def list(self, path: str = "") -> List[Entry]:
+        real = self._get()
+        if real is not None:
+            return real.list(path)
+        if clean_path(path):
+            raise FileNotFoundError(path)
+        return []
+
+    def stat(self, path: str) -> Entry:
+        real = self._get()
+        if real is None:
+            raise FileNotFoundError(path)
+        return real.stat(path)
+
+    def open(self, path: str) -> BinaryIO:
+        real = self._get()
+        if real is None:
+            raise FileNotFoundError(path)
+        return real.open(path)
+
+    def local_path(self, path: str) -> Optional[str]:
+        real = self._get()
+        return real.local_path(path) if real is not None else None
+
+
+def _open_output(uri: str, base_dir: str, options: Dict[str, Any]) -> Storage:
+    """The output storage; a missing / not yet created local folder gives an empty PendingOutput."""
+    if not uri:
+        return PendingOutput(None)
+    try:
+        return open_storage(uri, base_dir, **options)
+    except FileNotFoundError:
+        if re.match(r"^[A-Za-z]:[\\/]", uri) or "://" not in uri or uri.lower().startswith("file:"):
+            p = Path(uri[7:] if uri.lower().startswith("file://") else uri)
+            return PendingOutput(str(p if p.is_absolute() else Path(base_dir) / p))
+        raise
 
 
 def _mask(uri: str) -> str:

@@ -58,6 +58,7 @@ export type Overview = {
   files: number;
   files_complete: number;
   files_without_corpus: string[];
+  output_ready?: boolean; // false: the output folder does not exist yet (corpus only)
   totals: Totals;
   evaluation: Evaluation | null;
   run: RunInfo | null;
@@ -242,6 +243,7 @@ export type EditInfo = {
   editable: boolean;
   problem: string | null;
   path: string | null;
+  member?: string | null;       // .zip / .rar: the member file the line is in
   line: number | null;
   text: string | null;          // current text of the line
   sha1?: string;                // sha1 of the current line (sent back on save: conflict check)
@@ -266,6 +268,7 @@ export type EditEntry = {
 
 export type LineState = {
   path: string;
+  member?: string | null;
   line: number;
   raw: string;
   sha1: string;
@@ -292,6 +295,8 @@ export type CorpusLine = {
 
 export type CorpusLines = {
   path: string;
+  member: string | null;        // .zip / .rar: the member shown
+  members: string[] | null;     // .zip / .rar: all readable members; null for other files
   total_lines: number;
   start: number;
   count: number;
