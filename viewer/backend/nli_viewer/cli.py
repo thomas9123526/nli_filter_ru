@@ -187,7 +187,7 @@ def cmd_verify(args) -> int:
     ds = DatasetRegistry(_config(args)).get(args.dataset)
     problems: Dict[str, int] = {}
     examples = []
-    n = 0
+    n = edited = 0
     t0 = time.perf_counter()
     for f in ds.files():
         if args.file and f.key != args.file:
@@ -206,6 +206,9 @@ def cmd_verify(args) -> int:
                 elif not rec["id_check"]["match"]:
                     issues.append("id differs")
                 text = (rec["original"].get("record") or {}).get(rec["text_field"]) if rec["original"].get("record") else None
+                if (rec.get("edit") or {}).get("edited_after_filter"):
+                    edited += 1  # edited in the viewer after the run: check the spans against the text the run saw
+                    text = rec["edit"].get("filtered_text")
                 if isinstance(text, str):
                     for h in rec["decision"].get("hits") or []:
                         s, e = h["span"]
@@ -219,9 +222,37 @@ def cmd_verify(args) -> int:
         print(f"\r{n} decisions checked", end="", flush=True)
     print(f"\r{n} decisions checked in {time.perf_counter() - t0:.1f}s: "
           + ("all consistent" if not problems else ", ".join(f"{k}: {v}" for k, v in problems.items())))
+    if edited:
+        print(f"  {edited} line(s) were edited in the viewer after the run (not errors; their decisions are for the"
+              " text before the edit: rerun nli_filter.py on those files to update them)")
     for e in examples:
         print("  " + e)
     return 1 if problems else 0
+
+
+def cmd_edits(args) -> int:
+    """Edits made in the viewer (oldest first)."""
+    ds = DatasetRegistry(_config(args)).get(args.dataset)
+    if ds.editor is None:
+        print(f"{args.dataset}: editing is off (no \"editable\": true in the config)")
+        return 0
+    rows = ds.editor.history(args.path or None, args.line)
+    if args.json:
+        for e in rows:
+            print(json.dumps(e, ensure_ascii=False))
+        return 0
+    for e in rows:
+        undo = f" (undo of {e['undo_of']})" if e.get("undo_of") else ""
+        print(f"{e['time']}  {e['edit']}  {e['file']}:{e['line']}  id {e.get('id')}{undo}")
+        print(f"    old: {_short(e['old'])}")
+        print(f"    new: {_short(e['new'])}")
+    print(f"{len(rows)} edit(s); log: {ds.editor.log_path}; original files: {ds.editor.dir / 'originals'}")
+    return 0
+
+
+def _short(text: str, n: int = 160) -> str:
+    t = text.replace("\n", " ")
+    return t if len(t) <= n else t[:n] + f"... ({len(text)} chars)"
 
 
 def cmd_check(args) -> int:
@@ -301,6 +332,12 @@ def build_parser() -> argparse.ArgumentParser:
     common(s)
     s.add_argument("--file", help="only this file key")
     s.set_defaults(fn=cmd_verify)
+    s = sub.add_parser("edits", help="corpus edits made in the viewer (old and new text)")
+    common(s)
+    s.add_argument("--path", default="", help="only this corpus file")
+    s.add_argument("--line", type=int, default=None, help="only this line")
+    s.add_argument("--json", action="store_true", help="one JSON object per edit")
+    s.set_defaults(fn=cmd_edits)
     s = sub.add_parser("check", help="check that every dataset's storage can be reached")
     common(s, dataset=False)
     s.set_defaults(fn=cmd_check)

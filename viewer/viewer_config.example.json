@@ -9,7 +9,8 @@
       "name": "test_corpus",
       "title": "Test corpus (local disk)",
       "corpus": "../test_corpus",
-      "output": "../out_test_corpus"
+      "output": "../out_test_corpus",
+      "editable": true                    // allow editing the text of corpus lines (local corpus only; see README)
     },
     {
       // FTP: user and password in the URI or in *_options; ftps:// for FTP over TLS

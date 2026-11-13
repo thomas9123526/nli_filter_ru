@@ -20,6 +20,7 @@ Notes from 2026-11-10. The viewer works on another computer as long as you leave
 | No | `viewer\backend\.venv` | 324 MB | Only works on the PC that made it. The script makes a new one on first start. |
 | No | `viewer\frontend\node_modules` | 351 MB | Only needed to rebuild the web pages |
 | Optional | `viewer\.viewer_cache` | 1.5 MB | Safe to leave out; it gets rebuilt |
+| Optional | `viewer\.viewer_edits` | small | Only if you edited corpus text in the viewer: backups of the original files and the edit log (needed for Undo) |
 | Yes | The corpus and output folders | as large as they are | Keep them in the same place relative to `viewer\` (for example `test_corpus_de` and `out_test_corpus_de` next to `viewer`), or edit the paths in `viewer_config.json` |
 
 `viewer\frontend\out` is in `.gitignore`, so a git clone does not include it: copy it by hand.

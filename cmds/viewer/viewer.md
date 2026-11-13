@@ -49,6 +49,9 @@ themselves within 30 s.
 5. **Tune thresholds** (button on the dataset page): move the check-1 / check-2 thresholds and see which
    lines would flip and how precision / recall change, without running a model. Use the result for
    `--check1-threshold` / `--check2-threshold` in the next `nli_filter.py` run.
+6. **Browse corpus** (button on the dataset page): the corpus folders, files and lines. With
+   `"editable": true` on the dataset (local corpus only), the text of a line can be edited, also inside .zst
+   files: see `edit_corpus.md`.
 
 Hit colours: red = not incidental, amber = check 1 only, teal = incidental (check 2), blue = resolved by a
 rule. Shaded = check-1 window, dotted underline = check-2 window.

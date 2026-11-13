@@ -74,3 +74,58 @@ def test_pages_render(server, tmp_path):
 def test_error_states_render(server, tmp_path):
     assert "unknown dataset" in dom(server + "/dataset/?ds=nope", tmp_path)
     assert "no results for" in dom(server + "/record/?ds=t&f=nope&line=1", tmp_path)
+
+
+@pytest.fixture(scope="module")
+def edit_server(tmp_path_factory):
+    """An editable dataset on its own copy of the test tree (the tests change its corpus)."""
+    import uvicorn
+    from conftest import build_tree
+    root = tmp_path_factory.mktemp("uiedit")
+    tree = build_tree(root / "tree")
+    cfg = ViewerConfig(datasets=[DatasetConfig(name="e", title="Editable data", corpus=str(tree / "corpus"),
+                                               output=str(tree / "out"), editable=True)],
+                       cache_dir=str(root / "cache"), edits_dir=str(root / "edits"))
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    srv = uvicorn.Server(uvicorn.Config(create_app(cfg), host="127.0.0.1", port=port, log_level="warning"))
+    t = threading.Thread(target=srv.run, daemon=True)
+    t.start()
+    for _ in range(100):
+        if srv.started:
+            break
+        time.sleep(0.1)
+    yield f"http://127.0.0.1:{port}"
+    srv.should_exit = True
+    t.join(timeout=10)
+
+
+def test_corpus_pages_and_editing_render(edit_server, tmp_path):
+    import httpx
+    folder = dom(edit_server + "/corpus/?ds=e", tmp_path)
+    assert "Editing is on" in folder and "a/" in folder and "b/" in folder
+    lines = dom(edit_server + "/corpus/?ds=e&file=a/x.jsonl.zst", tmp_path)
+    assert 'data-testid="line-1"' in lines and "ax-5" in lines and "Preheat the oven" in lines
+    assert ">Edit</button>" in lines and "decision ›" in lines
+    rec = dom(edit_server + "/record/?ds=e&f=a/x&line=1", tmp_path)
+    assert 'data-testid="edit-text"' in rec and 'data-testid="edited-after-filter"' not in rec
+    # edit line 1 through the API, as the editor does
+    cur = httpx.get(edit_server + "/api/datasets/e/corpus/lines", params={"path": "a/x.jsonl.zst", "count": 1}).json()
+    r = httpx.post(edit_server + "/api/datasets/e/corpus/edit", headers={"X-Viewer-Edit": "1"},
+                   json={"path": "a/x.jsonl.zst", "line": 1, "text": "Edited: Russia is big.", "sha1": cur["lines"][0]["sha1"]})
+    assert r.status_code == 200
+    rec = dom(edit_server + "/record/?ds=e&f=a/x&line=1", tmp_path)
+    assert 'data-testid="edited-after-filter"' in rec and "Edited: Russia is big." in rec
+    assert "Russia is the largest country" in rec  # the highlighted text is still the one the run saw
+    assert "Edit history of this line (1)" in rec
+    lines = dom(edit_server + "/corpus/?ds=e&file=a/x.jsonl.zst", tmp_path)
+    assert "Edited: Russia is big." in lines and "edited 1×" in lines
+
+
+def test_read_only_dataset_has_no_edit_buttons(server, tmp_path):
+    lines = dom(server + "/corpus/?ds=t&file=a/x.jsonl.zst", tmp_path)
+    assert "read-only" in lines and "editing is off" in lines and ">Edit</button>" not in lines
+    rec = dom(server + "/record/?ds=t&f=a/x&line=1", tmp_path)
+    assert 'data-testid="edit-text"' not in rec

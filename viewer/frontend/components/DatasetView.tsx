@@ -23,6 +23,7 @@ export function DatasetView() {
         </div>
         <span className="spacer" />
         <Link className="btn" href={href("/tune", { ds })}>Tune thresholds</Link>
+        <Link className="btn" href={href("/corpus", { ds })}>Browse corpus</Link>
         <FindById ds={ds} />
       </div>
       <ErrorBox error={ov.error} onRetry={ov.reload} />

@@ -205,3 +205,25 @@ def test_config_file(tmp_path, monkeypatch, tree):
     p.write_text(json.dumps({"datasets": [{"name": "bad name", "corpus": "a", "output": "b"}]}))
     with pytest.raises(ValueError):
         load_config(str(p))
+
+
+def test_simulate_marks_early_stop_results_estimated(ds, monkeypatch):
+    runs = ds.runs()
+    assert ds.simulate(0.98, 0.8)["simulated"]["counts"]["estimated"] == 0   # old run: all scores were computed
+    early = [{**r, "settings": {**(r.get("settings") or {}), "early_stop": True}} for r in runs]
+    monkeypatch.setattr(ds, "runs", lambda: early)
+    strict = ds.simulate(0.98, 0.8)        # stored check-1 score may be the first >= 0.8, not the best
+    assert strict["simulated"]["counts"]["to_keep"] == strict["simulated"]["counts"]["estimated"] > 0
+    lax2 = ds.simulate(0.8, 0.05)          # hits after the first not-incidental one were not scored
+    assert lax2["simulated"]["counts"]["to_keep"] == lax2["simulated"]["counts"]["estimated"] > 0
+    assert ds.simulate(0.8, 0.8)["simulated"]["counts"]["estimated"] == 0
+
+
+def test_explain_early_stop_notes():
+    d = {"line": 1, "decision": "filter", "reason": "about_country", "check2_skipped": 3,
+         "check1": {"score": 0.9, "positive": True, "hyp": "topic", "window": [0, 5], "skipped": 2,
+                    "pairs": [{"window": [0, 5], "hyp": "topic", "fast": 0.9, "judge": None, "score": 0.9}]},
+         "hits": [{"kw": "Russia", "span": [0, 6]}]}
+    steps = explain("Russia", d, {})["verdict"]["steps"]
+    assert any("check 1 stopped early: 2 more windows" in s for s in steps)
+    assert any("check 2 stopped early: 3 more hits" in s for s in steps)

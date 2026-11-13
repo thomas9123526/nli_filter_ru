@@ -90,10 +90,38 @@ folder of the corpus (`books/part-00/shard-00000.jsonl.zst`), so point `corpus` 
 | Dataset | Totals, why lines were kept or filtered, evaluation (when lines have `expect`), run settings, models, hypotheses, file list (filter by path, files with mistakes, partial, missing corpus), find a line by id |
 | File | All decisions of one file: quick filters (filtered / kept / each reason / wrong vs expected / decided by the judge), search by id, keyword or line number, check-1 score range, sortable columns, paging |
 | Tune thresholds | Move the check-1 / check-2 thresholds and see at once how many lines would flip, which ones, and (with `expect` labels) precision / recall / F1 before and after, plus a check-1 sweep table. Recomputed from the stored scores, no model runs. Lines that were check-1 negative never went to check 2: if a lower threshold makes them positive they are counted as filtered and marked "estimated" |
+| Corpus | "Browse corpus" on the dataset page: the corpus folders and files, then any file's lines, 20 per page (go to line N); each line's id, text, a link to its decision, and **Edit** when editing is on (see below) |
 | Record | Verdict and the steps behind it; the original text with hits coloured by what happened to them, check-1 windows shaded, check-2 windows underlined (hover or click a hit or score row to locate it); check-1 and check-2 tables with hypothesis, fast, judge and final score against the threshold; models; file locations; raw JSON of the line and of the decision. `j` / `k` = next / previous (within the active filters), `Esc` = back to the list |
 
 Long texts (over 30,000 characters) are shown as the parts around the hits and windows, with the
 skipped stretches marked.
+
+## Editing corpus lines
+
+The text field of a corpus line can be changed in the viewer, also inside `.zst` and `.gz` files. It is off
+by default: turn it on per dataset in `viewer_config.json` and restart the viewer.
+
+```json
+{"name": "test_corpus_de", "corpus": "../test_corpus_de", "output": "../out_test_corpus_de", "editable": true}
+```
+
+Then use **Edit text** on a record page, or **Edit** on any line of the Corpus page (also lines without a
+decision). `Ctrl+Enter` saves, `Esc` cancels.
+
+| What | How |
+|---|---|
+| What can change | Only the text field (`text`, or the run's `--text-field`). The `id` and all other fields stay; the line keeps the JSON style of the file |
+| Which corpora | Local, mapped-drive or UNC folders (`D:\...`, `Z:\...`, `\\server\share\...`). FTP, SFTP and S3 corpora, and lines inside `.zip` files, stay read-only |
+| Who may edit | Only a browser on the PC the viewer runs on (`http://127.0.0.1:8000`, or the PC's own network address), also with `-Public` (other PCs see the pages read-only). `"edit_allow_remote": true` at the top of the config allows other PCs |
+| How a save works | The whole file is written again, compressed like the original, to a temporary file next to it; that file is decompressed and checked; then it replaces the original in one step. A crash or power cut leaves the old file complete |
+| Conflicts | The save sends a fingerprint (sha1) of the line as it was loaded. If the line changed in the meantime (another tab or person), the save is refused: reload and edit again |
+| Backup | The first edit of a file copies the untouched original to `.viewer_edits/<dataset>/originals/<same path>`. Later edits keep that first copy. To go back completely, copy it over the corpus file |
+| Log and undo | Every edit (time, file, line, id, old and new text) is appended to `.viewer_edits/<dataset>/edits.jsonl`. **Undo** in the line's edit history puts the old text back (latest change first). `python -m nli_viewer edits` lists them |
+| Many lines at once | On the Corpus page, **Add to pending changes** instead of Save: changes are collected (also across pages of the same file) and **Save all** writes them in one rewrite, all or nothing. The browser warns before leaving with unsaved changes |
+| Time | A save rewrites the whole file. Measured with 3,000,000 lines (287 MB `.zst`, 689 MB decompressed): about 9 s for one line, 10 s for 20 lines saved together; under a second for the test corpus. zstd uses all CPU cores; level `"edit_zstd_level"` (default 3). The checked new copy goes straight into the cache, so the next page needs no decompression |
+| First look at a big file | The lines show after the file is decompressed once (3.4 s for the file above); the "decision ›" links follow when the decisions table is built in the background (24 s there; "linking decisions…" meanwhile) |
+| Filter results | Decisions belong to the text the run saw. A line edited after the run is marked "edited after the filter run" on its record page: verdict, highlights and scores are shown for the old text, the current text below. Rerun `nli_filter.py` on the file for decisions on the new text. `verify` counts such lines separately, not as errors |
+| Don't | Edit a file while `nli_filter.py` is reading it. Windows refuses to replace an open file; the save then fails and the file stays as it was |
 
 ## Command line
 
@@ -109,6 +137,7 @@ cd viewer\backend
 .venv\Scripts\python.exe -m nli_viewer index     --config ..\viewer_config.json      # prepare all caches in advance
 .venv\Scripts\python.exe -m nli_viewer verify    --config ..\viewer_config.json test_corpus   # every decision vs its line
 .venv\Scripts\python.exe -m nli_viewer check     --config ..\viewer_config.json      # can every server be reached?
+.venv\Scripts\python.exe -m nli_viewer edits     --config ..\viewer_config.json test_corpus   # corpus edits made in the viewer
 ```
 
 `verify` checks every decision: the original line exists, its `id` equals the decision's `id`, and every
@@ -149,6 +178,11 @@ Over FTP, SFTP or S3 the first look also includes the download.
 | `GET /api/datasets/{ds}/raw?root=corpus\|output&path=&line=&count=` | raw lines of any file |
 | `GET /api/datasets/{ds}/browse?root=corpus\|output&path=` | folder listing |
 | `POST /api/datasets/{ds}/refresh` | rescan the output folder now (it is rescanned every 30 s anyway) |
+| `GET /api/datasets/{ds}/corpus/lines?path=&start=&count=&preview=` | corpus lines: id, text, sha1, number of edits, decision row |
+| `GET /api/datasets/{ds}/corpus/edit-status?path=` | can this browser edit this dataset / file, and if not, why |
+| `POST /api/datasets/{ds}/corpus/edit` body `{path, line, text, sha1}` | change a line's text (needs header `X-Viewer-Edit: 1`; 409 when the line changed since it was loaded) |
+| `GET /api/datasets/{ds}/corpus/edits?path=&line=` | edit log |
+| `POST /api/datasets/{ds}/corpus/edits/{edit}/undo` | undo an edit (same header) |
 
 ## Developing the UI
 
@@ -163,8 +197,8 @@ writes the static UI to `frontend/out`, which the backend serves.
 ## Tests
 
 ```powershell
-cd viewer\backend; .venv\Scripts\python.exe -m pytest      # 52 tests: storages (real FTP, SFTP + S3 servers), lines,
-                                                           # results, API, and the built UI in headless Chrome
+cd viewer\backend; .venv\Scripts\python.exe -m pytest      # 66 tests: storages (real FTP, SFTP + S3 servers), lines,
+                                                           # results, API, editing, and the built UI in headless Chrome
 .venv\Scripts\python.exe -m pytest -k "not ui"             # without the browser test (~30 s instead of ~3 min)
 cd viewer\frontend; npm run typecheck; npm run build
 ```
@@ -178,6 +212,7 @@ cd viewer\frontend; npm run typecheck; npm run build
 | `backend/nli_viewer/results.py` | `Dataset`, `DecisionIndex` (SQLite), file matching |
 | `backend/nli_viewer/explain.py` | highlight segments, score tables, verdict text |
 | `backend/nli_viewer/config.py` | config file, dataset registry |
+| `backend/nli_viewer/edit.py` | `CorpusEditor`: change a line's text in a .zst / .gz / plain file safely; backup, log, undo |
 | `backend/nli_viewer/api.py` | FastAPI app |
 | `backend/nli_viewer/cli.py` | command line |
 | `frontend/app`, `frontend/components`, `frontend/lib` | Next.js pages, UI components, API client and types |

@@ -1,7 +1,10 @@
 "use client";
 // Small typed client for the nli_viewer backend + a data-loading hook.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DatasetInfo, DecisionsResp, FileRow, FindMatch, Overview, RecordResp, SimResp } from "./types";
+import type {
+  BatchResp, BrowseEntry, CorpusLines, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
+  RecordResp, SimResp,
+} from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
@@ -25,9 +28,22 @@ export class ApiError extends Error {
 }
 
 export async function getJSON<T>(path: string, params?: Params, signal?: AbortSignal): Promise<T> {
+  return request<T>(`${API_BASE}${path}${query(params)}`, { signal, headers: { Accept: "application/json" } });
+}
+
+/** POST for editing: JSON body + the X-Viewer-Edit header the backend requires for every change. */
+export async function postJSON<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", "X-Viewer-Edit": "1" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+async function request<T>(url: string, init: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}${query(params)}`, { signal, headers: { Accept: "application/json" } });
+    res = await fetch(url, init);
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
     throw new ApiError(`Cannot reach the viewer backend (${(e as Error).message}). Is it running?`, 0);
@@ -56,6 +72,17 @@ export const api = {
   find: (ds: string, id: string, s?: AbortSignal) =>
     getJSON<{ matches: FindMatch[] }>(`/api/datasets/${enc(ds)}/find`, { id }, s),
   simulate: (ds: string, p: Params, s?: AbortSignal) => getJSON<SimResp>(`/api/datasets/${enc(ds)}/simulate`, p, s),
+  browse: (ds: string, path: string, s?: AbortSignal) =>
+    getJSON<{ root: string; path: string; entries: BrowseEntry[] }>(`/api/datasets/${enc(ds)}/browse`, { root: "corpus", path }, s),
+  corpusLines: (ds: string, p: Params, s?: AbortSignal) => getJSON<CorpusLines>(`/api/datasets/${enc(ds)}/corpus/lines`, p, s),
+  editStatus: (ds: string, path: string, s?: AbortSignal) =>
+    getJSON<EditStatus>(`/api/datasets/${enc(ds)}/corpus/edit-status`, { path }, s),
+  edits: (ds: string, p: Params, s?: AbortSignal) => getJSON<{ edits: EditEntry[] }>(`/api/datasets/${enc(ds)}/corpus/edits`, p, s),
+  editText: (ds: string, body: { path: string; line: number; text: string; sha1: string }) =>
+    postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edit`, body),
+  editBatch: (ds: string, body: { path: string; changes: { line: number; text: string; sha1: string }[] }) =>
+    postJSON<BatchResp>(`/api/datasets/${enc(ds)}/corpus/edit-batch`, body),
+  undoEdit: (ds: string, edit: string) => postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edits/${enc(edit)}/undo`),
 };
 
 export type Loaded<T> = { data: T | null; error: ApiError | null; loading: boolean; reload: () => void };

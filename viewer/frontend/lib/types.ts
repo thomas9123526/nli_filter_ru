@@ -7,6 +7,7 @@ export type DatasetInfo = {
   corpus: string;
   output: string;
   error: string | null;
+  editable?: boolean;
 };
 
 export type Totals = {
@@ -207,6 +208,7 @@ export type RecordResp = {
     error?: string;
   };
   text_field: string;
+  edit?: EditInfo;
   id_check: { decision_id: unknown; original_id: unknown; match: boolean };
   explanation: Explanation;
   nav: {
@@ -233,3 +235,76 @@ export type SimResp = {
   band: [number, number] | null;
   sweep: { check1: number; check2: number; filter: number; estimated: number; metrics: SimMetrics }[];
 };
+
+// ---- corpus editing ----
+
+export type EditInfo = {
+  editable: boolean;
+  problem: string | null;
+  path: string | null;
+  line: number | null;
+  text: string | null;          // current text of the line
+  sha1?: string;                // sha1 of the current line (sent back on save: conflict check)
+  edits: number;                // all edits of this line
+  edited_after_filter: boolean; // edited after the decisions file was written
+  edits_after_filter?: number;
+  filtered_text: string | null; // the text the filter run saw (highlights and scores belong to it)
+  last_edit?: string;
+};
+
+export type EditEntry = {
+  edit: string;
+  time: string;
+  file: string;
+  line: number;
+  id: unknown;
+  field: string;
+  old: string;
+  new: string;
+  undo_of?: string;
+};
+
+export type LineState = {
+  path: string;
+  line: number;
+  raw: string;
+  sha1: string;
+  text_field: string;
+  text: string | null;
+  id: unknown;
+  error?: string;
+};
+
+export type EditResp = LineState & { changed: boolean; entry?: EditEntry };
+
+export type CorpusLine = {
+  line: number;
+  sha1: string;
+  id: unknown;
+  text: string | null;
+  text_length?: number;
+  truncated?: boolean;
+  edits: number;
+  row?: number;
+  error?: string;
+  raw?: string;
+};
+
+export type CorpusLines = {
+  path: string;
+  total_lines: number;
+  start: number;
+  count: number;
+  text_field: string;
+  file_key: string | null;
+  editable: boolean;
+  problem: string | null;
+  decisions_pending?: boolean; // decision links still being prepared (first look at a big file)
+  lines: CorpusLine[];
+};
+
+export type BatchResp = { changed: number; entries: EditEntry[]; seconds: number; lines: LineState[] };
+
+export type BrowseEntry = { name: string; path: string; is_dir: boolean; size: number | null; mtime: number | null };
+
+export type EditStatus = { editable: boolean; problem: string | null; dataset_editable: boolean };

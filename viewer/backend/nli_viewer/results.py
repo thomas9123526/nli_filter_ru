@@ -14,6 +14,7 @@ the same sub folder of the corpus by its name without .jsonl/.zst/... (or by the
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import posixpath
 import sqlite3
@@ -108,6 +109,37 @@ class DecisionIndex:
         self._db: Optional[str] = None
         self._lock = threading.Lock()
         self._local = threading.local()
+        self._bg: Optional[threading.Thread] = None
+        self.error: Optional[str] = None  # last background build error
+
+    def ready(self) -> bool:
+        """True when the SQLite table exists already (no build needed); cheap: one stat, no decompression."""
+        if self._db:
+            return True
+        st, path = self.decisions.storage, self.decisions.path
+        key = self.cache.key("decision-index-v1", st.uri, path, st.fingerprint(path))
+        db = self.cache.dir(key) / "decisions.sqlite"
+        if db.exists():
+            with self._lock:
+                self._db = self._db or str(db)
+            return True
+        return False
+
+    def build_in_background(self) -> None:
+        """Start building the table in a thread (no-op when it is ready or already being built)."""
+        with self._lock:
+            if self._db or (self._bg is not None and self._bg.is_alive()):
+                return
+
+            def run():
+                try:
+                    self._ensure()
+                    self.error = None
+                except Exception as exc:  # noqa: BLE001 - reported to the caller via .error
+                    self.error = str(exc)
+
+            self._bg = threading.Thread(target=run, name="decision-index", daemon=True)
+            self._bg.start()
 
     def _ensure(self) -> str:
         if self._db:
@@ -350,6 +382,7 @@ class Dataset:
         self._indexes: "OrderedDict[str, DecisionIndex]" = OrderedDict()
         self._line_files: "OrderedDict[Tuple[str, str, Optional[str]], LineFile]" = OrderedDict()
         self._fps: Dict[str, Tuple] = {}
+        self.editor = None  # CorpusEditor when the dataset is editable (set by DatasetRegistry)
 
     # ---- loading --------------------------------------------------------------------------------
 
@@ -566,6 +599,9 @@ class Dataset:
                 original["error"] = f"line {decision.get('line')} not found in {fr.corpus_path}: {exc}"
         else:
             original["error"] = "corpus file not found"
+        edit = self._edit_info(fr, decision, original, text)
+        if edit.get("edited_after_filter") and edit.get("filtered_text") is not None:
+            text = edit["filtered_text"]  # the decision's spans and scores belong to the text before the edits
         if original.get("record") is not None and len(original.get("raw", "")) > 200000:
             original["raw"] = original["raw"][:200000]
             original["raw_truncated"] = True
@@ -573,12 +609,93 @@ class Dataset:
                        and str(decision["id"]) != str(original["id"]))
         return {
             "dataset": self.name, "file": key, "row": int(row), "line": decision.get("line"),
-            "decision": decision, "original": original, "text_field": text_field,
+            "decision": decision, "original": original, "text_field": text_field, "edit": edit,
             "id_check": {"decision_id": decision.get("id"), "original_id": original.get("id"), "match": not id_mismatch},
             "explanation": explain(text, decision, run, max_chars=max_chars),
             "nav": idx.neighbours(int(row), **filters),
             "files": {"corpus": fr.corpus_path, "decisions": fr.decisions_path, "summary": fr.summary_path},
         }
+
+    # ---- editing (see edit.py) ------------------------------------------------------------------
+
+    def edit_problem(self, path: Optional[str] = None, member: Optional[str] = None) -> Optional[str]:
+        """Why the corpus (or this corpus file) cannot be edited; None = it can."""
+        if self.editor is None:
+            return 'editing is off for this dataset (set "editable": true in viewer_config.json)'
+        return self.editor.problem(path, member)
+
+    def _decisions_time(self, fr: FileResult) -> Optional[float]:
+        try:
+            return self.output.stat(fr.decisions_path).mtime if fr.decisions_path else None
+        except (FileNotFoundError, OSError):
+            return None
+
+    def _edit_info(self, fr: FileResult, decision: Dict[str, Any], original: Dict[str, Any],
+                   text: Optional[str]) -> Dict[str, Any]:
+        """Can this line be edited, and was it edited after the filter run (then: the text the run saw)."""
+        member = decision.get("source") if fr.corpus_path and fr.corpus_path.lower().endswith(".zip") else None
+        problem = self.edit_problem(fr.corpus_path, member) if fr.corpus_path else "corpus file not found"
+        if problem is None and (not original.get("available") or text is None):
+            problem = original.get("error") or "the line has no text field"
+        info: Dict[str, Any] = {"editable": problem is None, "problem": problem, "path": fr.corpus_path,
+                                "line": decision.get("line"), "text": text, "edits": 0,
+                                "edited_after_filter": False, "filtered_text": None}
+        if original.get("raw") is not None:
+            info["sha1"] = hashlib.sha1(original["raw"].encode("utf-8")).hexdigest()
+        if self.editor is not None and fr.corpus_path and decision.get("line"):
+            edits, before = self.editor.since(fr.corpus_path, int(decision["line"]), self._decisions_time(fr))
+            info["edits"] = len(self.editor.history(fr.corpus_path, int(decision["line"])))
+            if edits:
+                info.update(edited_after_filter=True, edits_after_filter=len(edits), filtered_text=before,
+                            last_edit=edits[-1]["time"])
+        return info
+
+    def corpus_lines(self, path: str, start: int = 1, count: int = 20, preview: int = 0) -> Dict[str, Any]:
+        """Lines of a corpus file for the corpus page: text, id, sha1, edits, link to the decision record."""
+        from .edit import line_sha1
+        path = clean_path(path)
+        lf = self._line_file(self.corpus, path, None)
+        total = len(lf)
+        if total and not 1 <= start <= total:
+            raise KeyError(f"line {start} out of range 1..{total}")
+        settings = (max(self.runs(), key=lambda r: r.get("finished", ""), default={}).get("settings") or {})
+        text_field = self._text_field or settings.get("text_field") or "text"
+        id_field = self._id_field or settings.get("id_field") or "id"
+        fr = next((f for f in self.files() if f.corpus_path == path), None)
+        idx = self.decisions(fr.key) if fr is not None and fr.decisions_path else None
+        decisions_pending = False
+        if idx is not None and not idx.ready():
+            # building the decisions table of a big file takes a while: show the lines now, links when it is done
+            idx.build_in_background()
+            decisions_pending, idx = True, None
+        edited = self.editor.edited_lines(path) if self.editor is not None else {}
+        rows = []
+        for k, raw in enumerate(lf.lines(start, count) if total else []):
+            n = start + k
+            row: Dict[str, Any] = {"line": n, "sha1": line_sha1(raw), "id": None, "text": None, "edits": edited.get(n, 0)}
+            try:
+                obj = _loads(raw)
+                if isinstance(obj, dict):
+                    t = obj.get(text_field)
+                    row["text"] = t if isinstance(t, str) else None
+                    row["id"] = obj.get(id_field)
+                else:
+                    row["error"] = "not a JSON object"
+            except ValueError as exc:
+                row["error"] = f"not valid JSON: {exc}"
+                row["raw"] = raw[:2000].decode("utf-8", "replace")
+            if preview and row["text"] is not None and len(row["text"]) > preview:
+                row["text_length"] = len(row["text"])
+                row["text"] = row["text"][:preview]
+                row["truncated"] = True
+            if idx is not None:
+                r = idx.find_row(n)
+                if r is not None:
+                    row["row"] = r
+            rows.append(row)
+        return {"path": path, "total_lines": total, "start": start, "count": len(rows), "text_field": text_field,
+                "file_key": fr.key if fr else None, "editable": self.edit_problem(path) is None,
+                "problem": self.edit_problem(path), "decisions_pending": decisions_pending, "lines": rows}
 
     def simulate(self, check1: float, check2: float, max_flips: int = 300,
                  sweep: Iterable[float] = ()) -> Dict[str, Any]:
@@ -598,16 +715,24 @@ class Dataset:
         st = run.get("settings") or {}
         cur1, cur2 = st.get("check1_threshold", 0.8), st.get("check2_threshold", 0.8)
         check2_on = bool((run.get("hypotheses") or {}).get("check2", {"x": 1}))
+        # early stop (nli_filter default since 2026-11-13): a positive line stored its first check-1 score
+        # >= threshold, not its best, and check 2 stopped at the first hit that was not incidental. Results that
+        # depend on the scores never computed are marked 'estimated'.
+        early = bool(st.get("early_stop", False))
 
         def decide(c1, c2, decision, t1, t2):
             if c1 is None:
                 return decision, False  # never reached NLI: unchanged
             if c1 < t1:
-                return "keep", False
+                # an early-stopped positive line may have a higher score in a window that was not scored
+                return "keep", early and c1 >= cur1
             if c2 is None:
                 # positive now; check 2 ran only if it was positive before (then c2 None = no check 2 at all)
                 return "filter", decision == "keep" and check2_on and c1 < cur1
-            return ("keep" if c2 >= t2 else "filter"), False
+            if c2 >= t2:
+                # check 2 stopped at the hit with score c2: the hits after it were not scored
+                return "keep", early and c2 < cur2
+            return "filter", False
 
         def evaluate(t1, t2, collect=False):
             counts = {"filter": 0, "keep": 0, "to_filter": 0, "to_keep": 0, "estimated": 0}

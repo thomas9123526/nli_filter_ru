@@ -12,9 +12,10 @@ from __future__ import annotations
 import contextlib
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -22,10 +23,32 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .config import DatasetRegistry, ViewerConfig, load_config
+from .edit import EditConflict
 from .results import Dataset
 from .storage import StorageError, clean_path
 
-__all__ = ["create_app"]
+__all__ = ["create_app", "EDIT_HEADER"]
+
+EDIT_HEADER = "X-Viewer-Edit"  # every editing request must send it (a plain form on another web site cannot)
+_LOCAL_CLIENTS = {"127.0.0.1", "::1", "localhost"}
+
+
+class EditBody(BaseModel):
+    path: str
+    line: int
+    text: str
+    sha1: str = ""  # sha1 of the line as loaded; a different current line = 409 conflict
+
+
+class LineChange(BaseModel):
+    line: int
+    text: str
+    sha1: str = ""
+
+
+class BatchBody(BaseModel):
+    path: str
+    changes: List[LineChange]
 
 DEFAULT_FRONTEND = Path(__file__).resolve().parent.parent.parent / "frontend" / "out"
 
@@ -57,6 +80,10 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     @app.exception_handler(ValueError)
     async def _bad(_: Request, exc: ValueError):
         return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(EditConflict)
+    async def _conflict(_: Request, exc: EditConflict):
+        return JSONResponse({"detail": str(exc)}, status_code=409)
 
     @app.exception_handler(StorageError)
     async def _storage(_: Request, exc: StorageError):
@@ -153,6 +180,70 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             raise HTTPException(404, f"line {line} out of range 1..{total}")
         return {"path": clean_path(path), "root": root, "total_lines": total, "line": line,
                 "lines": [b.decode("utf-8", "replace") for b in lf.lines(line, count)]}
+
+    # ---- corpus: view any line, edit the text field (editable datasets on a local drive only) ----
+
+    def client_problem(request: Request) -> Optional[str]:
+        host = request.client.host if request.client else ""
+        server = (request.scope.get("server") or ("",))[0]  # the address the browser connected to
+        # same PC: 127.0.0.1 / ::1, or the PC's own network address (http://192.168.x.y:8000 opened on this PC)
+        local = host in _LOCAL_CLIENTS or (host and host == server)
+        if not cfg.edit_allow_remote and not local:
+            return (f"editing is only allowed from the PC the viewer runs on (this request came from {host or '?'}; "
+                    'set "edit_allow_remote": true in viewer_config.json to allow other PCs)')
+        return None
+
+    def guard(request: Request, d: Dataset, path: Optional[str] = None) -> None:
+        if request.headers.get(EDIT_HEADER) != "1":
+            raise HTTPException(403, f"editing requests need the header {EDIT_HEADER}: 1")
+        why = client_problem(request) or d.edit_problem(path)
+        if why:
+            raise HTTPException(403, why)
+
+    @app.get("/api/datasets/{name}/corpus/lines", tags=["corpus"])
+    def corpus_lines(name: str, path: str, start: int = Query(1, ge=1), count: int = Query(20, ge=1, le=200),
+                     preview: int = Query(0, ge=0)):
+        """Lines of a corpus file: text, id, sha1, number of edits, decision row (if the file has results)."""
+        return ds(name).corpus_lines(path, start, count, preview)
+
+    @app.get("/api/datasets/{name}/corpus/edit-status", tags=["corpus"])
+    def edit_status(name: str, request: Request, path: str = ""):
+        d = ds(name)
+        problem = d.edit_problem(clean_path(path) if path else None) or client_problem(request)
+        return {"editable": problem is None, "problem": problem, "dataset_editable": d.editor is not None}
+
+    @app.post("/api/datasets/{name}/corpus/edit", tags=["corpus"])
+    def corpus_edit(name: str, body: EditBody, request: Request):
+        """Replace the text field of one line; the corpus file (.zst / .gz / plain) is rewritten safely."""
+        d = ds(name)
+        path = clean_path(body.path)
+        guard(request, d, path)
+        host = request.client.host if request.client else None
+        return d.editor.edit_text(path, body.line, body.text, body.sha1 or None, client=host)
+
+    @app.post("/api/datasets/{name}/corpus/edit-batch", tags=["corpus"])
+    def corpus_edit_batch(name: str, body: BatchBody, request: Request):
+        """Several lines of one file in one rewrite (all or nothing)."""
+        d = ds(name)
+        path = clean_path(body.path)
+        guard(request, d, path)
+        host = request.client.host if request.client else None
+        return d.editor.edit_texts(path, [c.model_dump() for c in body.changes], client=host)
+
+    @app.get("/api/datasets/{name}/corpus/edits", tags=["corpus"])
+    def corpus_edits(name: str, path: str = "", line: Optional[int] = None):
+        d = ds(name)
+        return {"edits": d.editor.history(path or None, line) if d.editor is not None else []}
+
+    @app.post("/api/datasets/{name}/corpus/edits/{edit_id}/undo", tags=["corpus"])
+    def corpus_undo(name: str, edit_id: str, request: Request):
+        d = ds(name)
+        guard(request, d)
+        entry = next((e for e in d.editor.history() if e["edit"] == edit_id), None)
+        if entry is None:
+            raise KeyError(f"unknown edit '{edit_id}'")
+        guard(request, d, entry["file"])
+        return d.editor.undo(edit_id, client=request.client.host if request.client else None)
 
     @app.get("/api/cache", tags=["meta"])
     def cache():

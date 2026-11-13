@@ -8,13 +8,18 @@ viewer_config.json:
   "cors_origins": ["http://localhost:3000"],
   "datasets": [
     {"name": "test", "title": "Test corpus (Russia)",
-     "corpus": "../test_corpus", "output": "../out_test_corpus"},
+     "corpus": "../test_corpus", "output": "../out_test_corpus",
+     "editable": true},                   // allow editing the text of corpus lines (local corpus only)
     {"name": "s3run", "corpus": "minio://minio:9000/corpus", "output": "minio://minio:9000/nli-out",
      "corpus_options": {"access_key": "${MINIO_USER}", "secret_key": "${MINIO_PASSWORD}"},
      "output_options": {"access_key": "${MINIO_USER}", "secret_key": "${MINIO_PASSWORD}"}},
     {"name": "ftprun", "corpus": "ftp://reader:${FTP_PASSWORD}@ftp.lan/corpus", "output": "ftp://reader:${FTP_PASSWORD}@ftp.lan/out"}
   ]
 }
+
+Editing (see edit.py): "editable": true on a dataset whose corpus is on a local / mapped drive. Optional top level
+keys: "edits_dir" (backups of the original files + edit log, default ".viewer_edits"), "edit_zstd_level" (3),
+"edit_allow_remote" (false: only a browser on the viewer's own PC may edit, also when started with -Public).
 
 ${VAR} is replaced with the environment variable VAR, so passwords need not be written in the file.
 Comments (// ...) are allowed.
@@ -48,6 +53,7 @@ class DatasetConfig:
     text_field: Optional[str] = None
     id_field: Optional[str] = None
     refresh_seconds: float = 30.0   # how often the output folder is rescanned for new / changed results
+    editable: bool = False          # corpus lines' text may be edited in the viewer (local corpus only)
 
 
 @dataclass
@@ -58,6 +64,9 @@ class ViewerConfig:
     cors_origins: List[str] = field(default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"])
     base_dir: str = "."
     frontend_dir: Optional[str] = None
+    edits_dir: str = ".viewer_edits"    # original copies of edited files + edit log, per dataset
+    edit_zstd_level: int = 3
+    edit_allow_remote: bool = False     # False: only requests from this PC (127.0.0.1 / ::1) may edit
 
 
 def _expand(value: Any) -> Any:
@@ -101,7 +110,8 @@ def load_config(path: str) -> ViewerConfig:
     if not datasets:
         raise ValueError(f"{p}: no datasets")
     cfg = ViewerConfig(datasets=datasets, base_dir=str(p.parent))
-    for k in ("cache_dir", "cache_max_gb", "cors_origins", "frontend_dir"):
+    for k in ("cache_dir", "cache_max_gb", "cors_origins", "frontend_dir", "edits_dir", "edit_zstd_level",
+              "edit_allow_remote"):
         if k in data:
             setattr(cfg, k, data[k])
     return cfg
@@ -122,6 +132,8 @@ class DatasetRegistry:
         if not cache_dir.is_absolute():
             cache_dir = Path(cfg.base_dir) / cache_dir
         self.cache = LineCache(str(cache_dir), max_bytes=float(cfg.cache_max_gb) * 1e9)
+        edits_dir = Path(cfg.edits_dir)
+        self.edits_dir = edits_dir if edits_dir.is_absolute() else Path(cfg.base_dir) / edits_dir
         self._configs = {d.name: d for d in cfg.datasets}
         self._open: Dict[str, Dataset] = {}
         self._errors: Dict[str, str] = {}
@@ -148,6 +160,9 @@ class DatasetRegistry:
                 raise
             ds = Dataset(c.name, corpus, output, self.cache, c.title, c.description, c.text_field, c.id_field,
                          refresh_seconds=float(c.refresh_seconds))
+            if c.editable:
+                from .edit import CorpusEditor
+                ds.editor = CorpusEditor(ds, str(self.edits_dir), zstd_level=int(self.cfg.edit_zstd_level))
             self._open[name] = ds
             self._errors.pop(name, None)
             return ds
@@ -170,7 +185,8 @@ class DatasetRegistry:
             cf.wait(futures.values(), timeout=probe_seconds)
             for name, c in self._configs.items():
                 row = {"name": name, "title": c.title or name, "description": c.description,
-                       "corpus": _mask(c.corpus), "output": _mask(c.output), "error": None}
+                       "corpus": _mask(c.corpus), "output": _mask(c.output), "error": None,
+                       "editable": bool(c.editable)}
                 fut = futures[name]
                 if not fut.done():
                     row["error"] = f"no answer within {probe_seconds:.0f}s (server slow or unreachable)"

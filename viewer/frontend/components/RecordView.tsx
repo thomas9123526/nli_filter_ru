@@ -8,6 +8,7 @@ import { api, useApi } from "@/lib/api";
 import { RULE_LABEL, href, pickFilters, score } from "@/lib/format";
 import type { RecordResp } from "@/lib/types";
 import { HighlightedText, Legend, initialFocus, type Focus, type TextOptions } from "./HighlightedText";
+import { EditHistory, TextEditor } from "./TextEditor";
 import { CopyButton, Crumbs, DecisionBadge, ErrorBox, Loading, ReasonBadge, ScoreBar } from "./ui";
 
 export function RecordView() {
@@ -25,6 +26,18 @@ export function RecordView() {
   const [active, setActive] = useState<number[]>([]);
   const [opts, setOpts] = useState<TextOptions>({ check1: true, check2: true });
   const [focus, setFocus] = useState<Focus>(null);
+  const [editing, setEditing] = useState(false);
+  const [version, setVersion] = useState(0);
+  const status = useApi(ds ? `es:${ds}` : null, (s) => api.editStatus(ds, "", s));
+  const edit = rec?.edit;
+  const canEdit = !!edit?.editable && !!status.data?.editable && edit.text !== null && !!edit.path && !!edit.line;
+  const editProblem = edit && !canEdit ? (status.data?.problem || edit.problem) : null;
+  const afterSave = () => {
+    setEditing(false);
+    setVersion((v) => v + 1);
+    res.reload();
+  };
+  useEffect(() => setEditing(false), [key]);
   const jump = (id: number | null) => {
     if (id === null) return;
     setFocus((f) => ({ id, n: (f?.n || 1) + 1 }));
@@ -92,7 +105,29 @@ export function RecordView() {
                 <span className="muted">field “{rec.text_field}”{rec.explanation.text_length !== null ? ` · ${rec.explanation.text_length.toLocaleString("en-US")} characters` : ""}</span>
                 <span className="spacer" />
                 {rec.explanation.excerpted ? <span className="badge warn">long text: only the parts around the marks are shown</span> : null}
+                {canEdit && !editing ? <button className="btn small" onClick={() => setEditing(true)} data-testid="edit-text">Edit text</button> : null}
+                {!canEdit && editProblem && status.data?.dataset_editable ? <span className="faint" title={editProblem}>read-only</span> : null}
               </div>
+              {edit?.edited_after_filter ? (
+                <div className="panel-body" style={{ paddingBottom: 0 }}>
+                  <div className="alert warn" data-testid="edited-after-filter">
+                    This line was edited after the filter run ({edit.edits_after_filter} edit{edit.edits_after_filter === 1 ? "" : "s"}, last {edit.last_edit}).
+                    The verdict, highlights and scores below are for the text the run saw. Rerun <span className="mono">nli_filter.py</span> on this file to update them.
+                    {!editing && edit.text !== null ? (
+                      <details style={{ marginTop: 6 }}>
+                        <summary>Current text in the corpus file</summary>
+                        <div className="current-text">{edit.text}</div>
+                      </details>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              {editing && edit && edit.text !== null && edit.path && edit.line ? (
+                <div className="panel-body">
+                  <TextEditor ds={ds} path={edit.path} line={edit.line} text={edit.text} sha1={edit.sha1 || ""}
+                    onSaved={afterSave} onCancel={() => setEditing(false)} />
+                </div>
+              ) : null}
               <div className="panel-body" style={{ paddingBottom: 0 }}>
                 <Legend options={opts} setOptions={setOpts} hasCheck1={!!rec.explanation.check1} hasCheck2={!!rec.explanation.check2} />
               </div>
@@ -101,6 +136,11 @@ export function RecordView() {
               ) : (
                 <div className="panel-body"><div className="alert warn">Original text not available: {rec.original.error || `no “${rec.text_field}” field`}</div></div>
               )}
+              {edit && edit.edits > 0 && edit.path && edit.line ? (
+                <div className="panel-body">
+                  <EditHistory ds={ds} path={edit.path} line={edit.line} version={version} onChanged={afterSave} />
+                </div>
+              ) : null}
             </div>
             <Check1Table rec={rec} setActive={setActive} jump={jump} />
             <Check2Table rec={rec} setActive={setActive} jump={jump} />
