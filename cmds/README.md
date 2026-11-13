@@ -8,6 +8,8 @@
 | | `windows.md` | Summary of the three scripts above |
 | | `single_model.md` | Use one model on its own (filter without the judge, or score text directly) |
 | | `country_hypotheses.md` | Change or add countries, keywords, hypotheses, language names, labels |
+| | `snapshot_changes.md` | Remember the project's files; later copy only the changed ones (folder tree kept, no git) |
+| | `new_machine.md` | Move `nli_filter2` to a new machine with torch + CUDA: what to copy, offline install from `pkgs` |
 | | `run_sftp_test_corpus.md` | Run `nli_filter.py` on `test_corpus` straight from the SFTP server 192.168.170.200 |
 | | `remote_corpus.md` | Filter a corpus that is on FTP / SFTP / S3 (MinIO): give `nli_filter.py` the server URL, or copy / mount with rclone |
 | | `germany_big_keywords.md` | Example: Germany with a 10,000+ keyword list, commands for each purpose |

@@ -1,0 +1,8 @@
+cmds/setup/new_machine.md
+cmds/setup/snapshot_changes.md
+cmds/README.md
+tools/snapshot_changes.py
+
+
+
+git-7e2577725838bc6a5d262e98b1d62c09aa04da3f

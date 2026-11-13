@@ -20,3 +20,5 @@ test_corpus**
 out_test_corpus**
 out**
 pkgs/**
+# snapshot_changes.py
+.snapshots/
