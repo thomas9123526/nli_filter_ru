@@ -34,3 +34,17 @@ for what, names in OPTIONAL.items():
         except md.PackageNotFoundError:
             gone.append(name)
     print(f"  {what:<15}", "all installed" if not gone else "missing: " + " ".join(gone))
+
+# the result viewer (normally its own venv, viewer/backend/.venv; run this script with that python to check it)
+VIEWER = {"viewer": "fastapi uvicorn starlette pydantic zstandard orjson boto3 paramiko".split(),
+          "viewer tests": "pytest httpx pyftpdlib moto flask werkzeug cfn-lint".split()}
+print("\nResult viewer (run with viewer\\backend\\.venv\\Scripts\\python.exe to check the viewer's venv):")
+for what, names in VIEWER.items():
+    gone = []
+    for name in names:
+        try:
+            md.version(name)
+        except md.PackageNotFoundError:
+            gone.append(name)
+    print(f"  {what:<15}", "all installed" if not gone else "missing: " + " ".join(gone))
+print("  install offline: see the VIEWER section at the end of whl_files_need.txt")

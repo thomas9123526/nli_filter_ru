@@ -297,6 +297,47 @@ def test_cli_main_with_fake_models(tmp_path, monkeypatch, capsys):
     assert rep["stats"]["lines"] == 30 and rep["timing"]["fast_pairs"] > 0
 
 
+def test_keywords_report_matches_a_real_run(tmp_path, monkeypatch, capsys):
+    """--keywords-report loads no model, and its counts equal what a filter run sends to the models."""
+    write_inputs(tmp_path / "in")
+    src = str(tmp_path / "in" / "a.jsonl")
+
+    def no_model(*a, **kw):
+        raise AssertionError("--keywords-report must not load a model")
+
+    monkeypatch.setattr(nf, "NLIPool", no_model)
+    rep_dir = tmp_path / "rep"
+    assert nf.main([src, "--keywords-report", "--output-dir", str(rep_dir)]) == 0
+    text = capsys.readouterr().out
+    assert "Keywords report - Russia" in text and "go to the models" in text
+    rep = read_json(rep_dir / "keywords_report.json")
+    tsv = (rep_dir / "keywords_report.tsv").read_text(encoding="utf-8").splitlines()
+    assert tsv[0].startswith("keyword\tlines") and len(tsv) == 1 + rep["keywords"]
+
+    # the same file through the filter (fake models)
+    monkeypatch.setattr(nf, "NLIPool", lambda name, **kw: FakePool(name))
+    out = tmp_path / "out"
+    assert nf.main([src, "--output-dir", str(out), "--judge-model", "none"]) == 0
+    reasons = read_json(out / "summary.json")["stats"]["reasons"]
+    to_models = sum(v for k, v in reasons.items() if k in ("check1_negative", "check2_incidental", "about_country"))
+    assert rep["lines"] == read_json(out / "summary.json")["stats"]["lines"]
+    assert rep["lines_to_models"] == to_models
+    assert rep["lines_rules_only"] == reasons.get("rules_incidental", 0)
+    assert rep["lines_with_keyword"] == to_models + reasons.get("rules_incidental", 0)
+    assert rep["estimate"]["check1_windows"] == read_json(out / "summary.json")["stats"]["check1_windows"]
+    per = {s["keyword"]: s for s in rep["per_keyword"]}
+    assert per["Russia"]["lines"] > 0 and per["Russia"]["examples"][0]["text"].count("[") >= 1
+    assert all(s["only_lines"] <= s["nli_lines"] <= s["lines"] for s in rep["per_keyword"])
+    assert set(rep["keywords_unused"]).isdisjoint(per)
+
+
+def test_keywords_report_limit(tmp_path, capsys):
+    write_inputs(tmp_path / "in")
+    assert nf.main([str(tmp_path / "in"), "--keywords-report", "--limit", "7", "--output-dir", str(tmp_path / "r")]) == 0
+    assert read_json(tmp_path / "r" / "keywords_report.json")["lines"] == 7
+    assert "--limit 7" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("argv,msg", [
     (["nope.jsonl"], "input not found"),
     (["--country", "Japan"], "--country-adj is required"),

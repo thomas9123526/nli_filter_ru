@@ -272,6 +272,18 @@ def test_cli_hides_password_and_reports_failures(sftp_url, tmp_path, monkeypatch
     assert "login" in err and "wrong" not in err
 
 
+def test_keywords_report_from_server(url, tree, tmp_path, capsys):
+    """--keywords-report streams the files from the server: same counts as for the local copy."""
+    assert nf.main([str(tree / "corpus"), "--keywords-report", "--output-dir", str(tmp_path / "local")]) == 0
+    assert nf.main([url, "--keywords-report", "--output-dir", str(tmp_path / "remote")]) == 0
+    a = json.loads((tmp_path / "local" / "keywords_report.json").read_text(encoding="utf-8"))
+    b = json.loads((tmp_path / "remote" / "keywords_report.json").read_text(encoding="utf-8"))
+    for k in ("lines", "lines_with_keyword", "lines_rules_only", "lines_to_models", "estimate"):
+        assert a[k] == b[k], k
+    assert "s3cret" not in (tmp_path / "remote" / "keywords_report.json").read_text(encoding="utf-8")
+    assert "s3cret" not in capsys.readouterr().out
+
+
 def test_password_from_environment(sftp_url, monkeypatch):
     monkeypatch.setenv("NLI_TEST_PW", "s3cret")
     files = expand_inputs([sftp_url.replace("s3cret", "${NLI_TEST_PW}")])

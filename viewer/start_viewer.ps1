@@ -1,17 +1,34 @@
 # Start the NLI result viewer on Windows: http://127.0.0.1:8000
 #   .\start_viewer.ps1                       # uses viewer_config.json next to this script
 #   .\start_viewer.ps1 -Config my.json -Port 8080 -Public   # -Public: reachable from other machines
+#   .\start_viewer.ps1 -Wheels ..\pkgs\windows-py312   # first run without internet: install from a wheel folder
 # First run: creates backend\.venv, installs the Python packages, builds the frontend if npm is available.
-param([string]$Config = "$PSScriptRoot\viewer_config.json", [int]$Port = 8000, [switch]$Public, [switch]$Rebuild)
+param([string]$Config = "$PSScriptRoot\viewer_config.json", [int]$Port = 8000, [switch]$Public, [switch]$Rebuild,
+      [string]$Wheels = "")
 $ErrorActionPreference = "Stop"
 $backend = Join-Path $PSScriptRoot "backend"
 $frontend = Join-Path $PSScriptRoot "frontend"
-$py = Join-Path $backend ".venv\Scripts\python.exe"
+$venv = Join-Path $backend ".venv"
+$py = Join-Path $venv "Scripts\python.exe"
 
 if (-not (Test-Path $py)) {
-    Write-Host "Creating Python environment in $backend\.venv ..."
-    py -3 -m venv (Join-Path $backend ".venv")
-    & $py -m pip install --disable-pip-version-check -q -r (Join-Path $backend "requirements.txt")
+    Write-Host "Creating Python environment in $venv ..."
+    py -3 -m venv $venv
+    $source = @()
+    if ($Wheels) {
+        $Wheels = (Resolve-Path $Wheels).Path
+        Write-Host "Installing offline from $Wheels ..."
+        $source = @("--no-index", "--find-links", $Wheels)
+    }
+    & $py -m pip install --disable-pip-version-check -q @source -r (Join-Path $backend "requirements.txt")
+    if ($LASTEXITCODE -ne 0) {
+        # a half-installed environment would be taken as ready on the next start: remove it
+        Remove-Item -Recurse -Force $venv -ErrorAction SilentlyContinue
+        Write-Host "Installing the Python packages failed (see above); $venv was removed, fix the cause and start again."
+        Write-Host "'No such file or directory' under cfnlint = Windows path limit: move the project to a shorter path"
+        Write-Host "(e.g. D:\nli) or enable long paths (https://pip.pypa.io/warnings/enable-long-paths)."
+        exit 1
+    }
 }
 if ($Rebuild -or -not (Test-Path (Join-Path $frontend "out\index.html"))) {
     if (Get-Command npm -ErrorAction SilentlyContinue) {

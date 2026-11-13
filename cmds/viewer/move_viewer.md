@@ -27,8 +27,14 @@ Notes from 2026-11-10. The viewer works on another computer as long as you leave
 ## What the new PC needs
 
 - Windows 10 or 11 with Python 3.10+ from python.org, so the `py` launcher is installed.
-- Internet on the first start, so pip can install the backend packages. If the PC is offline, the viewer
-  needs its own wheel folder first, like the one in `pkgs\` for the filter (`cmds\setup\offline_wheels.md`).
+- The backend packages: from the internet on the first start, or offline from `pkgs` (since 2026-11-13 the
+  viewer's wheels, also those for its tests, are in each `pkgs\<machine>` folder):
+  `.\start_viewer.ps1 -Wheels ..\pkgs\windows-py312` (Linux: `WHEELS=../pkgs/h200-ubuntu-py312 ./start_viewer.sh`).
+  Pick the folder for the PC's Windows/Linux and Python version; list: end of `pkgs\whl_files_need.txt`.
+- A short project path, e.g. `D:\nli_filter2`: a test package (cfn-lint, part of moto) has very long file
+  names, and a deep path hits Windows' 260-character limit ("No such file or directory ... cfnlint"). The
+  start script then removes the half-made `.venv` and says so; or enable long paths
+  (https://pip.pypa.io/warnings/enable-long-paths).
 - The script-blocking fix from `cmds\viewer\check_results.md` if Windows won't run `.ps1` files.
 
 ## Start on the new PC

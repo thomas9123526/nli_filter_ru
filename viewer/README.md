@@ -24,6 +24,7 @@ Windows:
 ```powershell
 cd D:\hkc\nli_filter2\viewer
 .\start_viewer.ps1                 # first run: creates backend\.venv, installs packages, builds the UI
+.\start_viewer.ps1 -Wheels ..\pkgs\windows-py312   # first run without internet: packages from a wheel folder
 ```
 
 Linux:

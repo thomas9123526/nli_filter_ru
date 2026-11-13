@@ -43,6 +43,10 @@ forward slashes.
    found": that wheel then has to come from another source, because these are not in `pkgs`.
 2. **A very old torch** might not suit transformers 5.20.2; `nli_models.py --check modernbert` shows that
    straight away.
-3. **The viewer is not covered.** Its packages (fastapi, uvicorn and others) are not in `pkgs`;
-   `start_viewer.ps1` downloads them from the internet on the first start. An offline machine that should run
-   the viewer needs its wheels collected into `pkgs` first. Moving the viewer: `cmds\viewer\move_viewer.md`.
+3. **The viewer** (and its tests) has its own venv; its wheels are in the same `pkgs\<machine>` folders since
+   2026-11-13 (list: VIEWER section at the end of `pkgs\whl_files_need.txt`). First start offline:
+   `.\start_viewer.ps1 -Wheels ..\pkgs\<machine folder>`, or by hand in `viewer\backend`:
+   `python -m venv .venv` then `.venv\Scripts\python -m pip install --no-index --find-links ..\..\pkgs\<machine folder> -r requirements.txt`.
+   Checked 2026-11-13: fresh Python 3.10 and 3.12 venvs installed only from `pkgs` pass all 52 viewer tests and
+   the 13 server-input tests. Keep the project path short on Windows (see `cmds\viewer\move_viewer.md`).
+   Moving the viewer: `cmds\viewer\move_viewer.md`.

@@ -1082,6 +1082,10 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--report", action="store_true",
                    help="no filtering: print the summary of --output-dir from its *.summary.json files "
                         "(e.g. after several --shard copies) and save it as summary.report.json")
+    g.add_argument("--keywords-report", action="store_true",
+                   help="no models: run only the keyword search and the cheap rules over the input (use --limit for "
+                        "a sample) and report per keyword how many lines it hits and sends to the models, with "
+                        "examples; saves keywords_report.json / .tsv in --output-dir")
     g.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -1155,6 +1159,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("error: --compress zst needs the 'zstandard' package", file=sys.stderr)
         return 2
     company_names = load_keywords(args.company_names_file) if args.company_names_file else []
+    if args.keywords_report:
+        rules = None if args.no_rules else IncidentalRules(adj, args.language_menu_min, company_names=company_names)
+        return keywords_report(files, matcher, rules,
+                               WindowBuilder(args.check1_chars, args.check2_chars, args.max_windows),
+                               check1, check2, args, country, kw_file)
 
     # ---- models ---------------------------------------------------------------------------------
     t_load = time.perf_counter()
@@ -1285,6 +1294,136 @@ def build_report(out_dir: Path) -> Optional[Dict[str, Any]]:
         "output_dir": str(out_dir),
         "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[IncidentalRules],
+                    windows: WindowBuilder, check1: Dict[str, str], check2: Dict[str, str], args,
+                    country: str, kw_file: Optional[str]) -> int:
+    """
+    --keywords-report: keyword search + cheap rules only (no model). Per keyword: lines hit, hits the rules
+    explain, lines that reach the models, lines that reach them ONLY because of this keyword (what removing it
+    would save), examples. Totals estimate the model work of a real run.
+    """
+    canon = {k.lower(): k for k in matcher.keywords}
+    per = {k: {"keyword": k, "hits": 0, "lines": 0, "rule_hits": 0, "open_hits": 0, "nli_lines": 0,
+               "only_lines": 0, "examples": []} for k in matcher.keywords}
+    tot = collections.Counter()
+    n_examples = 3
+    t0 = time.perf_counter()
+    last = t0
+    out_dir = Path(args.output_dir)
+    for path in files:
+        if args.limit is not None and tot["lines"] >= args.limit:
+            break
+        try:
+            source = JsonlSource(path)
+            for rec in source.records():
+                if args.limit is not None and tot["lines"] >= args.limit:
+                    break
+                tot["lines"] += 1
+                tot["bytes"] += len(rec.raw) + 1
+                text = rec.get(args.text_field)
+                if not isinstance(text, str) or not text.strip():
+                    continue
+                tot["text_lines"] += 1
+                hits = matcher.find(text)
+                if not hits:
+                    continue
+                tot["hit_lines"] += 1
+                if rules is not None:
+                    rules.apply(text, hits)
+                open_hits = [h for h in hits if h.rule is None]
+                by_kw: Dict[str, List[Hit]] = collections.defaultdict(list)
+                for h in hits:
+                    by_kw[canon.get(text[h.start:h.end].lower(), text[h.start:h.end])].append(h)
+                open_kws = {canon.get(text[h.start:h.end].lower(), text[h.start:h.end]) for h in open_hits}
+                for k, hs in by_kw.items():
+                    s = per.setdefault(k, {"keyword": k, "hits": 0, "lines": 0, "rule_hits": 0, "open_hits": 0,
+                                           "nli_lines": 0, "only_lines": 0, "examples": []})
+                    s["hits"] += len(hs)
+                    s["lines"] += 1
+                    s["rule_hits"] += sum(1 for h in hs if h.rule)
+                    s["open_hits"] += sum(1 for h in hs if not h.rule)
+                    if k in open_kws:
+                        s["nli_lines"] += 1
+                        if len(open_kws) == 1:
+                            s["only_lines"] += 1
+                    if len(s["examples"]) < n_examples:
+                        h = hs[0]
+                        a, b = max(0, h.start - 50), min(len(text), h.end + 50)
+                        snippet = (("..." if a else "") + text[a:h.start] + "[" + text[h.start:h.end] + "]" +
+                                   text[h.end:b] + ("..." if b < len(text) else ""))
+                        s["examples"].append({"source": str(rec.source), "line": rec.line,
+                                              "text": " ".join(snippet.split())})
+                if not open_hits:
+                    tot["rules_lines"] += 1
+                    continue
+                tot["nli_lines"] += 1
+                tot["check1_windows"] += len(windows.check1(text, open_hits))
+                tot["open_hits"] += len(open_hits)
+                now = time.perf_counter()
+                if now - last >= 10:
+                    last = now
+                    log.warning("keywords report: %d lines (%.0f lines/s)", tot["lines"], tot["lines"] / (now - t0))
+        except Exception as exc:  # e.g. a server file that cannot be read: report it, go on
+            tot["failed_files"] += 1
+            log.error("skip %s: %s", path, mask_uri(exc))
+    seconds = time.perf_counter() - t0
+    lines = tot["lines"]
+    pairs_c1 = tot["check1_windows"] * len(check1)
+    rows = sorted(per.values(), key=lambda s: (-s["nli_lines"], -s["lines"], s["keyword"].lower()))
+    unused = sorted((s["keyword"] for s in rows if s["lines"] == 0), key=str.lower)
+    summary = {
+        "country": country, "keywords_file": kw_file, "keywords": len(matcher.keywords), "engine": matcher.engine,
+        "files": len(files), "failed_files": tot["failed_files"], "limit": args.limit,
+        "lines": lines, "text_lines": tot["text_lines"], "bytes": tot["bytes"], "seconds": round(seconds, 2),
+        "lines_with_keyword": tot["hit_lines"], "lines_rules_only": tot["rules_lines"],
+        "lines_to_models": tot["nli_lines"],
+        "estimate": {"check1_windows": tot["check1_windows"], "check1_pairs": pairs_c1,
+                     "check2_pairs_at_most": tot["open_hits"] * len(check2),
+                     "note": "check-2 pairs are only scored for lines that pass check 1, so the real number is lower"},
+        "keywords_used": len(rows) - len(unused), "keywords_unused": unused,
+        "per_keyword": [s for s in rows if s["lines"]],
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_dir / "keywords_report.json", "w", encoding="utf-8") as fh:
+        json.dump(summary, fh, ensure_ascii=False, indent=1)
+    with open(out_dir / "keywords_report.tsv", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("keyword\tlines\tlines_to_models\tonly_this_keyword\thits\trule_hits\texample\n")
+        for s in rows:
+            ex = s["examples"][0]["text"].replace("\t", " ") if s["examples"] else ""
+            fh.write(f"{s['keyword']}\t{s['lines']}\t{s['nli_lines']}\t{s['only_lines']}\t{s['hits']}\t"
+                     f"{s['rule_hits']}\t{ex}\n")
+
+    def pct(a: float) -> str:
+        return _pct(a, lines).strip()
+
+    mb = tot["bytes"] / 1e6
+    L = ["", "=" * 78, f" Keywords report - {country}, {len(matcher.keywords)} keywords ({matcher.engine}), "
+                       f"{len(files)} file(s), no models", "=" * 78,
+         f" lines               {lines:>12,}" + (f"   (sample: --limit {args.limit})" if args.limit else ""),
+         f" with a keyword      {tot['hit_lines']:>12,}   {pct(tot['hit_lines'])}",
+         f"   kept by the rules {tot['rules_lines']:>12,}   {pct(tot['rules_lines'])}   (language menus / labels, no model)",
+         f"   go to the models  {tot['nli_lines']:>12,}   {pct(tot['nli_lines'])}",
+         f" estimated model work: check 1 {pairs_c1:,} pairs ({tot['check1_windows']:,} windows x {len(check1)} "
+         f"hypotheses), check 2 at most {tot['open_hits'] * len(check2):,} pairs",
+         f" read {mb:,.1f} MB in {seconds:.1f}s ({mb / seconds if seconds else 0:.1f} MB/s, "
+         f"{lines / seconds if seconds else 0:,.0f} lines/s)"
+         + (f"   {tot['failed_files']} file(s) could not be read" if tot["failed_files"] else ""),
+         "", f" keywords that send the most lines to the models (top {min(args.show, len(summary['per_keyword']))}"
+             f" of {summary['keywords_used']} used):",
+         f"   {'keyword':<24} {'lines':>9} {'to models':>10} {'only this':>10} {'rule hits':>10}"]
+    for s in summary["per_keyword"][:args.show]:
+        L.append(f"   {s['keyword'][:24]:<24} {s['lines']:>9,} {s['nli_lines']:>10,} {s['only_lines']:>10,} "
+                 f"{s['rule_hits']:>10,}")
+        if s["examples"]:
+            L.append(f"      e.g. {s['examples'][0]['text'][:100]}")
+    L += ["", f" keywords without any hit: {len(unused)}" + (f" ({', '.join(unused[:15])}"
+                                                         f"{', ...' if len(unused) > 15 else ''})" if unused else ""),
+          " 'only this' = lines that reach the models only because of this keyword: removing it saves them.",
+          f" all keywords, with examples: {out_dir / 'keywords_report.tsv'} and keywords_report.json", "=" * 78]
+    print("\n".join(L))
+    return 1 if tot["failed_files"] else 0
 
 
 def report_main(args) -> int:

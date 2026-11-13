@@ -209,3 +209,404 @@ pkgs/h200-ubuntu-py312/python_dateutil-2.9.0.post0-py2.py3-none-any.whl         
 pkgs/h200-ubuntu-py312/s3transfer-0.19.3-py3-none-any.whl                                                                     #    0.09 MB  boto3
 pkgs/h200-ubuntu-py312/six-1.17.0-py2.py3-none-any.whl                                                                        #    0.01 MB  python_dateutil (often already installed)
 pkgs/h200-ubuntu-py312/urllib3-2.8.0-py3-none-any.whl                                                                         #    0.14 MB  botocore (often already installed)
+
+# ---------------------------------------------------------------------------------------------------------
+# VIEWER (viewer/backend) and its tests (viewer/backend/tests, tests/test_remote_input.py).
+# The viewer has its own venv (viewer/backend/.venv, no torch). Every wheel it needs is listed below, also the
+# ones the filter sections above already have (same file, not copied twice). Collected 2026-11-13, the versions
+# the viewer tests pass with (fastapi 0.162.2, uvicorn 0.54.0, pytest 9.2.0, moto 5.2.5, ...). pyftpdlib has no
+# wheel on PyPI: pyftpdlib-2.2.0-py3-none-any.whl was built from its source (pure Python, any machine).
+# "viewer" = needed to run the viewer; "viewer tests" = only for running the tests.
+#
+# Install offline (from viewer/backend):
+#   python -m venv .venv
+#   .venv/Scripts/python -m pip install --no-index --find-links ../../pkgs/<machine folder> -r requirements.txt   (Windows)
+#   .venv/bin/python     -m pip install --no-index --find-links ../../pkgs/<machine folder> -r requirements.txt   (Linux)
+# Without the tests: install only the first lines of requirements.txt (fastapi ... paramiko).
+# The UI test also needs Chrome or Edge installed and a built frontend (viewer/frontend/out); without them it is
+# skipped. Building the frontend needs Node.js + npm (not in pkgs); copying viewer/frontend/out avoids that.
+
+[rtx5090-windows-py310-viewer]  pkgs/rtx5090-windows-py310/  88 wheels, 60.4 MB (runtime 36, tests 52)
+pkgs/rtx5090-windows-py310/annotated_doc-0.0.6-py3-none-any.whl                                                               #    0.01 MB  viewer: fastapi
+pkgs/rtx5090-windows-py310/annotated_types-0.8.0-py3-none-any.whl                                                             #    0.01 MB  viewer: pydantic
+pkgs/rtx5090-windows-py310/antlr4_python3_runtime-4.13.2-py3-none-any.whl                                                     #    0.14 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/anyio-4.16.0-py3-none-any.whl                                                                      #    0.13 MB  viewer: starlette
+pkgs/rtx5090-windows-py310/attrs-26.1.0-py3-none-any.whl                                                                      #    0.07 MB  viewer tests: jsonschema
+pkgs/rtx5090-windows-py310/aws_xray_sdk-2.16.0-py2.py3-none-any.whl                                                           #    0.11 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/bcrypt-5.0.0-cp39-abi3-win_amd64.whl                                                               #    0.15 MB  viewer: paramiko
+pkgs/rtx5090-windows-py310/blinker-1.9.0-py3-none-any.whl                                                                     #    0.01 MB  viewer tests: flask
+pkgs/rtx5090-windows-py310/boto3-1.43.126-py3-none-any.whl                                                                    #    0.14 MB  viewer
+pkgs/rtx5090-windows-py310/botocore-1.43.127-py3-none-any.whl                                                                 #   16.26 MB  viewer: boto3
+pkgs/rtx5090-windows-py310/certifi-2026.10.23-py3-none-any.whl                                                                #    0.14 MB  viewer tests: httpx
+pkgs/rtx5090-windows-py310/cffi-2.1.1-cp310-cp310-win_amd64.whl                                                               #    0.19 MB  viewer: cryptography
+pkgs/rtx5090-windows-py310/cfn_lint-1.60.1-py3-none-any.whl                                                                   #    5.79 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/charset_normalizer-3.5.2-cp310-cp310-win_amd64.whl                                                 #    0.22 MB  viewer tests: requests
+pkgs/rtx5090-windows-py310/click-8.5.1-py3-none-any.whl                                                                       #    0.13 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/colorama-0.4.6-py2.py3-none-any.whl                                                                #    0.03 MB  viewer tests: pytest
+pkgs/rtx5090-windows-py310/cryptography-50.0.2-cp39-abi3-win_amd64.whl                                                        #    3.85 MB  viewer: paramiko
+pkgs/rtx5090-windows-py310/docker-7.2.0-py3-none-any.whl                                                                      #    0.15 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/exceptiongroup-1.3.1-py3-none-any.whl                                                              #    0.02 MB  viewer: anyio
+pkgs/rtx5090-windows-py310/fastapi-0.162.2-py3-none-any.whl                                                                   #    0.15 MB  viewer
+pkgs/rtx5090-windows-py310/flask-3.1.3-py3-none-any.whl                                                                       #    0.10 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/flask_cors-6.0.5-py3-none-any.whl                                                                  #    0.02 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/graphql_core-3.3.2-py3-none-any.whl                                                                #    0.37 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/h11-0.16.0-py3-none-any.whl                                                                        #    0.04 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/httpcore-1.0.9-py3-none-any.whl                                                                    #    0.08 MB  viewer tests: httpx
+pkgs/rtx5090-windows-py310/httptools-0.9.0-cp310-cp310-win_amd64.whl                                                          #    0.09 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/httpx-0.28.1-py3-none-any.whl                                                                      #    0.07 MB  viewer tests
+pkgs/rtx5090-windows-py310/idna-3.20-py3-none-any.whl                                                                         #    0.07 MB  viewer: anyio
+pkgs/rtx5090-windows-py310/iniconfig-2.3.1-py3-none-any.whl                                                                   #    0.01 MB  viewer tests: pytest
+pkgs/rtx5090-windows-py310/invoke-3.0.3-py3-none-any.whl                                                                      #    0.16 MB  viewer: paramiko
+pkgs/rtx5090-windows-py310/itsdangerous-2.2.0-py3-none-any.whl                                                                #    0.02 MB  viewer tests: flask
+pkgs/rtx5090-windows-py310/jinja2-3.1.6-py3-none-any.whl                                                                      #    0.13 MB  viewer tests: flask
+pkgs/rtx5090-windows-py310/jmespath-1.1.0-py3-none-any.whl                                                                    #    0.02 MB  viewer: boto3
+pkgs/rtx5090-windows-py310/joserfc-1.7.7-py3-none-any.whl                                                                     #    0.07 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/jsonpatch-1.46-py3-none-any.whl                                                                    #    0.03 MB  viewer tests: cfn-lint
+pkgs/rtx5090-windows-py310/jsonpath_ng-1.8.0-py3-none-any.whl                                                                 #    0.07 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/jsonpointer-3.12-py3-none-any.whl                                                                  #    0.01 MB  viewer tests: jsonpatch
+pkgs/rtx5090-windows-py310/jsonschema-4.26.0-py3-none-any.whl                                                                 #    0.09 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-windows-py310/jsonschema_path-0.5.0-py3-none-any.whl                                                             #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-windows-py310/jsonschema_specifications-2025.9.1-py3-none-any.whl                                                #    0.02 MB  viewer tests: jsonschema
+pkgs/rtx5090-windows-py310/lazy_object_proxy-1.12.0-cp310-cp310-win_amd64.whl                                                 #    0.03 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-windows-py310/markupsafe-3.0.4-cp310-cp310-win_amd64.whl                                                         #    0.01 MB  viewer tests: werkzeug
+pkgs/rtx5090-windows-py310/moto-5.2.5-py3-none-any.whl                                                                        #    7.21 MB  viewer tests
+pkgs/rtx5090-windows-py310/mpmath-1.3.0-py3-none-any.whl                                                                      #    0.54 MB  viewer tests: sympy
+pkgs/rtx5090-windows-py310/networkx-3.4.2-py3-none-any.whl                                                                    #    1.72 MB  viewer tests: cfn-lint
+pkgs/rtx5090-windows-py310/openapi_schema_validator-0.9.0-py3-none-any.whl                                                    #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-windows-py310/openapi_spec_validator-0.9.0-py3-none-any.whl                                                      #    0.05 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/opentelemetry_api-1.45.2-py3-none-any.whl                                                          #    0.06 MB  viewer: fastapi
+pkgs/rtx5090-windows-py310/orjson-3.13.0-cp310-cp310-win_amd64.whl                                                            #    0.12 MB  viewer
+pkgs/rtx5090-windows-py310/packaging-26.3-py3-none-any.whl                                                                    #    0.13 MB  viewer tests: pytest
+pkgs/rtx5090-windows-py310/paramiko-5.1.0-py3-none-any.whl                                                                    #    0.21 MB  viewer
+pkgs/rtx5090-windows-py310/pathable-0.6.0-py3-none-any.whl                                                                    #    0.02 MB  viewer tests: jsonschema-path
+pkgs/rtx5090-windows-py310/pluggy-1.7.0-py3-none-any.whl                                                                      #    0.03 MB  viewer tests: pytest
+pkgs/rtx5090-windows-py310/py_partiql_parser-0.6.3-py2.py3-none-any.whl                                                       #    0.02 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/pycparser-3.11-py3-none-any.whl                                                                    #    0.05 MB  viewer: cffi
+pkgs/rtx5090-windows-py310/pydantic-2.14.3-py3-none-any.whl                                                                   #    0.49 MB  viewer: fastapi
+pkgs/rtx5090-windows-py310/pydantic_core-2.50.4-cp310-cp310-win_amd64.whl                                                     #    2.26 MB  viewer: pydantic
+pkgs/rtx5090-windows-py310/pydantic_settings-2.15.0-py3-none-any.whl                                                          #    0.07 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-windows-py310/pyftpdlib-2.2.0-py3-none-any.whl                                                                   #    0.09 MB  viewer tests
+pkgs/rtx5090-windows-py310/pygments-2.21.0-py3-none-any.whl                                                                   #    1.25 MB  viewer tests: pytest
+pkgs/rtx5090-windows-py310/pynacl-1.6.2-cp38-abi3-win_amd64.whl                                                               #    0.24 MB  viewer: paramiko
+pkgs/rtx5090-windows-py310/pyparsing-3.3.3-py3-none-any.whl                                                                   #    0.13 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/pytest-9.2.0-py3-none-any.whl                                                                      #    0.41 MB  viewer tests
+pkgs/rtx5090-windows-py310/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                   #    0.23 MB  viewer: botocore
+pkgs/rtx5090-windows-py310/python_dotenv-1.2.4-py3-none-any.whl                                                               #    0.02 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/pywin32-312-cp310-cp310-win_amd64.whl                                                              #    6.93 MB  viewer tests: docker
+pkgs/rtx5090-windows-py310/pyyaml-6.0.3-cp310-cp310-win_amd64.whl                                                             #    0.16 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/referencing-0.37.0-py3-none-any.whl                                                                #    0.03 MB  viewer tests: jsonschema
+pkgs/rtx5090-windows-py310/regex-2026.9.29-cp310-cp310-win_amd64.whl                                                          #    0.28 MB  viewer tests: cfn-lint
+pkgs/rtx5090-windows-py310/requests-2.34.2-py3-none-any.whl                                                                   #    0.07 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/responses-0.26.3-py3-none-any.whl                                                                  #    0.04 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/rfc3339_validator-0.1.4-py2.py3-none-any.whl                                                       #    0.00 MB  viewer tests: openapi-schema-validator
+pkgs/rtx5090-windows-py310/rpds_py-0.30.0-cp310-cp310-win_amd64.whl                                                           #    0.24 MB  viewer tests: jsonschema
+pkgs/rtx5090-windows-py310/s3transfer-0.19.3-py3-none-any.whl                                                                 #    0.09 MB  viewer: boto3
+pkgs/rtx5090-windows-py310/six-1.17.0-py2.py3-none-any.whl                                                                    #    0.01 MB  viewer: python-dateutil
+pkgs/rtx5090-windows-py310/starlette-1.7.0-py3-none-any.whl                                                                   #    0.08 MB  viewer: fastapi
+pkgs/rtx5090-windows-py310/sympy-1.14.0-py3-none-any.whl                                                                      #    6.30 MB  viewer tests: cfn-lint
+pkgs/rtx5090-windows-py310/tomli-2.5.0-py3-none-any.whl                                                                       #    0.01 MB  viewer tests: pytest
+pkgs/rtx5090-windows-py310/typing_extensions-4.16.0-py3-none-any.whl                                                          #    0.05 MB  viewer: fastapi
+pkgs/rtx5090-windows-py310/typing_inspection-0.4.5-py3-none-any.whl                                                           #    0.01 MB  viewer: fastapi
+pkgs/rtx5090-windows-py310/urllib3-2.8.0-py3-none-any.whl                                                                     #    0.14 MB  viewer: botocore
+pkgs/rtx5090-windows-py310/uvicorn-0.54.0-py3-none-any.whl                                                                    #    0.09 MB  viewer
+pkgs/rtx5090-windows-py310/watchfiles-1.3.0-cp310-abi3-win_amd64.whl                                                          #    0.29 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/websockets-16.1.1-cp310-cp310-win_amd64.whl                                                        #    0.18 MB  viewer: uvicorn
+pkgs/rtx5090-windows-py310/werkzeug-3.1.9-py3-none-any.whl                                                                    #    0.23 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/wrapt-2.5.2-cp310-cp310-win_amd64.whl                                                              #    0.11 MB  viewer tests: aws-xray-sdk
+pkgs/rtx5090-windows-py310/xmltodict-1.0.4-py3-none-any.whl                                                                   #    0.01 MB  viewer tests: moto
+pkgs/rtx5090-windows-py310/zstandard-0.25.0-cp310-cp310-win_amd64.whl                                                         #    0.51 MB  viewer
+
+[windows-py312-viewer]  pkgs/windows-py312/  88 wheels, 60.8 MB (runtime 35, tests 53)
+pkgs/windows-py312/annotated_doc-0.0.6-py3-none-any.whl                                                                       #    0.01 MB  viewer: fastapi
+pkgs/windows-py312/annotated_types-0.8.0-py3-none-any.whl                                                                     #    0.01 MB  viewer: pydantic
+pkgs/windows-py312/antlr4_python3_runtime-4.13.2-py3-none-any.whl                                                             #    0.14 MB  viewer tests: moto
+pkgs/windows-py312/anyio-4.16.0-py3-none-any.whl                                                                              #    0.13 MB  viewer: starlette
+pkgs/windows-py312/attrs-26.1.0-py3-none-any.whl                                                                              #    0.07 MB  viewer tests: jsonschema
+pkgs/windows-py312/aws_xray_sdk-2.16.0-py2.py3-none-any.whl                                                                   #    0.11 MB  viewer tests: moto
+pkgs/windows-py312/bcrypt-5.0.0-cp39-abi3-win_amd64.whl                                                                       #    0.15 MB  viewer: paramiko
+pkgs/windows-py312/blinker-1.9.0-py3-none-any.whl                                                                             #    0.01 MB  viewer tests: flask
+pkgs/windows-py312/boto3-1.43.126-py3-none-any.whl                                                                            #    0.14 MB  viewer
+pkgs/windows-py312/botocore-1.43.127-py3-none-any.whl                                                                         #   16.26 MB  viewer: boto3
+pkgs/windows-py312/certifi-2026.10.23-py3-none-any.whl                                                                        #    0.14 MB  viewer tests: httpx
+pkgs/windows-py312/cffi-2.1.1-cp312-cp312-win_amd64.whl                                                                       #    0.19 MB  viewer: cryptography
+pkgs/windows-py312/cfn_lint-1.60.1-py3-none-any.whl                                                                           #    5.79 MB  viewer tests: moto
+pkgs/windows-py312/charset_normalizer-3.5.2-cp312-cp312-win_amd64.whl                                                         #    0.21 MB  viewer tests: requests
+pkgs/windows-py312/click-8.5.1-py3-none-any.whl                                                                               #    0.13 MB  viewer: uvicorn
+pkgs/windows-py312/colorama-0.4.6-py2.py3-none-any.whl                                                                        #    0.03 MB  viewer tests: pytest
+pkgs/windows-py312/cryptography-50.0.2-cp311-abi3-win_amd64.whl                                                               #    3.82 MB  viewer: paramiko
+pkgs/windows-py312/docker-7.2.0-py3-none-any.whl                                                                              #    0.15 MB  viewer tests: moto
+pkgs/windows-py312/fastapi-0.162.2-py3-none-any.whl                                                                           #    0.15 MB  viewer
+pkgs/windows-py312/flask-3.1.3-py3-none-any.whl                                                                               #    0.10 MB  viewer tests: moto
+pkgs/windows-py312/flask_cors-6.0.5-py3-none-any.whl                                                                          #    0.02 MB  viewer tests: moto
+pkgs/windows-py312/graphql_core-3.3.2-py3-none-any.whl                                                                        #    0.37 MB  viewer tests: moto
+pkgs/windows-py312/h11-0.16.0-py3-none-any.whl                                                                                #    0.04 MB  viewer: uvicorn
+pkgs/windows-py312/httpcore-1.0.9-py3-none-any.whl                                                                            #    0.08 MB  viewer tests: httpx
+pkgs/windows-py312/httptools-0.9.0-cp312-cp312-win_amd64.whl                                                                  #    0.09 MB  viewer: uvicorn
+pkgs/windows-py312/httpx-0.28.1-py3-none-any.whl                                                                              #    0.07 MB  viewer tests
+pkgs/windows-py312/idna-3.20-py3-none-any.whl                                                                                 #    0.07 MB  viewer: anyio
+pkgs/windows-py312/iniconfig-2.3.1-py3-none-any.whl                                                                           #    0.01 MB  viewer tests: pytest
+pkgs/windows-py312/invoke-3.0.3-py3-none-any.whl                                                                              #    0.16 MB  viewer: paramiko
+pkgs/windows-py312/itsdangerous-2.2.0-py3-none-any.whl                                                                        #    0.02 MB  viewer tests: flask
+pkgs/windows-py312/jinja2-3.1.6-py3-none-any.whl                                                                              #    0.13 MB  viewer tests: flask
+pkgs/windows-py312/jmespath-1.1.0-py3-none-any.whl                                                                            #    0.02 MB  viewer: boto3
+pkgs/windows-py312/joserfc-1.8.0-py3-none-any.whl                                                                             #    0.07 MB  viewer tests: moto
+pkgs/windows-py312/jsonpatch-1.47-py3-none-any.whl                                                                            #    0.03 MB  viewer tests: cfn-lint
+pkgs/windows-py312/jsonpath_ng-1.16.0-py3-none-any.whl                                                                        #    0.09 MB  viewer tests: moto
+pkgs/windows-py312/jsonpointer-3.12-py3-none-any.whl                                                                          #    0.01 MB  viewer tests: jsonpatch
+pkgs/windows-py312/jsonschema-4.26.0-py3-none-any.whl                                                                         #    0.09 MB  viewer tests: openapi-spec-validator
+pkgs/windows-py312/jsonschema_path-0.5.0-py3-none-any.whl                                                                     #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/windows-py312/jsonschema_specifications-2025.9.1-py3-none-any.whl                                                        #    0.02 MB  viewer tests: jsonschema
+pkgs/windows-py312/lazy_object_proxy-1.13.0-cp312-cp312-win_amd64.whl                                                         #    0.03 MB  viewer tests: openapi-spec-validator
+pkgs/windows-py312/markupsafe-3.0.4-cp312-cp312-win_amd64.whl                                                                 #    0.01 MB  viewer tests: werkzeug
+pkgs/windows-py312/moto-5.2.5-py3-none-any.whl                                                                                #    7.21 MB  viewer tests
+pkgs/windows-py312/mpmath-1.3.0-py3-none-any.whl                                                                              #    0.54 MB  viewer tests: sympy
+pkgs/windows-py312/networkx-3.7-py3-none-any.whl                                                                              #    2.14 MB  viewer tests: cfn-lint
+pkgs/windows-py312/openapi_schema_validator-0.9.0-py3-none-any.whl                                                            #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/windows-py312/openapi_spec_validator-0.9.0-py3-none-any.whl                                                              #    0.05 MB  viewer tests: moto
+pkgs/windows-py312/opentelemetry_api-1.45.2-py3-none-any.whl                                                                  #    0.06 MB  viewer: fastapi
+pkgs/windows-py312/orjson-3.13.0-cp312-cp312-win_amd64.whl                                                                    #    0.12 MB  viewer
+pkgs/windows-py312/packaging-26.3-py3-none-any.whl                                                                            #    0.13 MB  viewer tests: pytest
+pkgs/windows-py312/paramiko-5.1.0-py3-none-any.whl                                                                            #    0.21 MB  viewer
+pkgs/windows-py312/pathable-0.6.0-py3-none-any.whl                                                                            #    0.02 MB  viewer tests: jsonschema-path
+pkgs/windows-py312/pluggy-1.7.0-py3-none-any.whl                                                                              #    0.03 MB  viewer tests: pytest
+pkgs/windows-py312/py_partiql_parser-0.6.3-py2.py3-none-any.whl                                                               #    0.02 MB  viewer tests: moto
+pkgs/windows-py312/pyasynchat-1.0.5-py3-none-any.whl                                                                          #    0.01 MB  viewer tests: pyftpdlib
+pkgs/windows-py312/pyasyncore-1.0.5-py3-none-any.whl                                                                          #    0.01 MB  viewer tests: pyftpdlib
+pkgs/windows-py312/pycparser-3.12-py3-none-any.whl                                                                            #    0.06 MB  viewer: cffi
+pkgs/windows-py312/pydantic-2.14.3-py3-none-any.whl                                                                           #    0.49 MB  viewer: fastapi
+pkgs/windows-py312/pydantic_core-2.50.4-cp312-cp312-win_amd64.whl                                                             #    2.26 MB  viewer: pydantic
+pkgs/windows-py312/pydantic_settings-2.16.2-py3-none-any.whl                                                                  #    0.08 MB  viewer tests: openapi-spec-validator
+pkgs/windows-py312/pyftpdlib-2.2.0-py3-none-any.whl                                                                           #    0.09 MB  viewer tests
+pkgs/windows-py312/pygments-2.21.0-py3-none-any.whl                                                                           #    1.25 MB  viewer tests: pytest
+pkgs/windows-py312/pynacl-1.6.2-cp38-abi3-win_amd64.whl                                                                       #    0.24 MB  viewer: paramiko
+pkgs/windows-py312/pyparsing-3.3.3-py3-none-any.whl                                                                           #    0.13 MB  viewer tests: moto
+pkgs/windows-py312/pytest-9.2.0-py3-none-any.whl                                                                              #    0.41 MB  viewer tests
+pkgs/windows-py312/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                           #    0.23 MB  viewer: botocore
+pkgs/windows-py312/python_dotenv-1.2.4-py3-none-any.whl                                                                       #    0.02 MB  viewer: uvicorn
+pkgs/windows-py312/pywin32-312-cp312-cp312-win_amd64.whl                                                                      #    6.91 MB  viewer tests: docker
+pkgs/windows-py312/pyyaml-6.0.3-cp312-cp312-win_amd64.whl                                                                     #    0.15 MB  viewer: uvicorn
+pkgs/windows-py312/referencing-0.37.0-py3-none-any.whl                                                                        #    0.03 MB  viewer tests: jsonschema
+pkgs/windows-py312/regex-2026.11.9-cp312-cp312-win_amd64.whl                                                                  #    0.28 MB  viewer tests: cfn-lint
+pkgs/windows-py312/requests-2.34.2-py3-none-any.whl                                                                           #    0.07 MB  viewer tests: moto
+pkgs/windows-py312/responses-0.26.3-py3-none-any.whl                                                                          #    0.04 MB  viewer tests: moto
+pkgs/windows-py312/rfc3339_validator-0.1.4-py2.py3-none-any.whl                                                               #    0.00 MB  viewer tests: openapi-schema-validator
+pkgs/windows-py312/rpds_py-2026.9.1-cp312-cp312-win_amd64.whl                                                                 #    0.22 MB  viewer tests: jsonschema
+pkgs/windows-py312/s3transfer-0.19.3-py3-none-any.whl                                                                         #    0.09 MB  viewer: boto3
+pkgs/windows-py312/six-1.17.0-py2.py3-none-any.whl                                                                            #    0.01 MB  viewer: python-dateutil
+pkgs/windows-py312/starlette-1.10.0-py3-none-any.whl                                                                          #    0.08 MB  viewer: fastapi
+pkgs/windows-py312/sympy-1.14.0-py3-none-any.whl                                                                              #    6.30 MB  viewer tests: cfn-lint
+pkgs/windows-py312/typing_extensions-4.16.0-py3-none-any.whl                                                                  #    0.05 MB  viewer: fastapi
+pkgs/windows-py312/typing_inspection-0.4.5-py3-none-any.whl                                                                   #    0.01 MB  viewer: fastapi
+pkgs/windows-py312/urllib3-2.8.0-py3-none-any.whl                                                                             #    0.14 MB  viewer: botocore
+pkgs/windows-py312/uvicorn-0.54.0-py3-none-any.whl                                                                            #    0.09 MB  viewer
+pkgs/windows-py312/watchfiles-1.3.0-cp310-abi3-win_amd64.whl                                                                  #    0.29 MB  viewer: uvicorn
+pkgs/windows-py312/websockets-17.4-cp312-cp312-win_amd64.whl                                                                  #    0.22 MB  viewer: uvicorn
+pkgs/windows-py312/werkzeug-3.1.9-py3-none-any.whl                                                                            #    0.23 MB  viewer tests: moto
+pkgs/windows-py312/wrapt-2.5.2-cp312-cp312-win_amd64.whl                                                                      #    0.11 MB  viewer tests: aws-xray-sdk
+pkgs/windows-py312/xmltodict-1.0.4-py3-none-any.whl                                                                           #    0.01 MB  viewer tests: moto
+pkgs/windows-py312/zstandard-0.25.0-cp312-cp312-win_amd64.whl                                                                 #    0.51 MB  viewer
+
+[rtx5090-ubuntu-py310-viewer]  pkgs/rtx5090-ubuntu-py310/  87 wheels, 66.7 MB (runtime 37, tests 50)
+pkgs/rtx5090-ubuntu-py310/annotated_doc-0.0.6-py3-none-any.whl                                                                #    0.01 MB  viewer: fastapi
+pkgs/rtx5090-ubuntu-py310/annotated_types-0.8.0-py3-none-any.whl                                                              #    0.01 MB  viewer: pydantic
+pkgs/rtx5090-ubuntu-py310/antlr4_python3_runtime-4.13.2-py3-none-any.whl                                                      #    0.14 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/anyio-4.16.0-py3-none-any.whl                                                                       #    0.13 MB  viewer: starlette
+pkgs/rtx5090-ubuntu-py310/attrs-26.1.0-py3-none-any.whl                                                                       #    0.07 MB  viewer tests: jsonschema
+pkgs/rtx5090-ubuntu-py310/aws_xray_sdk-2.16.0-py2.py3-none-any.whl                                                            #    0.11 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/bcrypt-5.0.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    0.28 MB  viewer: paramiko
+pkgs/rtx5090-ubuntu-py310/blinker-1.9.0-py3-none-any.whl                                                                      #    0.01 MB  viewer tests: flask
+pkgs/rtx5090-ubuntu-py310/boto3-1.43.126-py3-none-any.whl                                                                     #    0.14 MB  viewer
+pkgs/rtx5090-ubuntu-py310/botocore-1.43.127-py3-none-any.whl                                                                  #   16.26 MB  viewer: boto3
+pkgs/rtx5090-ubuntu-py310/certifi-2026.10.23-py3-none-any.whl                                                                 #    0.14 MB  viewer tests: httpx
+pkgs/rtx5090-ubuntu-py310/cffi-2.1.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    0.22 MB  viewer: cryptography
+pkgs/rtx5090-ubuntu-py310/cfn_lint-1.60.1-py3-none-any.whl                                                                    #    5.79 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/charset_normalizer-3.5.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl#    0.27 MB  viewer tests: requests
+pkgs/rtx5090-ubuntu-py310/click-8.5.1-py3-none-any.whl                                                                        #    0.13 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/cryptography-50.0.2-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                        #    4.75 MB  viewer: paramiko
+pkgs/rtx5090-ubuntu-py310/docker-7.2.0-py3-none-any.whl                                                                       #    0.15 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/exceptiongroup-1.3.1-py3-none-any.whl                                                               #    0.02 MB  viewer: anyio
+pkgs/rtx5090-ubuntu-py310/fastapi-0.162.2-py3-none-any.whl                                                                    #    0.15 MB  viewer
+pkgs/rtx5090-ubuntu-py310/flask-3.1.3-py3-none-any.whl                                                                        #    0.10 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/flask_cors-6.0.5-py3-none-any.whl                                                                   #    0.02 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/graphql_core-3.3.2-py3-none-any.whl                                                                 #    0.37 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/h11-0.16.0-py3-none-any.whl                                                                         #    0.04 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/httpcore-1.0.9-py3-none-any.whl                                                                     #    0.08 MB  viewer tests: httpx
+pkgs/rtx5090-ubuntu-py310/httptools-0.9.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl        #    0.49 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/httpx-0.28.1-py3-none-any.whl                                                                       #    0.07 MB  viewer tests
+pkgs/rtx5090-ubuntu-py310/idna-3.20-py3-none-any.whl                                                                          #    0.07 MB  viewer: anyio
+pkgs/rtx5090-ubuntu-py310/iniconfig-2.3.1-py3-none-any.whl                                                                    #    0.01 MB  viewer tests: pytest
+pkgs/rtx5090-ubuntu-py310/invoke-3.0.3-py3-none-any.whl                                                                       #    0.16 MB  viewer: paramiko
+pkgs/rtx5090-ubuntu-py310/itsdangerous-2.2.0-py3-none-any.whl                                                                 #    0.02 MB  viewer tests: flask
+pkgs/rtx5090-ubuntu-py310/jinja2-3.1.6-py3-none-any.whl                                                                       #    0.13 MB  viewer tests: flask
+pkgs/rtx5090-ubuntu-py310/jmespath-1.1.0-py3-none-any.whl                                                                     #    0.02 MB  viewer: boto3
+pkgs/rtx5090-ubuntu-py310/joserfc-1.7.7-py3-none-any.whl                                                                      #    0.07 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/jsonpatch-1.46-py3-none-any.whl                                                                     #    0.03 MB  viewer tests: cfn-lint
+pkgs/rtx5090-ubuntu-py310/jsonpath_ng-1.8.0-py3-none-any.whl                                                                  #    0.07 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/jsonpointer-3.12-py3-none-any.whl                                                                   #    0.01 MB  viewer tests: jsonpatch
+pkgs/rtx5090-ubuntu-py310/jsonschema-4.26.0-py3-none-any.whl                                                                  #    0.09 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-ubuntu-py310/jsonschema_path-0.5.0-py3-none-any.whl                                                              #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-ubuntu-py310/jsonschema_specifications-2025.9.1-py3-none-any.whl                                                 #    0.02 MB  viewer tests: jsonschema
+pkgs/rtx5090-ubuntu-py310/lazy_object_proxy-1.12.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl#    0.07 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-ubuntu-py310/markupsafe-3.0.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl   #    0.02 MB  viewer tests: werkzeug
+pkgs/rtx5090-ubuntu-py310/moto-5.2.5-py3-none-any.whl                                                                         #    7.21 MB  viewer tests
+pkgs/rtx5090-ubuntu-py310/mpmath-1.3.0-py3-none-any.whl                                                                       #    0.54 MB  viewer tests: sympy
+pkgs/rtx5090-ubuntu-py310/networkx-3.4.2-py3-none-any.whl                                                                     #    1.72 MB  viewer tests: cfn-lint
+pkgs/rtx5090-ubuntu-py310/openapi_schema_validator-0.9.0-py3-none-any.whl                                                     #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-ubuntu-py310/openapi_spec_validator-0.9.0-py3-none-any.whl                                                       #    0.05 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/opentelemetry_api-1.45.2-py3-none-any.whl                                                           #    0.06 MB  viewer: fastapi
+pkgs/rtx5090-ubuntu-py310/orjson-3.13.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                            #    0.13 MB  viewer
+pkgs/rtx5090-ubuntu-py310/packaging-26.3-py3-none-any.whl                                                                     #    0.13 MB  viewer tests: pytest
+pkgs/rtx5090-ubuntu-py310/paramiko-5.1.0-py3-none-any.whl                                                                     #    0.21 MB  viewer
+pkgs/rtx5090-ubuntu-py310/pathable-0.6.0-py3-none-any.whl                                                                     #    0.02 MB  viewer tests: jsonschema-path
+pkgs/rtx5090-ubuntu-py310/pluggy-1.7.0-py3-none-any.whl                                                                       #    0.03 MB  viewer tests: pytest
+pkgs/rtx5090-ubuntu-py310/py_partiql_parser-0.6.3-py2.py3-none-any.whl                                                        #    0.02 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/pycparser-3.11-py3-none-any.whl                                                                     #    0.05 MB  viewer: cffi
+pkgs/rtx5090-ubuntu-py310/pydantic-2.14.3-py3-none-any.whl                                                                    #    0.49 MB  viewer: fastapi
+pkgs/rtx5090-ubuntu-py310/pydantic_core-2.50.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                     #    2.26 MB  viewer: pydantic
+pkgs/rtx5090-ubuntu-py310/pydantic_settings-2.15.0-py3-none-any.whl                                                           #    0.07 MB  viewer tests: openapi-spec-validator
+pkgs/rtx5090-ubuntu-py310/pyftpdlib-2.2.0-py3-none-any.whl                                                                    #    0.09 MB  viewer tests
+pkgs/rtx5090-ubuntu-py310/pygments-2.21.0-py3-none-any.whl                                                                    #    1.25 MB  viewer tests: pytest
+pkgs/rtx5090-ubuntu-py310/pynacl-1.6.2-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                               #    1.40 MB  viewer: paramiko
+pkgs/rtx5090-ubuntu-py310/pyparsing-3.3.3-py3-none-any.whl                                                                    #    0.13 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/pytest-9.2.0-py3-none-any.whl                                                                       #    0.41 MB  viewer tests
+pkgs/rtx5090-ubuntu-py310/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                    #    0.23 MB  viewer: botocore
+pkgs/rtx5090-ubuntu-py310/python_dotenv-1.2.4-py3-none-any.whl                                                                #    0.02 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/pyyaml-6.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl       #    0.77 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/referencing-0.37.0-py3-none-any.whl                                                                 #    0.03 MB  viewer tests: jsonschema
+pkgs/rtx5090-ubuntu-py310/regex-2026.9.29-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl    #    0.80 MB  viewer tests: cfn-lint
+pkgs/rtx5090-ubuntu-py310/requests-2.34.2-py3-none-any.whl                                                                    #    0.07 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/responses-0.26.3-py3-none-any.whl                                                                   #    0.04 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/rfc3339_validator-0.1.4-py2.py3-none-any.whl                                                        #    0.00 MB  viewer tests: openapi-schema-validator
+pkgs/rtx5090-ubuntu-py310/rpds_py-0.30.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                           #    0.39 MB  viewer tests: jsonschema
+pkgs/rtx5090-ubuntu-py310/s3transfer-0.19.3-py3-none-any.whl                                                                  #    0.09 MB  viewer: boto3
+pkgs/rtx5090-ubuntu-py310/six-1.17.0-py2.py3-none-any.whl                                                                     #    0.01 MB  viewer: python-dateutil
+pkgs/rtx5090-ubuntu-py310/starlette-1.7.0-py3-none-any.whl                                                                    #    0.08 MB  viewer: fastapi
+pkgs/rtx5090-ubuntu-py310/sympy-1.14.0-py3-none-any.whl                                                                       #    6.30 MB  viewer tests: cfn-lint
+pkgs/rtx5090-ubuntu-py310/tomli-2.5.0-py3-none-any.whl                                                                        #    0.01 MB  viewer tests: pytest
+pkgs/rtx5090-ubuntu-py310/typing_extensions-4.16.0-py3-none-any.whl                                                           #    0.05 MB  viewer: fastapi
+pkgs/rtx5090-ubuntu-py310/typing_inspection-0.4.5-py3-none-any.whl                                                            #    0.01 MB  viewer: fastapi
+pkgs/rtx5090-ubuntu-py310/urllib3-2.8.0-py3-none-any.whl                                                                      #    0.14 MB  viewer: botocore
+pkgs/rtx5090-ubuntu-py310/uvicorn-0.54.0-py3-none-any.whl                                                                     #    0.09 MB  viewer
+pkgs/rtx5090-ubuntu-py310/uvloop-0.23.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl      #    3.85 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/watchfiles-1.3.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                          #    0.46 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/websockets-16.1.1-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl      #    0.19 MB  viewer: uvicorn
+pkgs/rtx5090-ubuntu-py310/werkzeug-3.1.9-py3-none-any.whl                                                                     #    0.23 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/wrapt-2.5.2-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl            #    0.23 MB  viewer tests: aws-xray-sdk
+pkgs/rtx5090-ubuntu-py310/xmltodict-1.0.4-py3-none-any.whl                                                                    #    0.01 MB  viewer tests: moto
+pkgs/rtx5090-ubuntu-py310/zstandard-0.25.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                         #    5.56 MB  viewer
+
+[h200-ubuntu-py312-viewer]  pkgs/h200-ubuntu-py312/  87 wheels, 67.9 MB (runtime 36, tests 51)
+pkgs/h200-ubuntu-py312/annotated_doc-0.0.6-py3-none-any.whl                                                                   #    0.01 MB  viewer: fastapi
+pkgs/h200-ubuntu-py312/annotated_types-0.8.0-py3-none-any.whl                                                                 #    0.01 MB  viewer: pydantic
+pkgs/h200-ubuntu-py312/antlr4_python3_runtime-4.13.2-py3-none-any.whl                                                         #    0.14 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/anyio-4.16.0-py3-none-any.whl                                                                          #    0.13 MB  viewer: starlette
+pkgs/h200-ubuntu-py312/attrs-26.1.0-py3-none-any.whl                                                                          #    0.07 MB  viewer tests: jsonschema
+pkgs/h200-ubuntu-py312/aws_xray_sdk-2.16.0-py2.py3-none-any.whl                                                               #    0.11 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/bcrypt-5.0.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    0.28 MB  viewer: paramiko
+pkgs/h200-ubuntu-py312/blinker-1.9.0-py3-none-any.whl                                                                         #    0.01 MB  viewer tests: flask
+pkgs/h200-ubuntu-py312/boto3-1.43.126-py3-none-any.whl                                                                        #    0.14 MB  viewer
+pkgs/h200-ubuntu-py312/botocore-1.43.127-py3-none-any.whl                                                                     #   16.26 MB  viewer: boto3
+pkgs/h200-ubuntu-py312/certifi-2026.10.23-py3-none-any.whl                                                                    #    0.14 MB  viewer tests: httpx
+pkgs/h200-ubuntu-py312/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    0.22 MB  viewer: cryptography
+pkgs/h200-ubuntu-py312/cfn_lint-1.60.1-py3-none-any.whl                                                                       #    5.79 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl#    0.26 MB  viewer tests: requests
+pkgs/h200-ubuntu-py312/click-8.5.1-py3-none-any.whl                                                                           #    0.13 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                          #    4.72 MB  viewer: paramiko
+pkgs/h200-ubuntu-py312/docker-7.2.0-py3-none-any.whl                                                                          #    0.15 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/fastapi-0.162.2-py3-none-any.whl                                                                       #    0.15 MB  viewer
+pkgs/h200-ubuntu-py312/flask-3.1.3-py3-none-any.whl                                                                           #    0.10 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/flask_cors-6.0.5-py3-none-any.whl                                                                      #    0.02 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/graphql_core-3.3.2-py3-none-any.whl                                                                    #    0.37 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/h11-0.16.0-py3-none-any.whl                                                                            #    0.04 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/httpcore-1.0.9-py3-none-any.whl                                                                        #    0.08 MB  viewer tests: httpx
+pkgs/h200-ubuntu-py312/httptools-0.9.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl           #    0.55 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/httpx-0.28.1-py3-none-any.whl                                                                          #    0.07 MB  viewer tests
+pkgs/h200-ubuntu-py312/idna-3.20-py3-none-any.whl                                                                             #    0.07 MB  viewer: anyio
+pkgs/h200-ubuntu-py312/iniconfig-2.3.1-py3-none-any.whl                                                                       #    0.01 MB  viewer tests: pytest
+pkgs/h200-ubuntu-py312/invoke-3.0.3-py3-none-any.whl                                                                          #    0.16 MB  viewer: paramiko
+pkgs/h200-ubuntu-py312/itsdangerous-2.2.0-py3-none-any.whl                                                                    #    0.02 MB  viewer tests: flask
+pkgs/h200-ubuntu-py312/jinja2-3.1.6-py3-none-any.whl                                                                          #    0.13 MB  viewer tests: flask
+pkgs/h200-ubuntu-py312/jmespath-1.1.0-py3-none-any.whl                                                                        #    0.02 MB  viewer: boto3
+pkgs/h200-ubuntu-py312/joserfc-1.8.0-py3-none-any.whl                                                                         #    0.07 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/jsonpatch-1.47-py3-none-any.whl                                                                        #    0.03 MB  viewer tests: cfn-lint
+pkgs/h200-ubuntu-py312/jsonpath_ng-1.16.0-py3-none-any.whl                                                                    #    0.09 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/jsonpointer-3.12-py3-none-any.whl                                                                      #    0.01 MB  viewer tests: jsonpatch
+pkgs/h200-ubuntu-py312/jsonschema-4.26.0-py3-none-any.whl                                                                     #    0.09 MB  viewer tests: openapi-spec-validator
+pkgs/h200-ubuntu-py312/jsonschema_path-0.5.0-py3-none-any.whl                                                                 #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/h200-ubuntu-py312/jsonschema_specifications-2025.9.1-py3-none-any.whl                                                    #    0.02 MB  viewer tests: jsonschema
+pkgs/h200-ubuntu-py312/lazy_object_proxy-1.13.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl  #    0.07 MB  viewer tests: openapi-spec-validator
+pkgs/h200-ubuntu-py312/markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl      #    0.02 MB  viewer tests: werkzeug
+pkgs/h200-ubuntu-py312/moto-5.2.5-py3-none-any.whl                                                                            #    7.21 MB  viewer tests
+pkgs/h200-ubuntu-py312/mpmath-1.3.0-py3-none-any.whl                                                                          #    0.54 MB  viewer tests: sympy
+pkgs/h200-ubuntu-py312/networkx-3.7-py3-none-any.whl                                                                          #    2.14 MB  viewer tests: cfn-lint
+pkgs/h200-ubuntu-py312/openapi_schema_validator-0.9.0-py3-none-any.whl                                                        #    0.02 MB  viewer tests: openapi-spec-validator
+pkgs/h200-ubuntu-py312/openapi_spec_validator-0.9.0-py3-none-any.whl                                                          #    0.05 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/opentelemetry_api-1.45.2-py3-none-any.whl                                                              #    0.06 MB  viewer: fastapi
+pkgs/h200-ubuntu-py312/orjson-3.13.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                               #    0.13 MB  viewer
+pkgs/h200-ubuntu-py312/packaging-26.3-py3-none-any.whl                                                                        #    0.13 MB  viewer tests: pytest
+pkgs/h200-ubuntu-py312/paramiko-5.1.0-py3-none-any.whl                                                                        #    0.21 MB  viewer
+pkgs/h200-ubuntu-py312/pathable-0.6.0-py3-none-any.whl                                                                        #    0.02 MB  viewer tests: jsonschema-path
+pkgs/h200-ubuntu-py312/pluggy-1.7.0-py3-none-any.whl                                                                          #    0.03 MB  viewer tests: pytest
+pkgs/h200-ubuntu-py312/py_partiql_parser-0.6.3-py2.py3-none-any.whl                                                           #    0.02 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/pyasynchat-1.0.5-py3-none-any.whl                                                                      #    0.01 MB  viewer tests: pyftpdlib
+pkgs/h200-ubuntu-py312/pyasyncore-1.0.5-py3-none-any.whl                                                                      #    0.01 MB  viewer tests: pyftpdlib
+pkgs/h200-ubuntu-py312/pycparser-3.12-py3-none-any.whl                                                                        #    0.06 MB  viewer: cffi
+pkgs/h200-ubuntu-py312/pydantic-2.14.3-py3-none-any.whl                                                                       #    0.49 MB  viewer: fastapi
+pkgs/h200-ubuntu-py312/pydantic_core-2.50.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                        #    2.26 MB  viewer: pydantic
+pkgs/h200-ubuntu-py312/pydantic_settings-2.16.2-py3-none-any.whl                                                              #    0.08 MB  viewer tests: openapi-spec-validator
+pkgs/h200-ubuntu-py312/pyftpdlib-2.2.0-py3-none-any.whl                                                                       #    0.09 MB  viewer tests
+pkgs/h200-ubuntu-py312/pygments-2.21.0-py3-none-any.whl                                                                       #    1.25 MB  viewer tests: pytest
+pkgs/h200-ubuntu-py312/pynacl-1.6.2-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                                  #    1.40 MB  viewer: paramiko
+pkgs/h200-ubuntu-py312/pyparsing-3.3.3-py3-none-any.whl                                                                       #    0.13 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/pytest-9.2.0-py3-none-any.whl                                                                          #    0.41 MB  viewer tests
+pkgs/h200-ubuntu-py312/python_dateutil-2.9.0.post0-py2.py3-none-any.whl                                                       #    0.23 MB  viewer: botocore
+pkgs/h200-ubuntu-py312/python_dotenv-1.2.4-py3-none-any.whl                                                                   #    0.02 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl          #    0.81 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/referencing-0.37.0-py3-none-any.whl                                                                    #    0.03 MB  viewer tests: jsonschema
+pkgs/h200-ubuntu-py312/regex-2026.11.9-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl       #    0.81 MB  viewer tests: cfn-lint
+pkgs/h200-ubuntu-py312/requests-2.34.2-py3-none-any.whl                                                                       #    0.07 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/responses-0.26.3-py3-none-any.whl                                                                      #    0.04 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/rfc3339_validator-0.1.4-py2.py3-none-any.whl                                                           #    0.00 MB  viewer tests: openapi-schema-validator
+pkgs/h200-ubuntu-py312/rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                            #    0.37 MB  viewer tests: jsonschema
+pkgs/h200-ubuntu-py312/s3transfer-0.19.3-py3-none-any.whl                                                                     #    0.09 MB  viewer: boto3
+pkgs/h200-ubuntu-py312/six-1.17.0-py2.py3-none-any.whl                                                                        #    0.01 MB  viewer: python-dateutil
+pkgs/h200-ubuntu-py312/starlette-1.10.0-py3-none-any.whl                                                                      #    0.08 MB  viewer: fastapi
+pkgs/h200-ubuntu-py312/sympy-1.14.0-py3-none-any.whl                                                                          #    6.30 MB  viewer tests: cfn-lint
+pkgs/h200-ubuntu-py312/typing_extensions-4.16.0-py3-none-any.whl                                                              #    0.05 MB  viewer: fastapi
+pkgs/h200-ubuntu-py312/typing_inspection-0.4.5-py3-none-any.whl                                                               #    0.01 MB  viewer: fastapi
+pkgs/h200-ubuntu-py312/urllib3-2.8.0-py3-none-any.whl                                                                         #    0.14 MB  viewer: botocore
+pkgs/h200-ubuntu-py312/uvicorn-0.54.0-py3-none-any.whl                                                                        #    0.09 MB  viewer
+pkgs/h200-ubuntu-py312/uvloop-0.23.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl         #    4.53 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/watchfiles-1.3.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl                             #    0.46 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/websockets-17.4-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl           #    0.23 MB  viewer: uvicorn
+pkgs/h200-ubuntu-py312/werkzeug-3.1.9-py3-none-any.whl                                                                        #    0.23 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/wrapt-2.5.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl               #    0.25 MB  viewer tests: aws-xray-sdk
+pkgs/h200-ubuntu-py312/xmltodict-1.0.4-py3-none-any.whl                                                                       #    0.01 MB  viewer tests: moto
+pkgs/h200-ubuntu-py312/zstandard-0.25.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl                            #    5.55 MB  viewer
+
+# ---------------------------------------------------------------------------------------------------------
+# TORCH FOR A P2000 (or other Pascal GPU: GTX 10xx, Quadro Pxxxx) on Windows, when the machine has no working torch.
+# The +cu128 torch of the other machines does not include Pascal; +cu126 does. Only torch and the packages torch
+# needs are here; everything else comes from the normal Windows folder (rtx5090-windows-py310 / windows-py312).
+# Both Python versions are in this one folder; pip picks the right files. Downloaded 2026-11-13.
+# Needs only the NVIDIA driver (580 branch = the last for Pascal), no CUDA toolkit; use --dtype fp32 on Pascal.
+# Install offline (Python 3.10; for 3.12 use windows-py312 as the second folder):
+#   pip install --no-index --find-links pkgs/p2000-windows-torch-cu126 --find-links pkgs/rtx5090-windows-py310 torch==2.11.0+cu126 transformers==5.20.2 orjson pyahocorasick zstandard sentencepiece protobuf paramiko
+
+[p2000-windows-torch-cu126]  pkgs/p2000-windows-torch-cu126/  16 wheels, 5.23 GB (Python 3.10 + 3.12)
+pkgs/p2000-windows-torch-cu126/filelock-4.1.0-py3-none-any.whl                                                                #      0.13 MB  torch, huggingface_hub (Python 3.10)
+pkgs/p2000-windows-torch-cu126/filelock-4.2.10-py3-none-any.whl                                                               #      0.22 MB  torch, huggingface_hub (Python 3.12)
+pkgs/p2000-windows-torch-cu126/fsspec-2026.9.0-py3-none-any.whl                                                               #      0.22 MB  torch, huggingface_hub
+pkgs/p2000-windows-torch-cu126/jinja2-3.1.6-py3-none-any.whl                                                                  #      0.13 MB  torch
+pkgs/p2000-windows-torch-cu126/markupsafe-3.0.4-cp310-cp310-win_amd64.whl                                                     #      0.01 MB  jinja2 (Python 3.10)
+pkgs/p2000-windows-torch-cu126/markupsafe-3.0.4-cp312-cp312-win_amd64.whl                                                     #      0.01 MB  jinja2 (Python 3.12)
+pkgs/p2000-windows-torch-cu126/mpmath-1.3.0-py3-none-any.whl                                                                  #      0.54 MB  sympy
+pkgs/p2000-windows-torch-cu126/networkx-3.4.2-py3-none-any.whl                                                                #      1.72 MB  torch (Python 3.10)
+pkgs/p2000-windows-torch-cu126/networkx-3.7-py3-none-any.whl                                                                  #      2.14 MB  torch (Python 3.12)
+pkgs/p2000-windows-torch-cu126/numpy-2.2.6-cp310-cp310-win_amd64.whl                                                          #     12.90 MB  transformers, torch (Python 3.10)
+pkgs/p2000-windows-torch-cu126/numpy-2.5.4-cp312-cp312-win_amd64.whl                                                          #     12.57 MB  transformers, torch (Python 3.12)
+pkgs/p2000-windows-torch-cu126/setuptools-81.0.0-py3-none-any.whl                                                             #      1.06 MB  torch
+pkgs/p2000-windows-torch-cu126/sympy-1.14.0-py3-none-any.whl                                                                  #      6.30 MB  torch
+pkgs/p2000-windows-torch-cu126/torch-2.11.0+cu126-cp310-cp310-win_amd64.whl                                                   #   2596.41 MB  torch with CUDA 12.6 (Pascal GPUs such as the P2000; CUDA runtime + cuDNN inside) (Python 3.10)
+pkgs/p2000-windows-torch-cu126/torch-2.11.0+cu126-cp312-cp312-win_amd64.whl                                                   #   2596.45 MB  torch with CUDA 12.6 (Pascal GPUs such as the P2000; CUDA runtime + cuDNN inside) (Python 3.12)
+pkgs/p2000-windows-torch-cu126/typing_extensions-4.16.0-py3-none-any.whl                                                      #      0.05 MB  torch
