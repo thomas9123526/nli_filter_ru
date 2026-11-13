@@ -128,6 +128,7 @@ decision). `Ctrl+Enter` saves, `Esc` cancels.
 | Conflicts | The save sends a fingerprint (sha1) of the line as it was loaded. If the line changed in the meantime (another tab or person), the save is refused: reload and edit again |
 | Backup | The first edit of a file copies the untouched original to `.viewer_edits/<dataset>/originals/<same path>`. Later edits keep that first copy. To go back completely, copy it over the corpus file |
 | Log and undo | Every edit (time, file, line, id, old and new text) is appended to `.viewer_edits/<dataset>/edits.jsonl`. **Undo** in the line's edit history puts the old text back (latest change first). `python -m nli_viewer edits` lists them |
+| Insert / delete | **Insert below**, **Insert at top**, **Add at end** and **Delete** on the Corpus page; new lines need an unused `id`. Later lines move by one; the log of inserts / deletes maps the decisions' line numbers to the current ones (record page: "line 12 is now line 13"; new lines marked "new"). Undo for each in "Recent changes in this file" |
 | Many lines at once | On the Corpus page, **Add to pending changes** instead of Save: changes are collected (also across pages of the same file) and **Save all** writes them in one rewrite, all or nothing. The browser warns before leaving with unsaved changes |
 | Time | A save rewrites the whole file. Measured with 3,000,000 lines (287 MB `.zst`, 689 MB decompressed): about 9 s for one line, 10 s for 20 lines saved together; under a second for the test corpus. zstd uses all CPU cores; level `"edit_zstd_level"` (default 3). The checked new copy goes straight into the cache, so the next page needs no decompression |
 | First look at a big file | The lines show after the file is decompressed once (3.4 s for the file above); the "decision ›" links follow when the decisions table is built in the background (24 s there; "linking decisions…" meanwhile) |
@@ -193,7 +194,9 @@ Over FTP, SFTP or S3 the first look also includes the download.
 | `GET /api/datasets/{ds}/corpus/edit-status?path=` | can this browser edit this dataset / file, and if not, why |
 | `POST /api/datasets/{ds}/corpus/edit` body `{path, line, text, sha1}` | change a line's text (needs header `X-Viewer-Edit: 1`; 409 when the line changed since it was loaded) |
 | `GET /api/datasets/{ds}/corpus/edits?path=&line=` | edit log |
-| `POST /api/datasets/{ds}/corpus/edits/{edit}/undo` | undo an edit (same header) |
+| `POST /api/datasets/{ds}/corpus/insert` body `{path, after, record, sha1, member}` | insert a line after line `after` (0 = top) |
+| `POST /api/datasets/{ds}/corpus/delete` body `{path, line, sha1, member}` | delete a line |
+| `POST /api/datasets/{ds}/corpus/edits/{edit}/undo` | undo an edit, insert or delete (same header) |
 
 ## Developing the UI
 

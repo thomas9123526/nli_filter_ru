@@ -201,6 +201,9 @@ def cmd_verify(args) -> int:
                 n += 1
                 rec = ds.record(f.key, row=r["row"], max_chars=10 ** 9)
                 issues = []
+                if "deleted in the viewer" in (rec["original"].get("error") or ""):
+                    edited += 1  # removed in the viewer after the run: not an error
+                    continue
                 if not rec["original"]["available"]:
                     issues.append("original line missing")
                 elif not rec["id_check"]["match"]:
@@ -223,8 +226,8 @@ def cmd_verify(args) -> int:
     print(f"\r{n} decisions checked in {time.perf_counter() - t0:.1f}s: "
           + ("all consistent" if not problems else ", ".join(f"{k}: {v}" for k, v in problems.items())))
     if edited:
-        print(f"  {edited} line(s) were edited in the viewer after the run (not errors; their decisions are for the"
-              " text before the edit: rerun nli_filter.py on those files to update them)")
+        print(f"  {edited} line(s) were edited or deleted in the viewer after the run (not errors; their decisions"
+              " are for the text before: rerun nli_filter.py on those files to update them)")
     for e in examples:
         print("  " + e)
     return 1 if problems else 0

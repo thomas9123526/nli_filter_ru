@@ -97,8 +97,11 @@ export function EditHistory({ ds, path, member, line, version, onChanged }: {
               <td className="nowrap mono faint">{e.time}</td>
               <td>
                 {e.undo_of ? <span className="badge neutral">undo</span> : null}
-                <div className="diff-old" title={e.old}>{short(e.old)}</div>
-                <div className="diff-new" title={e.new}>{short(e.new)}</div>
+                {e.kind === "insert" ? <span className="badge keep">inserted</span> : null}
+                {e.kind === "insert" ? <div className="diff-new" title={e.new}>{short(e.new)}</div> : <>
+                  <div className="diff-old" title={e.old}>{short(e.old)}</div>
+                  <div className="diff-new" title={e.new}>{short(e.new)}</div>
+                </>}
               </td>
               <td className="nowrap">
                 {i === 0 ? <button className="btn small" disabled={busy !== null} onClick={() => undo(e.edit)}>{busy === e.edit ? "Undoing…" : "Undo"}</button> : null}

@@ -37,20 +37,35 @@ class EditBody(BaseModel):
     path: str
     line: int
     text: str
-    sha1: str = ""  # sha1 of the line as loaded; a different current line = 409 conflict
-    member: str = ""  # .zip / .rar: the member file the line is in
+    sha1: Optional[str] = ""  # sha1 of the line as loaded; a different current line = 409 conflict
+    member: Optional[str] = None  # .zip / .rar: the member file the line is in; null or "" = not an archive
 
 
 class LineChange(BaseModel):
     line: int
     text: str
-    sha1: str = ""
+    sha1: Optional[str] = ""
+
+
+class InsertBody(BaseModel):
+    path: str
+    after: int                 # 0 = at the top, number of lines = at the end
+    record: Dict[str, Any]     # the new line: id field, text field, other fields
+    sha1: Optional[str] = ""             # of line `after` (line 1 when after = 0) as loaded
+    member: Optional[str] = None  # null or "" = not an archive
+
+
+class DeleteBody(BaseModel):
+    path: str
+    line: int
+    sha1: Optional[str] = ""
+    member: Optional[str] = None  # null or "" = not an archive
 
 
 class BatchBody(BaseModel):
     path: str
     changes: List[LineChange]
-    member: str = ""
+    member: Optional[str] = None  # null or "" = not an archive
 
 DEFAULT_FRONTEND = Path(__file__).resolve().parent.parent.parent / "frontend" / "out"
 
@@ -233,6 +248,24 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         host = request.client.host if request.client else None
         return d.editor.edit_texts(path, [c.model_dump() for c in body.changes], client=host,
                                    member=body.member or None)
+
+    @app.post("/api/datasets/{name}/corpus/insert", tags=["corpus"])
+    def corpus_insert(name: str, body: InsertBody, request: Request):
+        """Insert a new line; the lines after it move down by one (decisions are mapped to their new lines)."""
+        d = ds(name)
+        path = clean_path(body.path)
+        guard(request, d, path, body.member or None)
+        host = request.client.host if request.client else None
+        return d.editor.insert_line(path, body.after, body.record, body.sha1 or None, body.member or None, client=host)
+
+    @app.post("/api/datasets/{name}/corpus/delete", tags=["corpus"])
+    def corpus_delete(name: str, body: DeleteBody, request: Request):
+        """Delete a line (kept in the edit log, so it can be undone); the lines after it move up by one."""
+        d = ds(name)
+        path = clean_path(body.path)
+        guard(request, d, path, body.member or None)
+        host = request.client.host if request.client else None
+        return d.editor.delete_line(path, body.line, body.sha1 or None, body.member or None, client=host)
 
     @app.get("/api/datasets/{name}/corpus/edits", tags=["corpus"])
     def corpus_edits(name: str, path: str = "", line: Optional[int] = None, member: str = ""):

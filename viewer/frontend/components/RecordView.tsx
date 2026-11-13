@@ -108,6 +108,11 @@ export function RecordView() {
                 {canEdit && !editing ? <button className="btn small" onClick={() => setEditing(true)} data-testid="edit-text">Edit text</button> : null}
                 {!canEdit && editProblem && status.data?.dataset_editable ? <span className="faint" title={editProblem}>read-only</span> : null}
               </div>
+              {edit?.moved ? (
+                <div className="panel-body" style={{ paddingBottom: 0 }}>
+                  <div className="alert" data-testid="line-moved">Lines were inserted or deleted above this one in the viewer: the decision's line {edit.decision_line} is now line {edit.line} of the corpus file.</div>
+                </div>
+              ) : null}
               {edit?.edited_after_filter ? (
                 <div className="panel-body" style={{ paddingBottom: 0 }}>
                   <div className="alert warn" data-testid="edited-after-filter">

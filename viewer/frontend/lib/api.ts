@@ -82,6 +82,10 @@ export const api = {
     postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edit`, body),
   editBatch: (ds: string, body: { path: string; member?: string | null; changes: { line: number; text: string; sha1: string }[] }) =>
     postJSON<BatchResp>(`/api/datasets/${enc(ds)}/corpus/edit-batch`, body),
+  insertLine: (ds: string, body: { path: string; member: string | null; after: number; sha1: string; record: Record<string, unknown> }) =>
+    postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/insert`, body),
+  deleteLine: (ds: string, body: { path: string; member: string | null; line: number; sha1: string }) =>
+    postJSON<{ deleted: number; total_lines: number }>(`/api/datasets/${enc(ds)}/corpus/delete`, body),
   undoEdit: (ds: string, edit: string) => postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edits/${enc(edit)}/undo`),
 };
 

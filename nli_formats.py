@@ -37,6 +37,7 @@ __all__ = ["INPUT_SUFFIXES", "ARCHIVE_SUFFIXES", "COMPRESSED_SUFFIXES", "TABLE_S
            "is_table", "needs_local_file", "rar_tool", "rar_members", "open_rar_member", "rar_replace_member",
            "parquet_available", "parquet_lines", "parquet_dump", "parquet_replace_texts", "IterStream",
            "table_lines", "table_replace_texts", "arrow_lines", "arrow_replace_texts", "table_problem",
+           "table_rewrite", "table_insert_row", "table_delete_row",
            "member_compression"]
 
 COMPRESSED_SUFFIXES = (".zst", ".zstd", ".gz")
@@ -359,3 +360,74 @@ def table_replace_texts(src: str, dst: str, field: str, texts: Dict[int, str], k
         parquet_replace_texts(src, dst, field, texts)
     else:
         arrow_replace_texts(src, dst, field, texts)
+
+
+def _read_table(src: str, kind: Optional[str] = None):
+    """(table, write(table, dst)): the writer keeps the file's format, compression and row group / batch size."""
+    import pyarrow as pa
+    if (kind or src).lower().endswith(".parquet"):
+        pq = _pq()
+        pf = pq.ParquetFile(src)
+        meta = pf.metadata
+        codec = meta.row_group(0).column(0).compression.lower() if meta.num_row_groups else "snappy"
+        rows = meta.row_group(0).num_rows if meta.num_row_groups else None
+        table = pf.read()
+
+        def write(t, dst):
+            pq.write_table(t, dst, compression=None if codec == "uncompressed" else codec, row_group_size=rows or None)
+        return table, write
+    with pa.OSFile(src, "rb") as fh:
+        k, reader = _arrow_open(src, fh)
+        batches = list(_arrow_batches(k, reader))
+        table = pa.Table.from_batches(batches, schema=reader.schema)
+    first = batches[0].num_rows if batches else None
+    options = pa.ipc.IpcWriteOptions(compression=_arrow_compression(src, table.nbytes))
+    opener = pa.ipc.new_file if k == "file" else pa.ipc.new_stream
+
+    def write(t, dst):
+        with pa.OSFile(dst, "wb") as sink, opener(sink, t.schema, options=options) as writer:
+            writer.write_table(t, max_chunksize=first or None)
+    return table, write
+
+
+def table_rewrite(src: str, dst: str, transform, kind: Optional[str] = None) -> None:
+    """dst = transform(table of src), written like src (kind = the original's suffix when src has another name)."""
+    table, write = _read_table(src, kind)
+    write(transform(table), dst)
+
+
+def table_insert_row(src: str, dst: str, index: int, row: Dict[str, Any], kind: Optional[str] = None) -> None:
+    """dst = src with `row` inserted before row `index` (0-based; index = number of rows appends). Columns the row
+    does not give are null; a value that does not fit its column's type raises ValueError."""
+    import pyarrow as pa
+
+    def insert(t):
+        extra = [k for k in row if k not in t.column_names]
+        if extra:
+            raise ValueError(f"the table has no column {', '.join(map(repr, extra))}")
+        if not 0 <= index <= t.num_rows:
+            raise ValueError(f"row {index + 1} out of range 1..{t.num_rows + 1}")
+        arrays = []
+        for f in t.schema:
+            v = row.get(f.name)
+            try:
+                arrays.append(pa.array([v], type=f.type))
+            except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError, OverflowError):
+                try:  # e.g. a date given as text "2024-01-01" (that is how rows are shown as JSON)
+                    arrays.append(pa.array([v]).cast(f.type))
+                except (pa.ArrowInvalid, pa.ArrowTypeError, pa.ArrowNotImplementedError, TypeError, ValueError) as exc:
+                    raise ValueError(f"value {v!r} does not fit column '{f.name}' ({f.type}): {exc}") from None
+        new = pa.Table.from_arrays(arrays, schema=t.schema)
+        return pa.concat_tables([t.slice(0, index), new, t.slice(index)])
+    table_rewrite(src, dst, insert, kind)
+
+
+def table_delete_row(src: str, dst: str, index: int, kind: Optional[str] = None) -> None:
+    """dst = src without row `index` (0-based)."""
+    import pyarrow as pa
+
+    def delete(t):
+        if not 0 <= index < t.num_rows:
+            raise ValueError(f"row {index + 1} out of range 1..{t.num_rows}")
+        return pa.concat_tables([t.slice(0, index), t.slice(index + 1)])
+    table_rewrite(src, dst, delete, kind)

@@ -56,6 +56,24 @@ PC's own network address both count).
 not on the file list. A grey "read-only" note says why editing is off. To allow other PCs, add
 `"edit_allow_remote": true` at the top of the config.
 
+## 2b. Insert and delete lines
+
+On the Corpus page (editable dataset):
+
+| Button | What it does |
+|---|---|
+| **Insert below** (each line) | form for a new line after it: `id` (must not be used yet in that file), text, and the other fields as JSON (prefilled with the neighbour's field names, empty) |
+| **Insert at top** (page 1) / **Add at end** (last page) | the same for a new first / last line |
+| **Delete** (each line) | removes the line after a confirmation; it stays in the edit log |
+| **Recent changes in this file** | the latest changes of the file (also inserts and deletes) with **Undo**; the only place to bring back a deleted line |
+
+The lines after an inserted / deleted line move by one. The viewer remembers every insert and delete, so the
+filter's decisions still point at the right lines: the record page says "the decision's line 12 is now line 13",
+a deleted line's decision says so, and a new line is marked **new** (no decision until `nli_filter.py` runs
+again). Works for `.jsonl` / `.gz` / `.zst`, archive members and table rows (`.parquet` / `.arrow`: missing
+columns are empty; a date can be typed as `"2024-05-06"`). Not possible while there are unsaved pending changes
+(they would land on the wrong lines).
+
 ## 3. Safety
 
 | | |

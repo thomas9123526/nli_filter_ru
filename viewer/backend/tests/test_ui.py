@@ -144,3 +144,17 @@ def test_archive_member_picker_renders(edit_server, tmp_path):
     page = dom(edit_server + "/corpus/?ds=e&file=c/w.zip", tmp_path)
     assert 'data-testid="member-select"' in page and "w1.jsonl" in page and "cw-1" in page
     assert ">Edit</button>" in page  # .zip members are editable now
+
+
+def test_insert_delete_buttons_render(edit_server, tmp_path):
+    import httpx
+    page = dom(edit_server + "/corpus/?ds=e&file=b/z.jsonl", tmp_path)
+    assert ">Insert at top</button>" in page and ">Add at end</button>" in page
+    assert ">Insert below</button>" in page and ">Delete</button>" in page
+    r = httpx.post(edit_server + "/api/datasets/e/corpus/insert", headers={"X-Viewer-Edit": "1"},
+                   json={"path": "b/z.jsonl", "after": 0, "record": {"id": "ui-new", "text": "inserted from the UI test"}})
+    assert r.status_code == 200
+    page = dom(edit_server + "/corpus/?ds=e&file=b/z.jsonl", tmp_path)
+    assert "ui-new" in page and 'data-testid="file-changes"' in page and "Recent changes in this file (1)" in page
+    rec = dom(edit_server + "/record/?ds=e&f=b/z&line=1", tmp_path)  # decision line 1 is now line 2
+    assert 'data-testid="line-moved"' in rec and "bz-1" in rec

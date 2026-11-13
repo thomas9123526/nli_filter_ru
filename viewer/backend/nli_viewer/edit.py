@@ -24,11 +24,17 @@ dataset has "editable": true in viewer_config.json (and, on a server, the accoun
     ed.edit_text("books/part-00/shard-00000.jsonl.zst", 12, "new text", base_sha1)
     ed.edit_texts(path, [{"line": 12, "text": "...", "sha1": s1}, {"line": 40, ...}])   # one rewrite
     ed.edit_texts("data.rar", [...], member="dir/a.jsonl")                              # archive member
+    ed.insert_line(path, after=12, record={"id": "x-1", "text": "...", "expect": "keep"})   # new line 13
+    ed.delete_line(path, 13, sha1)
     ed.undo(edit_id)
+
+Inserted and deleted lines move the lines after them; the log keeps every insert / delete, so a line number from
+before (e.g. in the filter's decisions) is mapped to the line's current number (map_forward / map_back).
 """
 from __future__ import annotations
 
 import array
+import bisect
 import contextlib
 import gzip
 import hashlib
@@ -41,7 +47,7 @@ import time
 import uuid
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Dict, Iterator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Iterator, List, Optional, Tuple
 
 from .lines import CHUNK, _scan_offsets, decompressed_stream, open_member
 from .storage import StorageError, clean_path
@@ -241,8 +247,10 @@ class CorpusEditor:
                 # start + len(old_raw): the line ending (\n or \r\n) after the line is kept
                 plan.append((start, start + len(old_raw), new_raw, entry))
             if plan:
+                texts = {e["line"] - 1: e["new"] for _, _, _, e in plan}
                 self._rewrite(path, target, lf.data_path, [(a, b, raw) for a, b, raw, _ in plan], old_fp, member,
-                              {e["line"]: e["new"] for _, _, _, e in plan}, text_field)
+                              lambda src, dst: nli_formats.table_replace_texts(src, dst, text_field, texts,
+                                                                              kind=Path(path).suffix))
                 batch = uuid.uuid4().hex[:12] if len(plan) > 1 else None
                 now, ts, secs = time.strftime("%Y-%m-%d %H:%M:%S"), time.time(), round(time.perf_counter() - t0, 3)
                 for _, _, _, e in plan:
@@ -257,20 +265,219 @@ class CorpusEditor:
                 "lines": [self.read_line(path, n, member) for n in sorted(lines)]}
 
     def undo(self, edit_id: str, client: Optional[str] = None) -> Dict[str, Any]:
-        """Put back the text an edit replaced (only when the line still holds that edit's text)."""
-        entry = next((e for e in self.history() if e["edit"] == edit_id), None)
-        if entry is None:
+        """Undo one logged change: put the old text back, remove an inserted line, put a deleted line back.
+        Only when the line still looks like that change left it (else: undo the later changes first)."""
+        log = self._read_log()
+        k = next((i for i, e in enumerate(log) if e["edit"] == edit_id), None)
+        if k is None:
             raise KeyError(f"unknown edit '{edit_id}'")
-        member = entry.get("member")
-        cur = self.read_line(entry["file"], entry["line"], member)
+        entry, member, kind = log[k], log[k].get("member"), log[k].get("kind", "text")
+        later = _ops(log[k + 1:], entry["file"], member)
+        if kind == "delete":
+            if later:
+                raise EditConflict("lines were inserted or deleted in this file after this delete: undo those first")
+            return self._insert_raw(entry["file"], entry["line"] - 1, entry["raw"].encode("utf-8"), member,
+                                    client=client, undo_of=edit_id, entry_extra={"id": entry.get("id"),
+                                                                                 "new": entry.get("old", "")})
+        line = map_forward(entry["line"], later)
+        if line is None:
+            raise EditConflict("this line was deleted later: undo that delete first")
+        cur = self.read_line(entry["file"], line, member)
+        if kind == "insert":
+            if cur["sha1"] != entry.get("new_sha1"):
+                raise EditConflict("the inserted line was changed later: undo those changes first")
+            return self.delete_line(entry["file"], line, cur["sha1"], member, client=client, undo_of=edit_id)
         if cur.get("text") != entry["new"] or str(cur.get("id")) != str(entry.get("id")):
             raise EditConflict("the line was changed again after this edit: undo the later edits first")
-        return self.edit_text(entry["file"], entry["line"], entry["old"], cur["sha1"], client=client, undo_of=edit_id,
+        return self.edit_text(entry["file"], line, entry["old"], cur["sha1"], client=client, undo_of=edit_id,
                               member=member)
 
+    # ---- inserting and deleting lines -----------------------------------------------------------
+
+    def _open_for_change(self, path: str, member: Optional[str]):
+        path = clean_path(path)
+        member = member or None
+        if nli_formats.is_archive(path) and not member:
+            raise EditError(f"{path} is an archive: say which member to edit")
+        why = self.problem(path, member)
+        if why:
+            raise EditError(why)
+        return path, member
+
+    def _target(self, path: str) -> Optional[Path]:
+        local = self.ds.corpus.local_path(path)
+        target = Path(local) if local else None
+        if target is not None and not target.is_file():
+            raise FileNotFoundError(path)
+        if target is None and self.ds.corpus.stat(path).is_dir:
+            raise FileNotFoundError(path)
+        return target
+
+    @staticmethod
+    def _eol(lf, n: int) -> bytes:
+        """Line ending after line n (b"" when the file ends without one)."""
+        start, end = lf._span(n)
+        with open(lf.data_path, "rb") as fh:
+            fh.seek(start)
+            tail = fh.read(end - start)[-2:]
+        return b"\r\n" if tail == b"\r\n" else b"\n" if tail.endswith(b"\n") else b""
+
+    def _id_exists(self, lf, value: Any, id_field: str) -> Optional[int]:
+        """Line number of a line whose id is `value` (searches the bytes, parses only candidate lines)."""
+        needles = {json.dumps(value, ensure_ascii=False).encode("utf-8"), json.dumps(value).encode("utf-8")}
+        overlap = max(len(n) for n in needles) - 1
+        starts = lf._starts
+        checked = set()
+        with open(lf.data_path, "rb") as fh:  # the decompressed cache copy, in blocks (big files: no RAM spike)
+            base, prev = 0, b""
+            while True:
+                block = fh.read(CHUNK)
+                if not block:
+                    return None
+                data = prev + block
+                offset = base - len(prev)
+                for needle in needles:
+                    i = data.find(needle)
+                    while i != -1:
+                        n = bisect.bisect_right(starts, offset + i)
+                        if n not in checked:
+                            checked.add(n)
+                            with contextlib.suppress(ValueError, IndexError):
+                                obj = json.loads(lf.line(n))
+                                if isinstance(obj, dict) and obj.get(id_field) == value:
+                                    return n
+                        i = data.find(needle, i + 1)
+                base += len(block)
+                prev = data[-overlap:] if overlap > 0 else b""
+
+    def insert_line(self, path: str, after: int, record: Dict[str, Any], sha1: Optional[str] = None,
+                    member: Optional[str] = None, client: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Insert a new line after line `after` (0 = at the top; the number of lines = at the end). record must have
+        the id field (not used yet in this file) and the text field. sha1: of the line the new one goes next to
+        (line `after`, or line 1 when after = 0), to notice a file changed meanwhile.
+        """
+        path, member = self._open_for_change(path, member)
+        text_field, id_field = self._text_field()
+        if not isinstance(record, dict):
+            raise EditError("the new line must be a JSON object")
+        rid = record.get(id_field)
+        if rid is None or (isinstance(rid, str) and not rid.strip()):
+            raise EditError(f"the new line needs an '{id_field}'")
+        if not isinstance(record.get(text_field), str):
+            raise EditError(f"the new line needs a text field '{text_field}' (a string)")
+        with self._lock(path):
+            self._target(path)
+            lf = self._fresh_line_file(path, member)
+            total = len(lf)
+            if not 0 <= int(after) <= total:
+                raise EditError(f"insert position {after} out of range 0..{total}")
+            after = int(after)
+            near = after or (1 if total else 0)
+            if near and sha1 and line_sha1(lf.line(near)) != sha1:
+                raise EditConflict(f"line {near} of {path} changed since it was loaded: reload and insert again")
+            dup = self._id_exists(lf, rid, id_field) if total else None
+            if dup is not None:
+                raise EditError(f"'{id_field}' {rid!r} is already used by line {dup}")
+            style = (False, (",", ":"))
+            if near:
+                with contextlib.suppress(ValueError):
+                    style = _style_of(lf.line(near), json.loads(lf.line(near)))
+            if nli_formats.is_table(path):
+                if not total:
+                    raise EditError("cannot insert into an empty table (its columns are unknown here)")
+                columns = list(json.loads(lf.line(1)).keys())
+                extra = [k for k in record if k not in columns]
+                if extra:
+                    raise EditError(f"the table has no column {', '.join(map(repr, extra))}")
+                record = {c: record.get(c) for c in columns}
+                raw = nli_formats.parquet_dump(record)
+            else:
+                raw = _dump(record, style)
+        return self._insert_raw(path, after, raw, member, client=client, record=record)
+
+    def _insert_raw(self, path: str, after: int, raw: bytes, member: Optional[str], client: Optional[str] = None,
+                    undo_of: Optional[str] = None, record: Optional[Dict[str, Any]] = None,
+                    entry_extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        path, member = self._open_for_change(path, member)
+        text_field, id_field = self._text_field()
+        t0 = time.perf_counter()
+        obj = record if record is not None else json.loads(raw)
+        with self._lock(path):
+            target = self._target(path)
+            old_fp = self.ds.corpus.fingerprint(path)
+            lf = self._fresh_line_file(path, member)
+            total = len(lf)
+            if not 0 <= after <= total:
+                raise EditError(f"insert position {after} out of range 0..{total}")
+            # the file's line ending: from the first line (the last one may have none)
+            eol = (self._eol(lf, 1) if total else b"") or b"\n"
+            if after < total:
+                pos, _ = lf._span(after + 1)
+                repl = (pos, pos, raw + eol)
+            elif total == 0:
+                repl = (0, 0, raw + b"\n")
+            else:
+                end = lf._size
+                last_eol = self._eol(lf, total)
+                repl = (end, end, raw + last_eol) if last_eol else (end, end, eol + raw)
+            self._rewrite(path, target, lf.data_path, [repl], old_fp, member,
+                          lambda src, dst: nli_formats.table_insert_row(src, dst, after, obj, kind=Path(path).suffix))
+            entry = {"edit": uuid.uuid4().hex[:12], "time": time.strftime("%Y-%m-%d %H:%M:%S"), "ts": time.time(),
+                     "kind": "insert", "file": path, **({"member": member} if member else {}), "line": after + 1,
+                     "id": obj.get(id_field) if isinstance(obj, dict) else None, "field": text_field, "old": "",
+                     "new": obj.get(text_field, "") if isinstance(obj, dict) else "",
+                     "raw": raw.decode("utf-8"), "new_sha1": line_sha1(raw), "client": client,
+                     "seconds": round(time.perf_counter() - t0, 3)}
+            if entry_extra:
+                entry.update({k: v for k, v in entry_extra.items() if v is not None})
+            if undo_of:
+                entry["undo_of"] = undo_of
+            self._log([entry])
+        return {"changed": 1, "entry": entry, **self.read_line(path, after + 1, member)}
+
+    def delete_line(self, path: str, line: int, sha1: Optional[str] = None, member: Optional[str] = None,
+                    client: Optional[str] = None, undo_of: Optional[str] = None) -> Dict[str, Any]:
+        """Remove line `line`; the lines after it move up by one. The removed line is kept in the log (undo)."""
+        path, member = self._open_for_change(path, member)
+        text_field, id_field = self._text_field()
+        t0 = time.perf_counter()
+        line = int(line)
+        with self._lock(path):
+            target = self._target(path)
+            old_fp = self.ds.corpus.fingerprint(path)
+            lf = self._fresh_line_file(path, member)
+            total = len(lf)
+            if not 1 <= line <= total:
+                raise EditError(f"line {line} out of range 1..{total}")
+            raw = lf.line(line)
+            if sha1 and line_sha1(raw) != sha1:
+                raise EditConflict(f"line {line} of {path} changed since it was loaded: reload and delete again")
+            start, end = lf._span(line)
+            if line < total or self._eol(lf, line) or line == 1:
+                repl = (start, end, b"")
+            else:  # last line without a line ending: remove the ending of the line before instead
+                pstart, _ = lf._span(line - 1)
+                repl = (pstart + len(lf.line(line - 1)), end, b"")
+            self._rewrite(path, target, lf.data_path, [repl], old_fp, member,
+                          lambda src, dst: nli_formats.table_delete_row(src, dst, line - 1, kind=Path(path).suffix))
+            obj: Dict[str, Any] = {}
+            with contextlib.suppress(ValueError):
+                loaded = json.loads(raw)
+                obj = loaded if isinstance(loaded, dict) else {}
+            entry = {"edit": uuid.uuid4().hex[:12], "time": time.strftime("%Y-%m-%d %H:%M:%S"), "ts": time.time(),
+                     "kind": "delete", "file": path, **({"member": member} if member else {}), "line": line,
+                     "id": obj.get(id_field), "field": text_field, "old": obj.get(text_field, "") or "", "new": "",
+                     "raw": raw.decode("utf-8", "replace"), "old_sha1": line_sha1(raw), "client": client,
+                     "seconds": round(time.perf_counter() - t0, 3)}
+            if undo_of:
+                entry["undo_of"] = undo_of
+            self._log([entry])
+        return {"changed": 1, "entry": entry, "deleted": line, "total_lines": total - 1}
+
     def _rewrite(self, path: str, target: Optional[Path], data_path: str, repl: List[Tuple[int, int, bytes]],
-                 old_fp: str, member: Optional[str] = None, texts: Optional[Dict[int, str]] = None,
-                 text_field: str = "text") -> None:
+                 old_fp: str, member: Optional[str] = None,
+                 table_op: Optional[Callable[[str, str], None]] = None) -> None:
         """New file next to the old one (server: a local one), checked, swapped in / uploaded; the viewer's cache
         is filled from the check. Archives get the new member, tables the new texts; the rest stays."""
         name = posixpath.basename(path)
@@ -290,9 +497,7 @@ class CorpusEditor:
                 if nli_formats.is_table(path):
                     digest = _digest(_content(data_path, repl))
                     try:
-                        nli_formats.table_replace_texts(original, str(tmp), text_field,
-                                                        {line - 1: t for line, t in (texts or {}).items()},
-                                                        kind=Path(path).suffix)
+                        table_op(original, str(tmp))  # replace texts / insert a row / delete a row
                     except ValueError as exc:
                         raise EditError(str(exc)) from None
                 else:
@@ -467,27 +672,48 @@ class CorpusEditor:
                 fh.flush()
                 os.fsync(fh.fileno())
 
-    def history(self, path: Optional[str] = None, line: Optional[int] = None,
-                member: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Logged edits (oldest first), optionally of one file (archive member) / line."""
+    def _read_log(self) -> List[Dict[str, Any]]:
         if not self.log_path.exists():
             return []
-        path = clean_path(path) if path else None
         out = []
         with self._log_lock, open(self.log_path, encoding="utf-8") as fh:
             for raw in fh:
                 with contextlib.suppress(ValueError):
-                    e = json.loads(raw)
-                    if (path is None or (e.get("file") == path and e.get("member") == (member or None))) \
-                            and (line is None or e.get("line") == int(line)):
-                        out.append(e)
+                    out.append(json.loads(raw))
         return out
+
+    def history(self, path: Optional[str] = None, line: Optional[int] = None,
+                member: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Logged changes (oldest first), optionally of one file (archive member) / line. Each entry gets
+        "current_line": where its line is now (inserts / deletes after it move it; None = deleted since)."""
+        log = self._read_log()
+        path = clean_path(path) if path else None
+        out = []
+        for k, e in enumerate(log):
+            if path is not None and not (e.get("file") == path and e.get("member") == (member or None)):
+                continue
+            if e.get("kind") == "delete":
+                cur = None
+            else:
+                cur = map_forward(e["line"], _ops(log[k + 1:], e["file"], e.get("member")))
+            if line is not None and cur != int(line):
+                continue
+            out.append({**e, "current_line": cur})
+        return out
+
+    def structural_ops(self, path: str, member: Optional[str] = None,
+                       after_ts: Optional[float] = None) -> List[Tuple[str, int]]:
+        """Inserts / deletes of a file in log order, made after after_ts: [("insert" | "delete", line), ...]."""
+        log = [e for e in self._read_log() if after_ts is None or e.get("ts", 0) > after_ts]
+        return _ops(log, clean_path(path), member)
 
     def edited_lines(self, path: str, member: Optional[str] = None) -> Dict[int, int]:
         """line -> number of edits, for one file (archive member)."""
         out: Dict[int, int] = {}
         for e in self.history(path, member=member):
-            out[e["line"]] = out.get(e["line"], 0) + 1
+            n = e.get("current_line")
+            if n is not None:
+                out[n] = out.get(n, 0) + 1
         return out
 
     def since(self, path: str, line: int, after_ts: Optional[float],
@@ -556,3 +782,38 @@ def _zip_replace(src: str, member: str, content: str, dst: str) -> None:
             else:
                 with zin.open(info) as fh, zout.open(info, "w", force_zip64=True) as out:
                     shutil.copyfileobj(fh, out, CHUNK)
+
+
+# ---- line numbers across inserts / deletes ----------------------------------------------------------
+
+def _ops(log: List[Dict[str, Any]], path: str, member: Optional[str]) -> List[Tuple[str, int]]:
+    return [(e["kind"], int(e["line"])) for e in log
+            if e.get("kind") in ("insert", "delete") and e.get("file") == path and e.get("member") == (member or None)]
+
+
+def map_forward(line: int, ops: List[Tuple[str, int]]) -> Optional[int]:
+    """Line number before the ops -> after them (None: the line was deleted)."""
+    for kind, at in ops:
+        if kind == "insert":
+            if line >= at:
+                line += 1
+        else:
+            if line == at:
+                return None
+            if line > at:
+                line -= 1
+    return line
+
+
+def map_back(line: int, ops: List[Tuple[str, int]]) -> Optional[int]:
+    """Line number after the ops -> before them (None: the line was inserted by them)."""
+    for kind, at in reversed(ops):
+        if kind == "insert":
+            if line == at:
+                return None
+            if line > at:
+                line -= 1
+        else:
+            if line >= at:
+                line += 1
+    return line

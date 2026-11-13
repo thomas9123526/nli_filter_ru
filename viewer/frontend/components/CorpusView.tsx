@@ -9,6 +9,7 @@ import { ApiError, api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
 import type { CorpusLine } from "@/lib/types";
 import { EditHistory, TextEditor } from "./TextEditor";
+import { FileChanges, InsertForm, deleteLine, fieldTemplate } from "./LineInsert";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 
 const PAGE = 20;
@@ -108,7 +109,12 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [savedNote, setSavedNote] = useState<string | null>(null);
+  const [inserting, setInserting] = useState<number | null>(null);  // insert after this line (0 = at the top)
+  const [changesVersion, setChangesVersion] = useState(0);
   const nPending = Object.keys(pending).length;
+  const reload = () => { setInserting(null); setVersion((v) => v + 1); setChangesVersion((v) => v + 1); };
+  const lastPage = !!data && start + PAGE > total;
+  const structural = editable && !nPending;  // inserting / deleting moves lines: not with unsaved changes
   useEffect(() => { setPending({}); setSavedNote(null); setSaveError(null); }, [ds, file, member]);
   useEffect(() => {
     if (!nPending) return;
@@ -185,6 +191,10 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
         <button className="btn" disabled={!data || start + PAGE > total} onClick={() => go(start + PAGE)}>Next {PAGE} ›</button>
         <span className="muted">{data ? `lines ${num(start)}–${num(Math.min(total, start + PAGE - 1))} of ${num(total)}` : "…"}</span>
         {data?.decisions_pending ? <span className="badge neutral" title="First look at this file: the decision links are being prepared in the background">linking decisions…</span> : null}
+        {editable && data && start === 1 ? <button className="btn small" disabled={!structural} title={nPending ? "save or discard the pending changes first" : "insert a new first line"}
+          onClick={() => setInserting(0)}>Insert at top</button> : null}
+        {editable && data && lastPage && total > 0 ? <button className="btn small" disabled={!structural} title={nPending ? "save or discard the pending changes first" : "add a line after the last one"}
+          onClick={() => setInserting(total)}>Add at end</button> : null}
         <span className="spacer" />
         <form className="row" onSubmit={(e) => { e.preventDefault(); if (Number(jumpTo) >= 1) go(Number(jumpTo)); }}>
           <input type="number" min={1} placeholder="line" value={jumpTo} onChange={(e) => setJumpTo(e.target.value)} />
@@ -193,13 +203,26 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
       </div>
       <ErrorBox error={res.error} onRetry={res.reload} />
       {res.loading && !data ? <Loading what="Reading the file (a .zst file is decompressed once into the cache)" /> : null}
+      {data ? <FileChanges ds={ds} path={file} member={member} version={changesVersion} onChanged={reload} /> : null}
+      {data && inserting !== null && (inserting === 0 || inserting === total) ? (
+        <InsertForm ds={ds} path={file} member={member} after={inserting} idField={data.id_field} textField={data.text_field}
+          sha1={(inserting === 0 ? data.lines[0]?.sha1 : data.lines[data.lines.length - 1]?.sha1) || ""}
+          template={fieldTemplate((inserting === 0 ? data.lines[0] : data.lines[data.lines.length - 1])?.extra)}
+          where={inserting === 0 ? "at the top" : `at the end (line ${total + 1})`} onDone={reload} onCancel={() => setInserting(null)} />
+      ) : null}
       {data ? (
         <div className="stack" style={{ opacity: res.loading && !data.decisions_pending ? 0.6 : 1 }}>
-          {data.lines.map((l) => (
-            <LineCard key={`${member || ""}:${l.line}:${l.sha1}`} ds={ds} file={file} member={member} fileKey={data.file_key} l={l} editable={editable}
+          {data.lines.map((l) => (<div key={`${member || ""}:${l.line}:${l.sha1}`} className="stack" style={{ gap: 8 }}>
+            <LineCard ds={ds} file={file} member={member} fileKey={data.file_key} l={l} editable={editable}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
-              onChanged={() => setVersion((v) => v + 1)} />
-          ))}
+              onChanged={reload} structural={structural}
+              onInsertBelow={() => setInserting(l.line)}
+              onDelete={async () => { try { if (await deleteLine(ds, file, member, l.line, l.sha1, l.id)) reload(); } catch (e) { setSaveError(e instanceof ApiError ? e : new ApiError((e as Error).message, 0)); } }} />
+            {inserting === l.line && l.line !== total ? (
+              <InsertForm ds={ds} path={file} member={member} after={l.line} sha1={l.sha1} idField={data.id_field} textField={data.text_field}
+                template={fieldTemplate(l.extra)} where={`after line ${l.line}`} onDone={reload} onCancel={() => setInserting(null)} />
+            ) : null}
+          </div>))}
           {data.lines.length === 0 ? <div className="muted">The file is empty.</div> : null}
         </div>
       ) : null}
@@ -207,9 +230,10 @@ function FileLines({ ds, file, member: wanted, start }: { ds: string; file: stri
   );
 }
 
-function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged }: {
+function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete }: {
   ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
+  structural: boolean; onInsertBelow: () => void; onDelete: () => void;
 }) {
   const [full, setFull] = useState<CorpusLine | null>(null);
   const [mode, setMode] = useState<"view" | "full" | "edit">("view");
@@ -237,6 +261,7 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         <strong className="mono">line {l.line}</strong>
         {l.id !== null && l.id !== undefined ? <span className="muted mono">id {String(l.id)}</span> : null}
         {l.edits ? <span className="badge warn">edited {l.edits}×</span> : null}
+        {l.inserted ? <span className="badge keep" title="added in the viewer after the filter run: no decision yet">new</span> : null}
         {pending ? <span className="badge accent">unsaved change</span> : null}
         {l.row && fileKey ? <Link className="btn small" href={href("/record", { ds, f: fileKey, row: l.row })}>decision ›</Link> : null}
         <span className="spacer" />
@@ -244,6 +269,10 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         {mode === "full" ? <button className="btn small ghost" onClick={() => setMode("view")}>Show less</button> : null}
         {editable && l.text !== null && mode !== "edit" ? <button className="btn small" onClick={() => load("edit")}>{pending ? "Edit again" : "Edit"}</button> : null}
         {pending && mode !== "edit" ? <button className="btn small ghost" onClick={onDiscard}>Discard change</button> : null}
+        {editable && mode !== "edit" && !pending ? <>
+          <button className="btn small ghost" disabled={!structural} title={structural ? "insert a new line after this one" : "save or discard the pending changes first"} onClick={onInsertBelow}>Insert below</button>
+          <button className="btn small ghost danger" disabled={!structural} title={structural ? "delete this line" : "save or discard the pending changes first"} onClick={onDelete}>Delete</button>
+        </> : null}
       </div>
       {l.error ? <div className="alert warn">{l.error}{l.raw ? <pre className="json">{l.raw}</pre> : null}</div> : null}
       {mode === "edit" && line.text !== null ? (

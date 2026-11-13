@@ -589,9 +589,14 @@ class Dataset:
         id_field = self._id_field or settings.get("id_field") or "id"
         original: Dict[str, Any] = {"available": False, "path": fr.corpus_path, "member": decision.get("source")}
         text = None
-        if fr.corpus_path:
+        # lines inserted / deleted in the viewer after the run move this line: where is it now?
+        now = self._current_line(fr, decision)
+        original["line"] = now
+        if fr.corpus_path and now is None:
+            original["error"] = "this line was deleted in the viewer after the filter run"
+        elif fr.corpus_path:
             try:
-                raw = self.corpus_line(fr.corpus_path, int(decision["line"]), decision.get("source"))
+                raw = self.corpus_line(fr.corpus_path, now, decision.get("source"))
                 original.update(available=True, raw=raw.decode("utf-8", "replace"))
                 try:
                     obj = _loads(raw)
@@ -607,7 +612,7 @@ class Dataset:
                 original["error"] = f"line {decision.get('line')} not found in {fr.corpus_path}: {exc}"
         else:
             original["error"] = "corpus file not found"
-        edit = self._edit_info(fr, decision, original, text)
+        edit = self._edit_info(fr, decision, original, text, now)
         if edit.get("edited_after_filter") and edit.get("filtered_text") is not None:
             text = edit["filtered_text"]  # the decision's spans and scores belong to the text before the edits
         if original.get("record") is not None and len(original.get("raw", "")) > 200000:
@@ -638,21 +643,36 @@ class Dataset:
         except (FileNotFoundError, OSError):
             return None
 
+    def _member_of(self, fr: FileResult, decision: Dict[str, Any]) -> Optional[str]:
+        return decision.get("source") if fr.corpus_path and nli_formats.is_archive(fr.corpus_path) else None
+
+    def _current_line(self, fr: FileResult, decision: Dict[str, Any]) -> Optional[int]:
+        """The decision's line number now (lines inserted / deleted in the viewer after the run move it;
+        None = deleted)."""
+        line = int(decision.get("line") or 0)
+        if self.editor is None or not fr.corpus_path or not line:
+            return line or None
+        from .edit import map_forward
+        ops = self.editor.structural_ops(fr.corpus_path, self._member_of(fr, decision), self._decisions_time(fr))
+        return map_forward(line, ops) if ops else line
+
     def _edit_info(self, fr: FileResult, decision: Dict[str, Any], original: Dict[str, Any],
-                   text: Optional[str]) -> Dict[str, Any]:
+                   text: Optional[str], now: Optional[int] = None) -> Dict[str, Any]:
         """Can this line be edited, and was it edited after the filter run (then: the text the run saw)."""
-        member = decision.get("source") if fr.corpus_path and nli_formats.is_archive(fr.corpus_path) else None
+        member = self._member_of(fr, decision)
+        now = now if now is not None else (None if original.get("line", 1) is None else decision.get("line"))
         problem = self.edit_problem(fr.corpus_path, member) if fr.corpus_path else "corpus file not found"
         if problem is None and (not original.get("available") or text is None):
             problem = original.get("error") or "the line has no text field"
         info: Dict[str, Any] = {"editable": problem is None, "problem": problem, "path": fr.corpus_path,
-                                "member": member, "line": decision.get("line"), "text": text, "edits": 0,
+                                "member": member, "line": now, "decision_line": decision.get("line"),
+                                "moved": bool(now) and now != decision.get("line"), "text": text, "edits": 0,
                                 "edited_after_filter": False, "filtered_text": None}
         if original.get("raw") is not None:
             info["sha1"] = hashlib.sha1(original["raw"].encode("utf-8")).hexdigest()
-        if self.editor is not None and fr.corpus_path and decision.get("line"):
-            edits, before = self.editor.since(fr.corpus_path, int(decision["line"]), self._decisions_time(fr), member)
-            info["edits"] = len(self.editor.history(fr.corpus_path, int(decision["line"]), member))
+        if self.editor is not None and fr.corpus_path and now:
+            edits, before = self.editor.since(fr.corpus_path, int(now), self._decisions_time(fr), member)
+            info["edits"] = len(self.editor.history(fr.corpus_path, int(now), member))
             if edits:
                 info.update(edited_after_filter=True, edits_after_filter=len(edits), filtered_text=before,
                             last_edit=edits[-1]["time"])
@@ -714,6 +734,10 @@ class Dataset:
             idx.build_in_background()
             decisions_pending, idx = True, None
         edited = self.editor.edited_lines(path, member) if self.editor is not None else {}
+        back_ops = []  # inserts / deletes since the run: current line -> the decision's line
+        if idx is not None and self.editor is not None and fr is not None:
+            back_ops = self.editor.structural_ops(path, member, self._decisions_time(fr))
+        from .edit import map_back
         rows = []
         for k, raw in enumerate(lf.lines(start, count) if total else []):
             n = start + k
@@ -724,6 +748,9 @@ class Dataset:
                     t = obj.get(text_field)
                     row["text"] = t if isinstance(t, str) else None
                     row["id"] = obj.get(id_field)
+                    # the other fields (e.g. expect, category): the template for a new line next to this one
+                    row["extra"] = {k: v for k, v in obj.items() if k not in (text_field, id_field)
+                                    and not (isinstance(v, str) and len(v) > 500)}
                 else:
                     row["error"] = "not a JSON object"
             except ValueError as exc:
@@ -734,12 +761,15 @@ class Dataset:
                 row["text"] = row["text"][:preview]
                 row["truncated"] = True
             if idx is not None:
-                r = idx.find_row(n, member)
+                old = map_back(n, back_ops) if back_ops else n
+                r = idx.find_row(old, member) if old is not None else None
                 if r is not None:
                     row["row"] = r
+                elif old is None:
+                    row["inserted"] = True  # added in the viewer after the run: no decision yet
             rows.append(row)
         return {"path": path, "member": member, "members": members, "total_lines": total, "start": start,
-                "count": len(rows), "text_field": text_field,
+                "count": len(rows), "text_field": text_field, "id_field": id_field,
                 "file_key": fr.key if fr else None, "editable": self.edit_problem(path, member) is None,
                 "problem": self.edit_problem(path, member), "decisions_pending": decisions_pending, "lines": rows}
 

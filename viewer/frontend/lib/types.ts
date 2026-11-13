@@ -249,6 +249,8 @@ export type EditInfo = {
   sha1?: string;                // sha1 of the current line (sent back on save: conflict check)
   edits: number;                // all edits of this line
   edited_after_filter: boolean; // edited after the decisions file was written
+  decision_line?: number | null; // the line number in the decisions file
+  moved?: boolean;              // lines inserted / deleted above it in the viewer moved it
   edits_after_filter?: number;
   filtered_text: string | null; // the text the filter run saw (highlights and scores belong to it)
   last_edit?: string;
@@ -256,6 +258,8 @@ export type EditInfo = {
 
 export type EditEntry = {
   edit: string;
+  kind?: "text" | "insert" | "delete";
+  current_line?: number | null; // where the line is now (inserts / deletes move lines); null = deleted
   time: string;
   file: string;
   line: number;
@@ -289,6 +293,8 @@ export type CorpusLine = {
   truncated?: boolean;
   edits: number;
   row?: number;
+  inserted?: boolean;           // added in the viewer after the filter run: no decision
+  extra?: Record<string, unknown>; // the other fields (template for a new line)
   error?: string;
   raw?: string;
 };
@@ -301,6 +307,7 @@ export type CorpusLines = {
   start: number;
   count: number;
   text_field: string;
+  id_field: string;
   file_key: string | null;
   editable: boolean;
   problem: string | null;
