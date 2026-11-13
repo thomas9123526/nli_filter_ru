@@ -19,7 +19,7 @@ viewer/.viewer_cache/
 # corpus edits made in the viewer: backups of the original corpus files + edit log
 viewer/.viewer_edits/
 .viewer_edits/
-test_corpus**
+/test_corpus*
 out_test_corpus**
 out**
 pkgs/**
