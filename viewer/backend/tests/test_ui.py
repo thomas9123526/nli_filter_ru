@@ -31,12 +31,17 @@ pytestmark = pytest.mark.skipif(BROWSER is None or not (DEFAULT_FRONTEND / "inde
 def server(tree, tmp_path_factory):
     import uvicorn
     cache = tmp_path_factory.mktemp("uicache")
+    ports = []
+    for _ in range(2):  # the viewer's port, and one where no model service listens
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        ports.append(s.getsockname()[1])
+        s.close()
+    port, no_service = ports
+    # not the default model service address: a real nli_playground.py may be running on this machine
     cfg = ViewerConfig(datasets=[DatasetConfig(name="t", title="UI test data", corpus=str(tree / "corpus"),
-                                               output=str(tree / "out"))], cache_dir=str(cache))
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
+                                               output=str(tree / "out"))], cache_dir=str(cache),
+                       playground_url=f"http://127.0.0.1:{no_service}")
     srv = uvicorn.Server(uvicorn.Config(create_app(cfg), host="127.0.0.1", port=port, log_level="warning"))
     t = threading.Thread(target=srv.run, daemon=True)
     t.start()

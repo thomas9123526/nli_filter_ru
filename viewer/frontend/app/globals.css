@@ -301,6 +301,15 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
 .diff-old, .diff-new { white-space: pre-wrap; word-break: break-word; font-size: 13px; padding: 2px 6px; border-radius: 4px; margin: 2px 0; }
 .diff-old { background: var(--filter-soft); text-decoration: line-through; text-decoration-color: var(--filter); }
 .diff-new { background: var(--keep-soft); }
+.diff-old.inline, .diff-new.inline { display: inline; padding: 0 4px; }
+.c2-pairs { font-size: 12px; margin-top: 4px; color: var(--muted); }
+.c2-pairs .chip { margin: 2px 4px 0 0; }
+.c2-pairs .chip.best { font-weight: 700; }
+.field-editor { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
+.field-editor table { width: 100%; border-collapse: collapse; }
+.field-editor td { padding: 3px 4px; vertical-align: middle; border: 0; }
+.field-editor td:first-child input { width: 140px; }
+.field-editor tr.removed input[type="text"] { text-decoration: line-through; opacity: 0.6; }
 .pending-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); box-shadow: var(--shadow); }
 .line-card.pending { border-color: var(--accent); }
 .line-card.target { box-shadow: 0 0 0 2px var(--active); scroll-margin: 80px; }

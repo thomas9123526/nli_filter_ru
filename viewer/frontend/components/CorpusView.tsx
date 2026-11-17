@@ -219,6 +219,7 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
       {res.loading && !data ? <Loading what="Reading the file (a .zst file is decompressed once into the cache)" /> : null}
       {data ? <FileChanges ds={ds} path={file} member={member} version={changesVersion} onChanged={reload} /> : null}
       {data ? <TryPanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
+        lineInfo={Object.fromEntries(data.lines.map((l) => [l.line, { id: l.id, text: l.text, length: l.text_length, extra: l.extra }]))}
         onResults={(r) => setTried(r ? Object.fromEntries(r.results.map((x) => [x.line, x])) : {})}
         onControl={setTryCtl} /> : null}
       {data && inserting !== null && (inserting === 0 || inserting === total) ? (
@@ -231,6 +232,7 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
         <div className="stack" style={{ opacity: res.loading && !data.decisions_pending ? 0.6 : 1 }}>
           {data.lines.map((l) => (<div key={`${member || ""}:${l.line}:${l.sha1}`} className="stack" style={{ gap: 8 }}>
             <LineCard ds={ds} file={file} member={member} fileKey={data.file_key} l={l} editable={editable}
+              textField={data.text_field} idField={data.id_field}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
               onChanged={reload} structural={structural} tried={tried[l.line]}
               isTarget={l.line === target} autoEdit={l.line === target && editTarget && !autoEditDone} onAutoEdit={() => setAutoEditDone(true)}
@@ -257,11 +259,12 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
 }
 
 function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete, tried,
-  isTarget, autoEdit, onAutoEdit, editProblem }: {
+  isTarget, autoEdit, onAutoEdit, editProblem, textField, idField }: {
   ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
   structural: boolean; onInsertBelow: () => void; onDelete: () => void; tried?: TryResult;
   isTarget?: boolean; autoEdit?: boolean; onAutoEdit?: () => void; editProblem?: string | null;
+  textField?: string; idField?: string;
 }) {
   const [full, setFull] = useState<CorpusLine | null>(null);
   const [mode, setMode] = useState<"view" | "full" | "edit">("view");
@@ -318,6 +321,7 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
       {l.error ? <div className="alert warn">{l.error}{l.raw ? <pre className="json">{l.raw}</pre> : null}</div> : null}
       {mode === "edit" && line.text !== null ? (
         <TextEditor ds={ds} path={file} member={member} line={l.line} text={line.text} sha1={line.sha1} initial={pending?.text}
+          fields={line.extra || {}} textField={textField} idField={idField} id={line.id}
           onSaved={() => { onDiscard(); saved(); }} onCancel={() => setMode("view")}
           onStage={(v) => { onStage(line.sha1, line.text as string, v); setMode("view"); }} />
       ) : pending ? (

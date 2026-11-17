@@ -21,7 +21,9 @@ API (JSON):
   POST /filter   {"lines": [{"line": 12, "raw": "<the JSON line>"}], "country": "Russia", "country_adj": "Russian",
                   "keywords": [...], "check1": {key: template}, "check2": {...}, "use_judge": true,
                   "check1_threshold": 0.8, "check2_threshold": 0.8, "uncertain_band": [0.6, 0.95],
-                  "max_windows": 2, "rules": true, "early_stop": true, "text_field": "text", "id_field": "id"}
+                  "max_windows": 2, "rules": true, "early_stop": true, "text_field": "text", "id_field": "id",
+                  "check1_early_stop": true, "check2_early_stop": true}   (per check; default = early_stop)
+                  max_windows 0 = a check-1 window around every keyword hit
               -> {"decisions": [<the record nli_filter.py writes per line>], "hypotheses": {...}, "pairs": {...},
                   "seconds": ...}
 Every setting left out has nli_filter.py's default. One request at a time (the models are shared).
@@ -189,14 +191,20 @@ class Playground:
                                      req.get("text_field") or d.text_field, req.get("id_field") or d.id_field or None,
                                      req.get("expect_field") or d.expect_field or None,
                                      req.get("group_field") or d.group_field or None,
-                                     early_stop=bool(req.get("early_stop", not d.no_early_stop)))
+                                     early_stop=bool(req.get("early_stop", not d.no_early_stop)),
+                                     check1_early_stop=None if req.get("check1_early_stop") is None
+                                     else bool(req["check1_early_stop"]),
+                                     check2_early_stop=None if req.get("check2_early_stop") is None
+                                     else bool(req["check2_early_stop"]))
         excludes = [x for x in (req.get("exclude_patterns") or known.get("exclude", [])) if isinstance(x, str)]
         matcher = nf.KeywordMatcher(keywords, excludes)
         rules = nf.IncidentalRules(adj, int(req.get("language_menu_min", d.language_menu_min))) \
             if req.get("rules", True) else None
+        max_windows = int(req.get("max_windows", d.max_windows))
+        if max_windows < 0:
+            raise ValueError("max_windows must be 0 (no limit) or more")
         windows = nf.WindowBuilder(int(req.get("check1_chars", d.check1_chars)),
-                                   int(req.get("check2_chars", d.check2_chars)),
-                                   int(req.get("max_windows", d.max_windows)))
+                                   int(req.get("check2_chars", d.check2_chars)), max_windows)
         records = []
         for item in lines:
             raw = str(item.get("raw", "")).encode("utf-8")
@@ -219,7 +227,8 @@ class Playground:
                 "models": {"fast": {"model": self.fast.name}, "judge": {"model": self.judge.name} if use_judge else None},
                 "settings": {"check1_threshold": settings.check1_threshold,
                              "check2_threshold": settings.check2_threshold, "uncertain_band": [lo, hi],
-                             "early_stop": settings.early_stop, "max_windows": windows.max_windows
+                             "early_stop": settings.early_stop, "check1_early_stop": settings.check1_early_stop,
+                             "check2_early_stop": settings.check2_early_stop, "max_windows": windows.max_windows
                              if hasattr(windows, "max_windows") else None,
                              "text_field": settings.text_field, "id_field": settings.id_field}}
 

@@ -422,6 +422,32 @@ def table_insert_row(src: str, dst: str, index: int, row: Dict[str, Any], kind: 
     table_rewrite(src, dst, insert, kind)
 
 
+def table_replace_rows(src: str, dst: str, rows: Dict[int, Dict[str, Any]], kind: Optional[str] = None) -> None:
+    """dst = src with whole rows replaced: {0-based index: row}. Columns stay; a column a row does not give becomes
+    null; a value that does not fit its column's type raises ValueError (as in table_insert_row)."""
+    import pyarrow as pa
+
+    def replace(t):
+        bad = [i for i in rows if not 0 <= i < t.num_rows]
+        if bad:
+            raise ValueError(f"row {bad[0] + 1} out of range 1..{t.num_rows}")
+        arrays = []
+        for k, f in enumerate(t.schema):
+            values = t.column(k).to_pylist()
+            for i, r in rows.items():
+                v = r.get(f.name)
+                try:  # the value as this column's Python type (e.g. a date given as text "2024-01-01")
+                    values[i] = pa.array([v], type=f.type).to_pylist()[0]
+                except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError, OverflowError):
+                    try:
+                        values[i] = pa.array([v]).cast(f.type).to_pylist()[0]
+                    except (pa.ArrowInvalid, pa.ArrowTypeError, pa.ArrowNotImplementedError, TypeError, ValueError) as exc:
+                        raise ValueError(f"value {v!r} does not fit column '{f.name}' ({f.type}): {exc}") from None
+            arrays.append(pa.array(values, type=f.type))
+        return pa.Table.from_arrays(arrays, schema=t.schema)
+    table_rewrite(src, dst, replace, kind)
+
+
 def table_delete_row(src: str, dst: str, index: int, kind: Optional[str] = None) -> None:
     """dst = src without row `index` (0-based)."""
     import pyarrow as pa

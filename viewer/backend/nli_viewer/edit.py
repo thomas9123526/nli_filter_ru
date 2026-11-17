@@ -1,5 +1,5 @@
 """
-edit.py - change the text field of one corpus line, also inside a .zst / .gz file, a member of a .zip / .rar
+edit.py - change the text field (and other fields, e.g. expect / category) of one corpus line, also inside a .zst / .gz file, a member of a .zip / .rar
 archive or a row of a .parquet table, safely.
 
 For corpus folders on a local (or mapped / UNC) drive and on FTP / SFTP / S3 (MinIO) servers, only when the
@@ -186,7 +186,9 @@ class CorpusEditor:
                    undo_of: Optional[str] = None, member: Optional[str] = None) -> Dict[str, Any]:
         """
         Several lines of one file (one member of a .zip / .rar) in ONE rewrite:
-        changes = [{"line": n, "text": "...", "sha1": "..."}, ...].
+        changes = [{"line": n, "text": "...", "sha1": "...", "fields": {"expect": "keep"}, "remove": ["note"]}, ...].
+        "text" (the text field), "fields" (other fields to set or add) and "remove" (other fields to drop) are each
+        optional; the id field cannot be changed (the filter's decisions are linked to lines by it).
         All or nothing: one stale sha1 or bad line and nothing is written. Returns the new lines + log entries.
         """
         path = clean_path(path)
@@ -201,10 +203,26 @@ class CorpusEditor:
         lines = [int(c.get("line", 0)) for c in changes]
         if len(set(lines)) != len(lines):
             raise EditError("the same line is changed twice in one save")
-        for c in changes:
-            if not isinstance(c.get("text"), str):
-                raise EditError(f"line {c.get('line')}: text must be a string")
         text_field, id_field = self._text_field()
+        table = nli_formats.is_table(path)
+        for c in changes:
+            n, fields, remove = c.get("line"), c.get("fields") or {}, c.get("remove") or []
+            if c.get("text") is not None and not isinstance(c.get("text"), str):
+                raise EditError(f"line {n}: text must be a string")
+            if not isinstance(fields, dict) or not isinstance(remove, list) or not all(isinstance(k, str) for k in remove):
+                raise EditError(f"line {n}: fields must be an object and remove a list of field names")
+            if c.get("text") is None and not fields and not remove:
+                raise EditError(f"line {n}: nothing to change")
+            for k in [*fields, *remove]:
+                if not k.strip():
+                    raise EditError(f"line {n}: a field needs a name")
+                if k == text_field:
+                    raise EditError(f"line {n}: change the text field '{text_field}' as the text, not as a field")
+                if k == id_field:
+                    raise EditError(f"line {n}: the id field '{id_field}' cannot be changed (the filter's decisions "
+                                    "are linked to the lines by it)")
+            if table and remove:
+                raise EditError(f"line {n}: a table cannot lose a column for one row; set the value to null instead")
         t0 = time.perf_counter()
         entries: List[Dict[str, Any]] = []
         with self._lock(path):
@@ -218,8 +236,10 @@ class CorpusEditor:
             lf = self._fresh_line_file(path, member)
             total = len(lf)
             plan = []  # (start, cut_end, new_raw, log entry)
+            rows: Dict[int, Dict[str, Any]] = {}  # tables: 0-based row -> the whole new row
             for c in sorted(changes, key=lambda c: int(c["line"])):
-                line, text = int(c["line"]), c["text"]
+                line, text = int(c["line"]), c.get("text")
+                fields, remove = c.get("fields") or {}, c.get("remove") or []
                 if not 1 <= line <= total:
                     raise EditError(f"line {line} out of range 1..{total}")
                 old_raw = lf.line(line)
@@ -234,23 +254,41 @@ class CorpusEditor:
                 old_text = obj.get(text_field)
                 if not isinstance(old_text, str):
                     raise EditError(f"line {line} has no text field '{text_field}'")
-                if text == old_text:
+                if table:
+                    extra = [k for k in fields if k not in obj]
+                    if extra:
+                        raise EditError(f"line {line}: the table has no column {', '.join(map(repr, extra))}")
+                new_obj = dict(obj)  # same key order; added fields go at the end
+                if text is not None:
+                    new_obj[text_field] = text
+                for k in remove:
+                    new_obj.pop(k, None)
+                new_obj.update(fields)
+                if new_obj == obj and list(new_obj) == list(obj):
                     continue  # unchanged: nothing to write or log
-                style = _style_of(old_raw, obj)
-                obj[text_field] = text
-                new_raw = _dump(obj, style)
+                changed = {k: {"old": obj.get(k), "new": new_obj.get(k),
+                               **({"added": True} if k not in obj else {}), **({"removed": True} if k not in new_obj else {})}
+                           for k in dict.fromkeys([*obj, *new_obj])
+                           if k != text_field and ((k in obj) != (k in new_obj) or obj.get(k) != new_obj.get(k))}
+                new_raw = nli_formats.parquet_dump(new_obj) if table else _dump(new_obj, _style_of(old_raw, obj))
                 start, _ = lf._span(line)
                 entry = {"edit": uuid.uuid4().hex[:12], "file": path, **({"member": member} if member else {}),
                          "line": line, "id": obj.get(id_field),
-                         "field": text_field, "old": old_text, "new": text, "old_sha1": line_sha1(old_raw),
+                         "field": text_field, "old": old_text, "new": new_obj[text_field],
+                         **({"fields": changed} if changed else {}), "old_sha1": line_sha1(old_raw),
                          "new_sha1": line_sha1(new_raw), "client": client}
+                rows[line - 1] = new_obj
                 # start + len(old_raw): the line ending (\n or \r\n) after the line is kept
                 plan.append((start, start + len(old_raw), new_raw, entry))
             if plan:
-                texts = {e["line"] - 1: e["new"] for _, _, _, e in plan}
+                if any("fields" in e for _, _, _, e in plan):  # other fields too: whole rows
+                    table_op = lambda src, dst: nli_formats.table_replace_rows(src, dst, rows, kind=Path(path).suffix)  # noqa: E731
+                else:
+                    texts = {e["line"] - 1: e["new"] for _, _, _, e in plan}
+                    table_op = lambda src, dst: nli_formats.table_replace_texts(src, dst, text_field, texts,  # noqa: E731
+                                                                                kind=Path(path).suffix)
                 self._rewrite(path, target, lf.data_path, [(a, b, raw) for a, b, raw, _ in plan], old_fp, member,
-                              lambda src, dst: nli_formats.table_replace_texts(src, dst, text_field, texts,
-                                                                              kind=Path(path).suffix))
+                              table_op)
                 batch = uuid.uuid4().hex[:12] if len(plan) > 1 else None
                 now, ts, secs = time.strftime("%Y-%m-%d %H:%M:%S"), time.time(), round(time.perf_counter() - t0, 3)
                 for _, _, _, e in plan:
@@ -287,6 +325,22 @@ class CorpusEditor:
             if cur["sha1"] != entry.get("new_sha1"):
                 raise EditConflict("the inserted line was changed later: undo those changes first")
             return self.delete_line(entry["file"], line, cur["sha1"], member, client=client, undo_of=edit_id)
+        if entry.get("fields"):  # other fields changed too: only when the line is exactly as this edit left it
+            if cur["sha1"] != entry.get("new_sha1"):
+                raise EditConflict("the line was changed again after this edit: undo the later edits first")
+            back: Dict[str, Any] = {"line": line, "sha1": cur["sha1"], "fields": {}, "remove": []}
+            if entry["old"] != entry["new"]:
+                back["text"] = entry["old"]
+            for k, fc in entry["fields"].items():
+                if fc.get("added"):
+                    back["remove"].append(k)
+                else:
+                    back["fields"][k] = fc.get("old")
+            out = self.edit_texts(entry["file"], [back], client=client, undo_of=edit_id, member=member)
+            res = {"changed": bool(out["entries"]), **out["lines"][0]}
+            if out["entries"]:
+                res["entry"] = out["entries"][0]
+            return res
         if cur.get("text") != entry["new"] or str(cur.get("id")) != str(entry.get("id")):
             raise EditConflict("the line was changed again after this edit: undo the later edits first")
         return self.edit_text(entry["file"], line, entry["old"], cur["sha1"], client=client, undo_of=edit_id,
@@ -718,8 +772,10 @@ class CorpusEditor:
 
     def since(self, path: str, line: int, after_ts: Optional[float],
               member: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-        """Edits of this line made after `after_ts` (e.g. the decisions file's time) and the text before them."""
-        edits = [e for e in self.history(path, line, member) if after_ts is None or e.get("ts", 0) > after_ts]
+        """Edits of this line made after `after_ts` (e.g. the decisions file's time) and the text before them.
+        Edits of other fields only (expect, category, ...) do not count: the filter's decision is about the text."""
+        edits = [e for e in self.history(path, line, member) if (after_ts is None or e.get("ts", 0) > after_ts)
+                 and (e.get("kind") in ("insert", "delete") or e.get("old") != e.get("new"))]
         return edits, (edits[0]["old"] if edits else None)
 
 

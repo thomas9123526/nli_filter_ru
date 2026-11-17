@@ -21,6 +21,8 @@
 | | `pycharm.md` | PyCharm: `nli_viewer` imports shown as errors (mark `viewer\backend` as Sources Root) |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
 | | `h200_readiness.md` | Review of the scripts for multi-GPU runs |
+| | `batch_size_and_vllm.md` | Batch sizes on 8 x H200 and on one RTX 5090 (start values, how to tune, copies per GPU) and why vLLM is not used |
+| | `../shard_commands.py` | Writes the `nli_filter.py` commands for N copies over chosen GPUs to a file (`shard_run_<N>copies.sh` / `.bat`) and checks the options first: `python shard_commands.py --help` |
 | `testing/` | `test_corpus.md` | Make and filter `test_corpus` (`make_test_corpus.py`); long texts in every file (`--long-lines`) |
 | | `tests.md` | Run the pytest suites |
 | | `long_texts_windows.md` | Long texts with many keywords: `test_russia_long.jsonl`, the window options 1-4, default vs `--max-windows 6`, results, early stop |

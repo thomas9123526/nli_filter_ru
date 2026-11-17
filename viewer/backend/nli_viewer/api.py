@@ -45,8 +45,10 @@ class EditBody(BaseModel):
 
 class LineChange(BaseModel):
     line: int
-    text: str
+    text: Optional[str] = None              # new text field; null = leave the text
     sha1: Optional[str] = ""
+    fields: Optional[Dict[str, Any]] = None  # other fields to set or add (not the id field)
+    remove: Optional[List[str]] = None       # other fields to drop
 
 
 class InsertBody(BaseModel):

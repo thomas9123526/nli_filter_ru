@@ -168,6 +168,8 @@ export type Check2Row = {
   judged: boolean;
   incidental: boolean;
   window_text: string | null;
+  // every check-2 hypothesis on this hit's sentence (decisions written since 2026-11-17; older: empty)
+  pairs?: { hyp: string; hypothesis: string | null; fast: number | null; judge: number | null; score: number | null; judged: boolean; best: boolean }[];
 };
 
 export type Explanation = {
@@ -269,7 +271,12 @@ export type EditEntry = {
   old: string;
   new: string;
   undo_of?: string;
+  // other fields changed by this edit: name -> old / new value (added: not there before, removed: dropped)
+  fields?: Record<string, { old: unknown; new: unknown; added?: boolean; removed?: boolean }>;
 };
+
+/** One line's change in an edit-batch save: new text and / or other fields (the id cannot change). */
+export type LineChange = { line: number; sha1: string; text?: string; fields?: Record<string, unknown>; remove?: string[] };
 
 export type LineState = {
   path: string;

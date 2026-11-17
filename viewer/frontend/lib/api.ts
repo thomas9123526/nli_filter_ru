@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
-  RecordResp, SimResp,
+  LineChange, RecordResp, SimResp,
 } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
@@ -80,7 +80,7 @@ export const api = {
   edits: (ds: string, p: Params, s?: AbortSignal) => getJSON<{ edits: EditEntry[] }>(`/api/datasets/${enc(ds)}/corpus/edits`, p, s),
   editText: (ds: string, body: { path: string; line: number; text: string; sha1: string; member?: string | null }) =>
     postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edit`, body),
-  editBatch: (ds: string, body: { path: string; member?: string | null; changes: { line: number; text: string; sha1: string }[] }) =>
+  editBatch: (ds: string, body: { path: string; member?: string | null; changes: LineChange[] }) =>
     postJSON<BatchResp>(`/api/datasets/${enc(ds)}/corpus/edit-batch`, body),
   insertLine: (ds: string, body: { path: string; member: string | null; after: number; sha1: string; record: Record<string, unknown> }) =>
     postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/insert`, body),

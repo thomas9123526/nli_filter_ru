@@ -838,20 +838,21 @@ class Dataset:
         # early stop (nli_filter default since 2026-11-13): a positive line stored its first check-1 score
         # >= threshold, not its best, and check 2 stopped at the first hit that was not incidental. Results that
         # depend on the scores never computed are marked 'estimated'.
-        early = bool(st.get("early_stop", False))
+        early1 = bool(st.get("check1_early_stop", st.get("early_stop", False)))  # per check since 2026-11-17
+        early2 = bool(st.get("check2_early_stop", st.get("early_stop", False)))
 
         def decide(c1, c2, decision, t1, t2):
             if c1 is None:
                 return decision, False  # never reached NLI: unchanged
             if c1 < t1:
                 # an early-stopped positive line may have a higher score in a window that was not scored
-                return "keep", early and c1 >= cur1
+                return "keep", early1 and c1 >= cur1
             if c2 is None:
                 # positive now; check 2 ran only if it was positive before (then c2 None = no check 2 at all)
                 return "filter", decision == "keep" and check2_on and c1 < cur1
             if c2 >= t2:
                 # check 2 stopped at the hit with score c2: the hits after it were not scored
-                return "keep", early and c2 < cur2
+                return "keep", early2 and c2 < cur2
             return "filter", False
 
         def evaluate(t1, t2, collect=False):

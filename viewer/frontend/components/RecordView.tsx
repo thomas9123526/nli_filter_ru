@@ -270,7 +270,7 @@ export function Check2Table({ rec, setActive, jump }: { rec: RecordResp; setActi
     <div className="panel flush">
       <div className="panel-head">
         <h2>Check 2 · is a hit only incidental?</h2>
-        <span className="muted">threshold {c2.threshold} · best hypothesis per hit · {c2.all_incidental ? "all hits incidental → kept" : "not all incidental"}</span>
+        <span className="muted">threshold {c2.threshold} · a hit is incidental if any hypothesis reaches it (the best counts) · {c2.all_incidental ? "all hits incidental → kept" : "not all incidental → filtered"}</span>
       </div>
       <div className="table-wrap">
         <table>
@@ -281,7 +281,16 @@ export function Check2Table({ rec, setActive, jump }: { rec: RecordResp; setActi
                 onMouseEnter={() => setActive([r.hit_mark, ...winOf(r.hit)])} onMouseLeave={() => setActive([])}>
                 <td className="nowrap"><strong>{r.kw}</strong> <span className="faint mono">{r.span[0]}–{r.span[1]}</span></td>
                 <td><div className="hyp-key">{r.hyp}</div><div className="hyp">{r.hypothesis || <span className="faint">(text not in run summary)</span>}</div>
-                  {r.window_text ? <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>window: “{r.window_text}”</div> : null}</td>
+                  {r.window_text ? <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>window: “{r.window_text}”</div> : null}
+                  {r.pairs && r.pairs.length > 1 ? (
+                    <div className="c2-pairs" data-testid="check2-pairs">all hypotheses:{" "}
+                      {r.pairs.map((p) => (
+                        <span key={p.hyp} className={`chip${p.best ? " best" : ""}`} title={p.hypothesis || ""}>
+                          {p.hyp} {score(p.score)}{p.judged ? ` (fast ${score(p.fast)}, judge ${score(p.judge)})` : ""}{p.best ? " · best" : ""}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}</td>
                 <td className="num mono">{score(r.fast)}</td>
                 <td className="num mono">{r.judged ? score(r.judge) : <span className="faint">–</span>}</td>
                 <td className="nowrap"><ScoreBar value={r.score} threshold={c2.threshold} kind="inc" /> {r.incidental ? <span className="badge keep">incidental</span> : <span className="badge filter">not incidental</span>}</td>

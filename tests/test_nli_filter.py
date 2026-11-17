@@ -396,3 +396,63 @@ def test_check2_hits_in_one_sentence_scored_once():
     c2 = [h["check2"] for h in out["hits"] if "check2" in h]
     assert len(c2) == 3 and len({tuple(c["window"]) for c in c2}) == 1
     assert f.scorer.fast_pairs == 1 + 2      # 1 check-1 window + 1 sentence x 2 check-2 hypotheses
+
+
+# ---------------------------------------------------------------- per-check early stop, every check-2 score, windows
+
+def _filter_with(max_windows=6, **flags):
+    s = nf.FilterSettings("Russia", "Russian", nf._render(nf.DEFAULT_CHECK1, "Russia", "Russian", "c1"),
+                          nf._render(nf.DEFAULT_CHECK2, "Russia", "Russian", "c2"), **flags)
+    scorer = nf.CascadeScorer(FakePool("fast"), FakePool("judge"), (0.6, 0.95))
+    return nf.LineFilter(s, nf.KeywordMatcher(RU["keywords"]), nf.IncidentalRules("Russian"),
+                         nf.WindowBuilder(max_windows=max_windows), scorer)
+
+
+def test_per_check_early_stop_defaults():
+    s = nf.FilterSettings("R", "r", {}, {})
+    assert (s.check1_early_stop, s.check2_early_stop) == (True, True)
+    s = nf.FilterSettings("R", "r", {}, {}, early_stop=False)
+    assert (s.check1_early_stop, s.check2_early_stop) == (False, False)
+    s = nf.FilterSettings("R", "r", {}, {}, early_stop=True, check2_early_stop=False)
+    assert (s.check1_early_stop, s.check2_early_stop) == (True, False)
+
+
+@pytest.mark.parametrize("c1,c2", [(False, True), (True, False), (False, False)])
+def test_per_check_early_stop_same_decisions(c1, c2):
+    """Each early stop is an exact shortcut: turning one off only adds scores."""
+    recs = _long_records()
+    base = [o.decision for o in _filter_with(early_stop=True).process(recs)]
+    f = _filter_with(check1_early_stop=c1, check2_early_stop=c2)
+    got = [o.decision for o in f.process(recs)]
+    assert [(d["decision"], d["reason"]) for d in got] == [(d["decision"], d["reason"]) for d in base]
+    for d in got:
+        if not c1:
+            assert "skipped" not in d.get("check1", {})   # every check-1 window scored
+        if not c2:
+            assert "check2_skipped" not in d               # every hit's sentence scored
+    if not c2:
+        assert any(sum(1 for h in d.get("hits", []) if "check2" in h) > 1 for d in got)
+
+
+def test_check2_keeps_every_hypothesis_score():
+    f = _filter_with(early_stop=False)
+    out = f.process(records(["Russian River Brewing Company history night."]))[0].decision
+    c2 = next(h["check2"] for h in out["hits"] if "check2" in h)
+    assert [p["hyp"] for p in c2["pairs"]] == list(f.s.check2)          # every check-2 hypothesis
+    best = max(c2["pairs"], key=lambda p: p["score"])
+    assert (c2["hyp"], c2["score"]) == (best["hyp"], best["score"])      # the decision still uses the best
+    assert c2["incidental"] == (c2["score"] >= 0.8)
+
+
+def test_max_windows_zero_is_a_window_for_every_hit():
+    text = ("x " * 300) + "Russia here. " + ("y " * 300) + "Moscow too. " + ("z " * 300) + "Kremlin end."
+    hits = nf.KeywordMatcher(RU["keywords"]).find(text)
+    assert len(nf.WindowBuilder(check1_chars=200, max_windows=2).check1(text, hits)) == 2
+    wins = nf.WindowBuilder(check1_chars=200, max_windows=0).check1(text, hits)
+    assert len(wins) == len(hits) == 3
+    assert all(any(a <= h.start and h.end <= b for a, b in wins) for h in hits)
+
+
+def test_max_windows_negative_is_refused(capsys):
+    assert nf.main(["--max-windows", "-1"]) == 2
+    assert "--max-windows" in capsys.readouterr().err

@@ -149,6 +149,11 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
                 "fast": c2.get("fast"), "judge": c2.get("judge"), "score": c2.get("score"),
                 "judged": c2.get("judge") is not None, "incidental": bool(c2.get("incidental")),
                 "window_text": window_text(c2.get("window", [0, 0])),
+                # every check-2 hypothesis's scores (decisions written since 2026-11-17; older ones: best only)
+                "pairs": [{"hyp": p.get("hyp"), "hypothesis": _hyp_text(run, "check2", p.get("hyp")),
+                           "fast": p.get("fast"), "judge": p.get("judge"), "score": p.get("score"),
+                           "judged": p.get("judge") is not None, "best": p.get("hyp") == c2.get("hyp")}
+                          for p in c2.get("pairs") or []],
             })
 
     # ---- verdict ----------------------------------------------------------------------------------

@@ -381,7 +381,7 @@ class WindowBuilder:
         for h in hits:
             if any(s <= h.start and h.end <= e for s, e in wins):
                 continue
-            if len(wins) >= self.max_windows:
+            if self.max_windows and len(wins) >= self.max_windows:  # 0 = no limit: a window for every hit
                 break
             wins.append(self._around(text, h, self.check1_chars))
         return wins
@@ -458,6 +458,17 @@ class FilterSettings:
     expect_field: Optional[str] = "expect"
     group_field: Optional[str] = "category"
     early_stop: bool = True         # stop scoring a line once its decision is certain (same decisions, fewer pairs)
+    # per check (None = as early_stop): check 1 stops at the first window that passes (check 1 is an OR over
+    # windows x hypotheses); check 2 stops at the first hit that is not incidental (the line needs ALL hits
+    # incidental to be kept). Both are exact shortcuts: turning them off adds scores, never changes a decision.
+    check1_early_stop: Optional[bool] = None
+    check2_early_stop: Optional[bool] = None
+
+    def __post_init__(self) -> None:
+        if self.check1_early_stop is None:
+            self.check1_early_stop = self.early_stop
+        if self.check2_early_stop is None:
+            self.check2_early_stop = self.early_stop
 
 
 @dataclass
@@ -511,7 +522,7 @@ class LineFilter:
         # as scoring all windows: positive = any pair >= threshold).
         c1_pairs: List[List[Dict[str, Any]]] = [[] for _ in pending]
         c1_done = done = [0] * len(pending)            # windows scored so far per line
-        size = 1 if s.early_stop else max((len(p[3]) for p in pending), default=0)
+        size = 1 if s.check1_early_stop else max((len(p[3]) for p in pending), default=0)
         while True:
             premises, hyps, owners = [], [], []
             for n, (out, _, _, wins) in enumerate(pending):
@@ -553,7 +564,7 @@ class LineFilter:
                 by_span[span].append(h)
         done = [0] * len(pending)                      # sentences scored so far per line
         stopped = [False] * len(pending)
-        size = 1 if s.early_stop else max((len(x) for x in sentences), default=0)
+        size = 1 if s.check2_early_stop else max((len(x) for x in sentences), default=0)
         while True:
             premises, hyps, owners = [], [], []
             for n, sents in enumerate(sentences):
@@ -568,17 +579,20 @@ class LineFilter:
             if not premises:
                 break
             best2: Dict[Tuple[int, int, int], Dict[str, Any]] = {}
+            all2: Dict[Tuple[int, int, int], List[Dict[str, Any]]] = {}  # every hypothesis's scores (shown)
             for (n, a, b, group, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
+                all2.setdefault((n, a, b), []).append({"hyp": key, "fast": _r(f), "judge": _r(j), "score": _r(final)})
                 cur = best2.get((n, a, b))
                 if cur is None or final > cur["_final"]:
                     best2[(n, a, b)] = {"window": [a, b], "hyp": key, "fast": _r(f), "judge": _r(j),
                                         "score": _r(final), "_final": final, "incidental": final >= s.check2_threshold,
                                         "_group": group}
-            for (n, _, _), res in best2.items():
+            for (n, a, b), res in best2.items():
                 group = res.pop("_group")
+                res["pairs"] = all2[(n, a, b)]
                 for h in group:
                     h.check2 = dict(res)
-                if not res["incidental"] and s.early_stop:
+                if not res["incidental"] and s.check2_early_stop:
                     stopped[n] = True
             size *= 2
 
@@ -1174,10 +1188,15 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--company-names-file", help="company/brand names, one per line; hits inside them are incidental")
     g.add_argument("--check1-chars", type=int, default=1000, help="check-1 window size in characters (~250 tokens)")
     g.add_argument("--check2-chars", type=int, default=300, help="max check-2 window (the sentence) in characters")
-    g.add_argument("--max-windows", type=int, default=2, help="check-1 windows per line (default 2)")
+    g.add_argument("--max-windows", type=int, default=2,
+                   help="check-1 windows per line (default 2; 0 = a window around every keyword hit of a long text)")
     g.add_argument("--no-early-stop", action="store_true",
                    help="score every check-1 window and every check-2 sentence even after the decision is certain "
-                        "(same decisions, more model calls; for comparing scores)")
+                        "(same decisions, more model calls; for comparing scores) = both options below")
+    g.add_argument("--no-check1-early-stop", action="store_true",
+                   help="score every check-1 window, also after one passed (same decisions)")
+    g.add_argument("--no-check2-early-stop", action="store_true",
+                   help="score every hit's check-2 sentence, also after one was not incidental (same decisions)")
     g = p.add_argument_group("models and parallelism")
     g.add_argument("--fast-model", default="modernbert", help="modernbert | deberta | bge-m3 | folder (default modernbert)")
     g.add_argument("--judge-model", default="deberta", help="deberta | modernbert | bge-m3 | folder | none (default deberta)")
@@ -1286,6 +1305,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except (StorageError, ValueError, RuntimeError) as exc:
         print(f"error: cannot read the input: {mask_uri(exc)}", file=sys.stderr)
         return 2
+    if args.max_windows < 0:
+        print("error: --max-windows must be 0 (no limit) or more", file=sys.stderr)
+        return 2
     if args.shard:
         k, _, n = args.shard.partition("/")
         k, n = int(k), int(n)
@@ -1337,7 +1359,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         settings = FilterSettings(country, adj, check1, check2, args.check1_threshold, args.check2_threshold,
                                   args.text_field, args.id_field or None, args.expect_field or None,
-                                  args.group_field or None, early_stop=not args.no_early_stop)
+                                  args.group_field or None, early_stop=not args.no_early_stop,
+                                  check1_early_stop=not (args.no_early_stop or args.no_check1_early_stop),
+                                  check2_early_stop=not (args.no_early_stop or args.no_check2_early_stop))
         rules = None if args.no_rules else IncidentalRules(adj, args.language_menu_min, company_names=company_names)
         scorer = CascadeScorer(fast, judge, (lo, hi))
         line_filter = LineFilter(settings, matcher, rules,
@@ -1386,6 +1410,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                      "language_menu_min": args.language_menu_min, "check1_chars": args.check1_chars,
                      "check2_chars": args.check2_chars, "max_windows": args.max_windows,
                      "early_stop": not args.no_early_stop,
+                     "check1_early_stop": settings.check1_early_stop, "check2_early_stop": settings.check2_early_stop,
                      "text_field": args.text_field, "id_field": args.id_field, "expect_field": args.expect_field,
                      "chunk_lines": args.chunk_lines, "inflight": inflight, "write_split": args.write_split,
                      "decisions": args.decisions, "limit": args.limit, "shard": args.shard},
