@@ -6,6 +6,7 @@ export const REASON_LABEL: Record<string, string> = {
   no_text: "No text",
   no_keyword: "No keyword",
   strict_keyword: "Level-A keyword",
+  keyword_only: "Keyword (no model)",
   rules_incidental: "Resolved by rules",
   check1_negative: "Check 1: not about country",
   check2_incidental: "Check 2: only incidental",

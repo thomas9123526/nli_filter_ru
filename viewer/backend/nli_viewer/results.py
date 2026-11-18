@@ -38,7 +38,7 @@ __all__ = ["Dataset", "FileResult", "DecisionIndex", "stem", "REASONS"]
 
 _SUFFIXES = nli_formats.INPUT_SUFFIXES  # .jsonl .json .ndjson .gz .zst .zstd .zip .rar .parquet
 REASONS = ["blank", "bad_json", "no_text", "no_keyword", "strict_keyword", "rules_incidental", "check1_negative",
-           "check2_incidental", "about_country"]
+           "check2_incidental", "about_country", "keyword_only"]
 _RUN_PREFIX = "summary"
 
 

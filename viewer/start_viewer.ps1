@@ -2,9 +2,11 @@
 #   .\start_viewer.ps1                       # uses viewer_config.json next to this script
 #   .\start_viewer.ps1 -Config my.json -Port 8080 -Public   # -Public: reachable from other machines
 #   .\start_viewer.ps1 -Wheels ..\pkgs\windows-py312   # first run without internet: install from a wheel folder
+#   .\start_viewer.ps1 -Python C:\Python312\python.exe   # first run: create backend\.venv with this Python (default: py -3)
 # First run: creates backend\.venv, installs the Python packages, builds the frontend if npm is available.
+# -Python only matters while backend\.venv does not exist; to switch Python, delete backend\.venv first.
 param([string]$Config = "$PSScriptRoot\viewer_config.json", [int]$Port = 8000, [switch]$Public, [switch]$Rebuild,
-      [string]$Wheels = "")
+      [string]$Wheels = "", [string]$Python = "")
 $ErrorActionPreference = "Stop"
 $backend = Join-Path $PSScriptRoot "backend"
 $frontend = Join-Path $PSScriptRoot "frontend"
@@ -13,7 +15,18 @@ $py = Join-Path $venv "Scripts\python.exe"
 
 if (-not (Test-Path $py)) {
     Write-Host "Creating Python environment in $venv ..."
-    py -3 -m venv $venv
+    if ($Python) {
+        if (-not (Test-Path $Python)) { Write-Host "Python not found: $Python"; exit 1 }
+        Write-Host "Using $Python"
+        & $Python -m venv $venv
+    } else {
+        py -3 -m venv $venv
+    }
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $py)) {
+        Remove-Item -Recurse -Force $venv -ErrorAction SilentlyContinue
+        Write-Host "Creating the Python environment failed (see above)."
+        exit 1
+    }
     $source = @()
     if ($Wheels) {
         $Wheels = (Resolve-Path $Wheels).Path

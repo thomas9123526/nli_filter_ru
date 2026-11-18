@@ -30,6 +30,7 @@ REASON_TEXT = {
     "check2_incidental": "Kept: the text looked like it is about the country, but every remaining keyword hit is only incidental (check 2).",
     "about_country": "Filtered: the text is about the country (check 1 passed) and not every hit is incidental.",
     "strict_keyword": "Filtered: the text has a level-A (strict) keyword: no model was asked.",
+    "keyword_only": "Filtered: the text has a keyword hit the cheap rules did not resolve (--keywords-only run: no model).",
 }
 
 

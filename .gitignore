@@ -7,6 +7,7 @@ out_test_corpus2/**
 test_corpus/**
 test_corpus2/**
 test_ru/**
+.venv/**
 *.zst
 
 # viewer (generated)
@@ -29,3 +30,4 @@ pkgs/**
 
 # nli_playground.py run logs
 .playground_jobs/
+

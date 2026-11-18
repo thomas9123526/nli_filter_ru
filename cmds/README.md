@@ -17,6 +17,7 @@
 | | `../keywords/russia.txt` | Russia keyword list (used automatically for `--country Russia`; replaces the built-in list) |
 | | `germany_big_keywords.md` | Example: Germany with a 10,000+ keyword list, commands for each purpose |
 | | `offline_wheels.md` | Which wheels each machine needs (`pkgs/`), offline install, transformers 4.x vs 5.x |
+| | `venv_py312.md` | Create `.venv` in the project folder on Windows + Python 3.12 and install offline from `pkgs\windows-py312` + `pkgs\p2000-windows-torch-cu126`, then run the tests |
 | | `wheels_check.md` | Are the `pkgs` wheels enough for another computer with torch (Python 3.10 / 3.12, Windows / Ubuntu): checked, install command |
 | | `pycharm.md` | PyCharm: `nli_viewer` imports shown as errors (mark `viewer\backend` as Sources Root) |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
@@ -25,6 +26,7 @@
 | | `../shard_commands.py` | Writes the `nli_filter.py` commands for N copies over chosen GPUs to a file (`shard_run_<N>copies.sh` / `.bat`) and checks the options first: `python shard_commands.py --help` |
 | `testing/` | `test_corpus.md` | Make and filter `test_corpus` (`make_test_corpus.py`); long texts in every file (`--long-lines`) |
 | | `tests.md` | Run the pytest suites |
+| | `testing_step.md` | Testing step by step: the order (unit tests, slow test, smoke test, server input, viewer) and a log of each session's results |
 | | `compare_and_replay.md` | `nli_compare.py` (two runs line by line: better / worse lines, what differs), `nli_replay.py` (other thresholds / fewer hypotheses from stored scores, no models), regression with the golden set |
 | | `long_texts_windows.md` | Long texts with many keywords: `test_russia_long.jsonl`, the window options 1-4, default vs `--max-windows 6`, results, early stop |
 | | `germany_hypotheses.md` | Germany: three hypothesis sets to run and compare (recall without losing precision) |
@@ -45,5 +47,6 @@
 | | `chunk_lines.md` | What `--chunk-lines` means |
 | | `how_it_works.md` | How keywords, country, hypotheses and models decide a line; what the output files contain |
 | | `devices_and_progress.md` | `--device` / `--mode` / workers, how well it scales on many GPUs or CPUs, progress in the viewer |
+| | `network_packages.md` | Which files import the SFTP / S3 / FTP packages (only `nli_storage.py`, and only when a server URL is used) |
 
 Run every command from the project folder `D:\hkc\nli_filter2`, not from `cmds`.

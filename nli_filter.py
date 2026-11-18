@@ -581,6 +581,24 @@ class CascadeScorer:
         return [(f, j, f if j is None else j) for f, j in zip(fast, judge)]
 
 
+class NoModel:
+    """Stands in for NLIPool with --keywords-only: nothing is loaded, and scoring is an error (never called)."""
+
+    name = "none"
+    devices = ["cpu"]
+    mode = "single"
+
+    def score(self, premises: List[str], hypotheses: List[str]) -> List[float]:
+        raise RuntimeError("--keywords-only: no model is loaded")
+
+    def info(self) -> Dict[str, Any]:
+        return {"model": "none", "mode": "single", "devices": ["cpu"], "dtype": "-", "max_length": 0,
+                "load_seconds": 0.0}
+
+    def close(self) -> None:
+        pass
+
+
 # --------------------------------------------------------------------------------------------------
 # One chunk of lines -> decisions
 # --------------------------------------------------------------------------------------------------
@@ -622,6 +640,9 @@ class FilterSettings:
     # check 1 and check 2 as if the A words were B; the result is stored in decision["audit"] and does not
     # change the decision (shows A words that are too broad)
     audit_strict: float = 0.0
+    # --keywords-only: no models. A line with a keyword hit the cheap rules leave open is filtered (reason
+    # keyword_only); level A, rules and exclusions work as usual.
+    keywords_only: bool = False
 
     def __post_init__(self) -> None:
         if self.check1_early_stop is None:
@@ -722,6 +743,9 @@ class LineFilter:
                     self._audit_final(d, "keep", "rules_incidental", None, text, hits)
                 else:
                     self._final(d, "keep", "rules_incidental", text, hits)
+                continue
+            if s.keywords_only:  # no models: an open keyword hit filters the line
+                self._final(d, "filter", "keyword_only", text, hits)
                 continue
             if strict_line:
                 audited.add(len(pending))
@@ -841,7 +865,7 @@ class LineFilter:
     def _audit_pick(self, rec: Record) -> bool:
         """Is this level-A line in the audit sample? (deterministic: same lines on every run)"""
         rate = self.s.audit_strict
-        if rate <= 0:
+        if rate <= 0 or self.s.keywords_only:  # the audit needs the models
             return False
         if rate >= 1:
             return True
@@ -894,7 +918,7 @@ class LineFilter:
 # --------------------------------------------------------------------------------------------------
 
 REASONS = ["blank", "bad_json", "no_text", "no_keyword", "rules_incidental", "check1_negative",
-           "check2_incidental", "about_country", "strict_keyword"]
+           "check2_incidental", "about_country", "strict_keyword", "keyword_only"]
 
 
 class RunStats:
@@ -1346,7 +1370,8 @@ def format_summary(summary: Dict[str, Any], show: int = 20) -> str:
                "no_keyword": "no country keyword", "rules_incidental": "all hits resolved by CPU rules",
                "check1_negative": "NLI: not about the country", "check2_incidental": "NLI: all hits incidental",
                "about_country": "FILTERED: about the country",
-               "strict_keyword": "FILTERED: a level-A keyword (no model)"}
+               "strict_keyword": "FILTERED: a level-A keyword (no model)",
+               "keyword_only": "FILTERED: a keyword hit (--keywords-only, no model)"}
     for k in REASONS:
         v = st["reasons"].get(k, 0)
         if v:
@@ -1514,6 +1539,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="no models: run only the keyword search and the cheap rules over the input (use --limit for "
                         "a sample) and report per keyword how many lines it hits and sends to the models, with "
                         "examples; saves keywords_report.json / .tsv in --output-dir")
+    g.add_argument("--keywords-only", action="store_true",
+                   help="filter without models: every line with a keyword hit that the cheap rules do not resolve "
+                        "is filtered (reason keyword_only); no model is loaded, ./models is not needed. Writes the "
+                        "same outputs as a normal run (--write-split, --decisions, --shard, ...)")
     g.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -1582,6 +1611,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not 0 <= args.audit_strict <= 1:
         print("error: --audit-strict must be between 0 and 1", file=sys.stderr)
         return 2
+    if args.keywords_only and args.audit_strict:
+        print("error: --audit-strict needs the models: it cannot be used with --keywords-only", file=sys.stderr)
+        return 2
+    if args.keywords_only and args.keywords_report:
+        print("error: use --keywords-only or --keywords-report, not both", file=sys.stderr)
+        return 2
     lo, hi = args.uncertain_band
     if not (0 <= lo < hi <= 1):
         print("error: --uncertain-band needs 0 <= LOW < HIGH <= 1", file=sys.stderr)
@@ -1629,13 +1664,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                   max_length=args.max_length, models_root=args.models_root, cpu_threads=args.cpu_threads,
                   max_batch_tokens=args.max_batch_tokens)
     try:
-        fast = NLIPool(args.fast_model, batch_size=args.batch_size, **common)
+        fast = NoModel() if args.keywords_only else NLIPool(args.fast_model, batch_size=args.batch_size, **common)
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"error: fast model: {exc}", file=sys.stderr)
         return 2
     judge = None
     try:
-        if args.judge_model.lower() != "none":
+        if args.judge_model.lower() != "none" and not args.keywords_only:
             try:
                 judge = NLIPool(args.judge_model, batch_size=args.judge_batch_size or args.batch_size, **common)
             except (FileNotFoundError, ValueError, RuntimeError) as exc:
@@ -1656,7 +1691,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                   check2_early_stop=not (args.no_early_stop or args.no_check2_early_stop),
                                   strict_rules=args.strict_rules, check1_types=check1_types,
                                   check2_types=check2_types, max_keyword_hyps=args.max_keyword_hyps,
-                                  audit_strict=args.audit_strict)
+                                  audit_strict=args.audit_strict, keywords_only=args.keywords_only)
         rules = None if args.no_rules else IncidentalRules(adj, args.language_menu_min, company_names=company_names)
         scorer = CascadeScorer(fast, judge, (lo, hi))
         line_filter = LineFilter(settings, matcher, rules,
@@ -1710,6 +1745,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                      "check2_chars": args.check2_chars, "max_windows": args.max_windows,
                      "early_stop": not args.no_early_stop, "strict_rules": args.strict_rules,
                      "max_keyword_hyps": args.max_keyword_hyps, "audit_strict": args.audit_strict,
+                     "keywords_only": args.keywords_only,
                      "check1_early_stop": settings.check1_early_stop, "check2_early_stop": settings.check2_early_stop,
                      "text_field": args.text_field, "id_field": args.id_field, "expect_field": args.expect_field,
                      "chunk_lines": args.chunk_lines, "inflight": inflight, "write_split": args.write_split,

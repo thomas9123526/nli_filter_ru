@@ -1,0 +1,207 @@
+{
+ "machine": "DESKTOP-1IFUKEE",
+ "finished": "2026-11-17T23:46:55",
+ "temporary_folder": null,
+ "results": [
+  {
+   "name": "environment",
+   "status": "PASS",
+   "seconds": 1.5,
+   "detail": "Python 3.12.10, torch 2.11.0+cu126 (CUDA 12.6), no GPU (CPU only)",
+   "python": "3.12.10",
+   "platform": "Windows-10-10.0.19045-SP0",
+   "machine": "DESKTOP-1IFUKEE",
+   "cpu_count": 20,
+   "packages": {
+    "torch": "2.11.0+cu126",
+    "transformers": "5.20.2",
+    "tokenizers": "0.23.3",
+    "zstandard": "0.25.0",
+    "orjson": "3.13.0",
+    "pyahocorasick": "2.3.1",
+    "sentencepiece": "0.2.3",
+    "pyarrow": "26.0.1",
+    "fastapi": null,
+    "uvicorn": null,
+    "httpx": null,
+    "paramiko": null,
+    "boto3": null
+   },
+   "torch_cuda_build": "12.6",
+   "gpus": []
+  },
+  {
+   "name": "models load and score (nli_models.py --check all)",
+   "status": "PASS",
+   "seconds": 18.2,
+   "detail": "3 models on cpu",
+   "lines": [
+    "[OK] NLIModel('modernbert', device='cpu', dtype='float32') loaded 1.6s, 3 pairs 0.25s | about Russia 0.997 (want high), unrelated 0.000 (want low), company-name role 0.786 (hard case, ideally high)",
+    "[OK] NLIModel('deberta', device='cpu', dtype='float32') loaded 3.0s, 3 pairs 0.57s | about Russia 0.996 (want high), unrelated 0.000 (want low), company-name role 0.557 (hard case, ideally high)",
+    "[OK] NLIModel('bge-m3', device='cpu', dtype='float32') loaded 6.5s, 3 pairs 0.90s | about Russia 0.859 (want high), unrelated 0.009 (want low), company-name role 0.022 (hard case, ideally high)"
+   ]
+  },
+  {
+   "name": "reference: CPU, --mode single",
+   "status": "PASS",
+   "seconds": 17.4,
+   "detail": "20 lines, 3.11 lines/s, accuracy 0.90",
+   "options": [
+    "--device",
+    "cpu",
+    "--mode",
+    "single"
+   ],
+   "wall_seconds": 17.3,
+   "timing": {
+    "load_seconds": 8.39,
+    "run_seconds": 6.42,
+    "lines_per_second": 3.11,
+    "fast_pairs": 31,
+    "judge_pairs": 0,
+    "pairs_per_second": 4.83
+   },
+   "accuracy": 0.9,
+   "models": {
+    "fast": {
+     "model": "modernbert",
+     "devices": [
+      "cpu"
+     ],
+     "mode": "single",
+     "dtype": "float32"
+    },
+    "judge": {
+     "model": "deberta",
+     "devices": [
+      "cpu"
+     ],
+     "mode": "single",
+     "dtype": "float32"
+    }
+   },
+   "decisions": 20
+  },
+  {
+   "name": "CPU, 2 workers, --mode thread",
+   "status": "PASS",
+   "seconds": 12.2,
+   "detail": "same decisions as the CPU reference for 20 lines; max score diff 0.0000; 6.23 lines/s, accuracy 0.90",
+   "options": [
+    "--device",
+    "cpu*2",
+    "--mode",
+    "thread"
+   ],
+   "wall_seconds": 12.2,
+   "timing": {
+    "load_seconds": 6.79,
+    "run_seconds": 3.21,
+    "lines_per_second": 6.23,
+    "fast_pairs": 31,
+    "judge_pairs": 0,
+    "pairs_per_second": 9.66
+   },
+   "accuracy": 0.9,
+   "models": {
+    "fast": {
+     "model": "modernbert",
+     "devices": [
+      "cpu",
+      "cpu"
+     ],
+     "mode": "thread",
+     "dtype": "float32"
+    },
+    "judge": {
+     "model": "deberta",
+     "devices": [
+      "cpu",
+      "cpu"
+     ],
+     "mode": "thread",
+     "dtype": "float32"
+    }
+   },
+   "lines": 20,
+   "missing": [],
+   "flips": [],
+   "near_threshold_flips": [],
+   "max_score_diff": 0.0
+  },
+  {
+   "name": "CPU, 2 workers, --mode process",
+   "status": "PASS",
+   "seconds": 35.2,
+   "detail": "same decisions as the CPU reference for 20 lines; max score diff 0.0000; 1.78 lines/s, accuracy 0.90",
+   "options": [
+    "--device",
+    "cpu*2",
+    "--mode",
+    "process"
+   ],
+   "wall_seconds": 35.2,
+   "timing": {
+    "load_seconds": 18.4,
+    "run_seconds": 11.24,
+    "lines_per_second": 1.78,
+    "fast_pairs": 31,
+    "judge_pairs": 0,
+    "pairs_per_second": 2.76
+   },
+   "accuracy": 0.9,
+   "models": {
+    "fast": {
+     "model": "modernbert",
+     "devices": [
+      "cpu",
+      "cpu"
+     ],
+     "mode": "process",
+     "dtype": "float32"
+    },
+    "judge": {
+     "model": "deberta",
+     "devices": [
+      "cpu",
+      "cpu"
+     ],
+     "mode": "process",
+     "dtype": "float32"
+    }
+   },
+   "lines": 20,
+   "missing": [],
+   "flips": [],
+   "near_threshold_flips": [],
+   "max_score_diff": 0.0
+  },
+  {
+   "name": "2 --shard copies at once on cpu (.zst, --write-split, --report)",
+   "status": "PASS",
+   "seconds": 20.2,
+   "detail": "2 copies, .zst + --write-split + --report OK; same decisions as the CPU reference for 20 lines; max score diff 0.0000",
+   "lines": 20,
+   "missing": [],
+   "flips": [],
+   "near_threshold_flips": [],
+   "max_score_diff": 0.0,
+   "kept": 12,
+   "filtered": 8
+  },
+  {
+   "name": "replay + compare (no models): same settings give the same decisions",
+   "status": "PASS",
+   "seconds": 0.1,
+   "detail": "nli_replay.py + nli_compare.py: 20 lines, none changed",
+   "lines": 20,
+   "changed": 0
+  },
+  {
+   "name": "viewer backend on the shard results",
+   "status": "SKIP",
+   "seconds": 0.0,
+   "detail": "viewer packages not installed here (fastapi); install viewer/backend/requirements.txt"
+  }
+ ]
+}

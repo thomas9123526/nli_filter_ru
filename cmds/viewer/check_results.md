@@ -52,7 +52,7 @@ On a fresh Windows 10/11 machine you may hit these:
 |---|---|---|
 | "running scripts is disabled on this system" | Windows 10/11 block `.ps1` scripts by default | `powershell -ExecutionPolicy Bypass -File .\start_viewer.ps1`, or once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
 | Script copied from a zip or download still blocked | Windows marks downloaded files | `Unblock-File .\start_viewer.ps1` |
-| `py` not found | The script calls the `py` launcher. The python.org installer includes it; Microsoft Store Python and conda do not. | Install Python 3.10+ from python.org, or change `py -3` to `python` in `viewer\start_viewer.ps1` (line 13) |
+| `py` not found | The script calls the `py` launcher. The python.org installer includes it; Microsoft Store Python and conda do not. | Install Python 3.10+ from python.org, or give the Python to use: `.\start_viewer.ps1 -Python C:\path\to\python.exe` (first run only; delete `viewer\backend\.venv` to switch) |
 | First start needs internet | It installs fastapi, uvicorn and the other backend packages with pip. `viewer\backend\requirements.txt` also lists test-only packages (pytest, moto). | Run the first start on a machine with internet, or prepare an offline wheel folder like the one for the filter (`cmds\setup\offline_wheels.md`) |
 | Web pages missing ("npm not found") | `viewer\frontend\out` is in `.gitignore`, so a git clone does not include it, and building it needs Node.js | Copy `viewer\frontend\out` from a PC where it is already built |
 | First start failed partway | If pip fails, the script carries on, and the next start skips the install because `backend\.venv` already exists | Delete `viewer\backend\.venv` and run the script again |

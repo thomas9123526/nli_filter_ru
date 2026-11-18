@@ -38,6 +38,13 @@
       "title": "test_russia: russian_kw.json",
       "corpus": "../test_ru",
       "output": "../out_ru_kw"
+    },
+    {
+      "name": "sftp_test",
+      "title": "test_russia: russian_kw.json",
+      "corpus": "sftp://download:download@192.168.170.200/home/download/hkc_test/test_corpus",
+      "output": "D:/hkc/sftp_run/out_test_corpus",
+      "editable":true
     }
   ]
 }

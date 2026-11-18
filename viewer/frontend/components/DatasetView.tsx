@@ -245,7 +245,7 @@ function FilesTable({ ds }: { ds: string }) {
 }
 
 function shortReason(r: string): string {
-  return ({ no_keyword: "no kw", strict_keyword: "A kw", rules_incidental: "rules", check1_negative: "c1 neg", check2_incidental: "c2 inc", about_country: "about", no_text: "no text", blank: "blank", bad_json: "bad" } as Record<string, string>)[r] || r;
+  return ({ no_keyword: "no kw", strict_keyword: "A kw", keyword_only: "kw only", rules_incidental: "rules", check1_negative: "c1 neg", check2_incidental: "c2 inc", about_country: "about", no_text: "no text", blank: "blank", bad_json: "bad" } as Record<string, string>)[r] || r;
 }
 
 function FindById({ ds }: { ds: string }) {

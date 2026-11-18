@@ -33,7 +33,7 @@ sys.path.insert(0, str(HERE))
 from nli_compare import _decision_files, _read_lines  # noqa: E402
 
 REASONS = ["blank", "bad_json", "no_text", "no_keyword", "rules_incidental", "check1_negative",
-           "check2_incidental", "about_country", "strict_keyword"]
+           "check2_incidental", "about_country", "strict_keyword", "keyword_only"]
 
 
 def _dropped(key: str, drop: Iterable[str]) -> bool:

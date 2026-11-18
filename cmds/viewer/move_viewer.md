@@ -27,7 +27,10 @@ Notes from 2026-11-10. The viewer works on another computer as long as you leave
 
 ## What the new PC needs
 
-- Windows 10 or 11 with Python 3.10+ from python.org, so the `py` launcher is installed.
+- Windows 10 or 11 with Python 3.10+ from python.org, so the `py` launcher is installed. Without `py`, or to
+  pick one of several Pythons, name it on the first start:
+  `.\start_viewer.ps1 -Python C:\path\to\python.exe -Wheels ..\pkgs\windows-py312`
+  (`-Python` only matters while `viewer\backend\.venv` does not exist; delete it to switch).
 - The backend packages: from the internet on the first start, or offline from `pkgs` (since 2026-11-13 the
   viewer's wheels, also those for its tests, are in each `pkgs\<machine>` folder):
   `.\start_viewer.ps1 -Wheels ..\pkgs\windows-py312` (Linux: `WHEELS=../pkgs/h200-ubuntu-py312 ./start_viewer.sh`).
