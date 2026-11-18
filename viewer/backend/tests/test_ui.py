@@ -189,6 +189,35 @@ def test_run_filter_page_and_bottom_button(edit_server, tmp_path):
     assert 'data-testid="try-run-collapsed"' in corpus and 'data-testid="try-run"' not in corpus
 
 
+def test_keywords_table_editor_renders(edit_server, tmp_path):
+    # the Run filter page opens its settings: the keyword lexicon table with its toolbar
+    run = dom(edit_server + "/run/?ds=e", tmp_path)
+    assert 'data-testid="kw-editor"' in run and 'data-testid="kw-mode"' in run
+    assert ">Table</button>" in run and ">Text</button>" in run and "Test a text" in run and "＋ Keyword" in run
+    assert "other meanings" in run and "exclude" in run
+
+
+def test_keywords_and_review_pages_render(server, tmp_path):
+    import httpx
+    # build the per-file indexes first (the page would show "indexing" and poll)
+    for _ in range(50):
+        if not httpx.get(server + "/api/datasets/t/keywords").json()["pending"]:
+            break
+        time.sleep(0.2)
+    kw = dom(server + "/keywords/?ds=t", tmp_path)
+    assert "Keywords of t" in kw and 'data-testid="kw-stats"' in kw
+    assert 'data-testid="kwstat-Russian"' in kw and 'data-testid="kwstat-Russia"' in kw and "only this kw" in kw
+    rv = dom(server + "/review/?ds=t", tmp_path)
+    assert "Review t" in rv and 'data-testid="golden-panel"' in rv and "Close to a threshold" in rv
+    assert 'data-testid="review-lines"' in rv or "nothing in this queue" in rv
+    rv = dom(server + "/review/?ds=t&queue=judge", tmp_path)
+    assert "Decided by the judge" in rv and "golden-filter-" in rv  # the test lines' best pair was judged
+    ds = dom(server + "/dataset/?ds=t", tmp_path)
+    assert ">Keywords</a>" in ds and ">Review</a>" in ds
+    rec = dom(server + "/record/?ds=t&f=a/x&row=1", tmp_path)
+    assert 'data-testid="golden-label"' in rec
+
+
 def test_runs_progress_renders(edit_server, tmp_path):
     import json as _json
     import httpx

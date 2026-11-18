@@ -599,9 +599,16 @@ class NLIPool:
             try:
                 msg = self._result_q.get(timeout=1.0)
             except queue.Empty:
-                if time.monotonic() > deadline or any(not p.is_alive() for p in self._procs):
+                dead = [p for p in self._procs if not p.is_alive()]
+                if time.monotonic() > deadline or dead:
+                    codes = ", ".join(f"{p.name} exit code {p.exitcode}" for p in dead)
                     self._terminate()
-                    raise RuntimeError("NLI worker process did not start (died or timed out)")
+                    if dead:
+                        raise RuntimeError(
+                            f"NLI worker process died while loading the model ({codes}). Each process loads its own "
+                            f"copy of the model: this is usually out of memory (RAM, or GPU memory). Use fewer "
+                            f"workers (--device cpu*1 / --workers-per-device 1) or --mode thread.")
+                    raise RuntimeError(f"NLI worker process did not start within {start_timeout:.0f} s")
                 continue
             if msg[0] == "error":
                 self._terminate()

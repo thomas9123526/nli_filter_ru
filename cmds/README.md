@@ -25,6 +25,7 @@
 | | `../shard_commands.py` | Writes the `nli_filter.py` commands for N copies over chosen GPUs to a file (`shard_run_<N>copies.sh` / `.bat`) and checks the options first: `python shard_commands.py --help` |
 | `testing/` | `test_corpus.md` | Make and filter `test_corpus` (`make_test_corpus.py`); long texts in every file (`--long-lines`) |
 | | `tests.md` | Run the pytest suites |
+| | `compare_and_replay.md` | `nli_compare.py` (two runs line by line: better / worse lines, what differs), `nli_replay.py` (other thresholds / fewer hypotheses from stored scores, no models), regression with the golden set |
 | | `long_texts_windows.md` | Long texts with many keywords: `test_russia_long.jsonl`, the window options 1-4, default vs `--max-windows 6`, results, early stop |
 | | `germany_hypotheses.md` | Germany: three hypothesis sets to run and compare (recall without losing precision) |
 | | `germany_test.md` | Step-by-step Germany test: test files, runs, viewer, result folders |
@@ -32,10 +33,13 @@
 | | `viewer_report.md` | Overnight report: what the viewer does, tests, fixes |
 | | `check_results.md` | Check a filter run in the viewer; running `start_viewer.ps1` on Windows 10/11 |
 | | `edit_corpus.md` | Edit the text of corpus lines (also in .zst files) in the viewer: turn on, backup, undo |
+| | `review_tools.md` | Keywords page (per-keyword stats and flags), Review page (queues), golden set labels (outside the corpus), `--audit-strict` for level-A keywords |
 | | `try_settings.md` | Try keywords / hypotheses on the Corpus page (model service `nli_playground.py`); shared `hypotheses\*.json` |
 | | `move_viewer.md` | Copy the viewer to another computer: what to copy, what to leave out |
 | | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
 | | `sftp_192.168.170.200.md` | Filter and view `test_corpus` on the SFTP server 192.168.170.200 |
+| `design/` | `overnight_2026-11-18.md` | Overnight report: Keywords / Review pages, golden set, `--audit-strict`, `nli_compare.py`, `nli_replay.py`; how to try them, test results |
+| | `keyword_lexicon_plan.md` | Plan: keyword lexicon (level A strict / B models, type, gloss, other meanings, exclude), templated hypotheses, review tools; build order |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |

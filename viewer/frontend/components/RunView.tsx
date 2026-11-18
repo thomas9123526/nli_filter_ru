@@ -21,7 +21,7 @@ const quote = (a: string) => (!a || /\s/.test(a) ? `"${a}"` : a);
 const MANAGED: Record<string, number> = {
   "--country": 1, "--country-adj": 1, "--keywords-file": 1, "--hypotheses-file": 1, "--check1-hyp": 1, "--check2-hyp": 1,
   "--check1-threshold": 1, "--check2-threshold": 1, "--uncertain-band": 2, "--max-windows": 1,
-  "--no-early-stop": 0, "--no-check1-early-stop": 0, "--no-check2-early-stop": 0, "--no-rules": 0,
+  "--no-early-stop": 0, "--no-check1-early-stop": 0, "--no-check2-early-stop": 0, "--no-rules": 0, "--strict-rules": 0,
 };
 
 /** The command with the panel's options replaced by `args`; everything else (inputs, --device, ...) is kept.

@@ -4,7 +4,8 @@
 // files (keywords/*.txt) are shared with nli_filter.py and can be saved from here.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, useApi } from "@/lib/api";
-import type { HypothesesData, PlaygroundInfo, PlaygroundRun, TryResult } from "@/lib/types";
+import type { HypothesesData, PlaygroundInfo, PlaygroundRun, TryResult, TypeHyps } from "@/lib/types";
+import { KeywordsEditor } from "./KeywordsEditor";
 import { CopyButton, ErrorBox } from "./ui";
 
 export type TrySettings = {
@@ -13,6 +14,10 @@ export type TrySettings = {
   hypFile: string; hyp: HypothesesData;
   useJudge: boolean; check1: number; check2: number; bandLo: number; bandHi: number;
   maxWindows: number; earlyStop1: boolean; earlyStop2: boolean; rules: boolean;
+  strictRules: boolean;  // rules may clear a level-A hit (default off: A is absolute)
+  auditA: boolean;       // also run level-A lines through the rules / models (shown, decision unchanged)
+  // the file text the copy above started from: a copy not edited since follows the file when it changes on disk
+  kwBase?: string; hypBase?: string;
 };
 
 const STORE = "nli-viewer-try-settings";
@@ -49,8 +54,25 @@ export function useTrySettings(info: PlaygroundInfo | null | undefined): [TrySet
       // earlyStop: one switch for both checks before 2026-11-17
       earlyStop1: saved.earlyStop1 ?? (saved as { earlyStop?: boolean }).earlyStop ?? true,
       earlyStop2: saved.earlyStop2 ?? (saved as { earlyStop?: boolean }).earlyStop ?? true, rules: saved.rules ?? true,
+      strictRules: saved.strictRules ?? false, auditA: saved.auditA ?? false,
+      kwBase: saved.kwBase ?? (saved.keywords === undefined && kw ? kw.text : undefined),
+      hypBase: saved.hypBase ?? (saved.hyp === undefined && hf ? JSON.stringify(hf.data) : undefined),
     });
   }, [info, st]);
+  // the files changed on disk (saved elsewhere, edited in an editor): a copy that was not edited here follows them
+  useEffect(() => {
+    if (!info || !st) return;
+    const p: Partial<TrySettings> = {};
+    const kw = info.keywords.find((k) => k.name === st.kwFile);
+    if (kw && st.kwBase !== undefined && sameText(st.keywords, st.kwBase) && !sameText(kw.text, st.kwBase)) {
+      p.keywords = kw.text; p.kwBase = kw.text;
+    }
+    const hf = info.hypotheses.find((h) => h.name === st.hypFile && h.data);
+    if (hf && st.hypBase !== undefined && JSON.stringify(st.hyp) === st.hypBase && JSON.stringify(hf.data) !== st.hypBase) {
+      p.hyp = hf.data as HypothesesData; p.hypBase = JSON.stringify(hf.data);
+    }
+    if (Object.keys(p).length) set(p);
+  }, [info]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!st) return;
     try { localStorage.setItem(STORE, JSON.stringify(st)); } catch { /* storage off: fine */ }
@@ -58,8 +80,10 @@ export function useTrySettings(info: PlaygroundInfo | null | undefined): [TrySet
   return [st, set];
 }
 
+const noEmpty = (t: TypeHyps | undefined) => (t && Object.keys(t).length ? t : undefined);
 const sameHyp = (a: HypothesesData | undefined, b: HypothesesData | undefined) =>
-  JSON.stringify({ c1: a?.check1, c2: a?.check2 }) === JSON.stringify({ c1: b?.check1, c2: b?.check2 });
+  JSON.stringify({ c1: a?.check1, c2: a?.check2, t1: noEmpty(a?.check1_types), t2: noEmpty(a?.check2_types) })
+  === JSON.stringify({ c1: b?.check1, c2: b?.check2, t1: noEmpty(b?.check1_types), t2: noEmpty(b?.check2_types) });
 const sameText = (a: string, b: string) => a.replace(/\r\n/g, "\n").trim() === b.replace(/\r\n/g, "\n").trim();
 
 /**
@@ -90,6 +114,7 @@ export function settingsToArgs(st: TrySettings, info: PlaygroundInfo): { args: s
   if (!st.earlyStop1) args.push("--no-check1-early-stop");
   if (!st.earlyStop2) args.push("--no-check2-early-stop");
   if (!st.rules) args.push("--no-rules");
+  if (st.rules && st.strictRules) args.push("--strict-rules");
   if (!st.useJudge) args.push("--judge-model", "none");
   return { args, judge: st.useJudge, warnings };
 }
@@ -119,7 +144,7 @@ export function tryReport(ds: string, path: string, member: string | null, st: T
   out.push(`- keywords: ${kw ? `keywords/${kw.file}` : "(built-in)"}, ${kwCount} keyword(s), ${kwState}`);
   out.push(`- hypotheses: ${hf ? `hypotheses/${hf.file}` : "(built-in) = hypotheses/default.json"}, ${hypState}`);
   out.push(`- judge ${st.useJudge ? "on" : "off"}, band ${st.bandLo}–${st.bandHi}, check 1 ≥ ${st.check1}, check 2 ≥ ${st.check2}, `
-    + `windows ${st.maxWindows || "all (0)"}, early stop check 1 ${st.earlyStop1 ? "on" : "off"} / check 2 ${st.earlyStop2 ? "on" : "off"}, rules ${st.rules ? "on" : "off"}`);
+    + `windows ${st.maxWindows || "all (0)"}, early stop check 1 ${st.earlyStop1 ? "on" : "off"} / check 2 ${st.earlyStop2 ? "on" : "off"}, rules ${st.rules ? "on" : "off"}${st.rules && st.strictRules ? " (also for level A)" : ""}${st.auditA ? ", audit of level-A lines on" : ""}`);
   const m = run.results[0]?.explanation.models;
   out.push(`- models: fast ${m?.fast || "?"}${st.useJudge ? `, judge ${m?.judge || "?"}` : ""}; ${run.seconds.toFixed(1)} s, `
     + `pairs fast ${run.pairs.fast} / judge ${run.pairs.judge}`);
@@ -132,6 +157,10 @@ export function tryReport(ds: string, path: string, member: string | null, st: T
   const c2 = Object.entries(st.hyp.check2 || {});
   if (!c2.length) out.push("- (none: no check 2)");
   for (const [k, v] of c2) out.push(`- \`${k}\`: ${v}`);
+  for (const [label, t] of [["Check 1", st.hyp.check1_types], ["Check 2", st.hyp.check2_types]] as const) {
+    const rows = Object.entries(t || {}).flatMap(([typ, h]) => Object.entries(h).map(([k, v]) => `- \`${typ}\` \`${k}\`: ${v}`));
+    if (rows.length) out.push("", `${label} hypotheses built from the matched keyword (type → template):`, ...rows);
+  }
   for (const r of run.results) {
     const li = lines[r.line];
     const ex = r.explanation;
@@ -165,7 +194,9 @@ export function tryReport(ds: string, path: string, member: string | null, st: T
           : `\`${c.hyp}\` fast ${f3(c.fast)}${c.judged ? `, judge ${f3(c.judge)}` : ""} → ${f3(c.score)}`)
           + (c.incidental ? " → incidental" : " → not incidental")).join("; ");
         const state = { about: "not incidental", incidental: "incidental", rule: "incidental by rule",
-          open: ex.check1?.positive ? "not scored (check 2 stopped early)" : "not scored (check 1 negative)" }[h.state || "open"];
+          strict: "level-A keyword (filters the line, no model)",
+          open: r.decision.reason === "strict_keyword" ? "not scored (the line is filtered by a level-A keyword)"
+            : ex.check1?.positive ? "not scored (check 2 stopped early)" : "not scored (check 1 negative)" }[h.state || "open"];
         out.push(`  - "${h.kw}" chars ${h.start}–${h.end}: ${state}${h.rule ? ` (rule ${h.rule})` : ""}${c2s ? ` | check 2: ${c2s}` : ""}`);
       }
       if (hits.length > 30) out.push(`  - … ${hits.length - 30} more`);
@@ -174,7 +205,107 @@ export function tryReport(ds: string, path: string, member: string | null, st: T
   return out.join("\n") + "\n";
 }
 
-export function TryPanel({ ds, path, member, lines, onResults, onControl, lineInfo }: {
+/** "1-3, 7, 9-" -> the page's lines in that selection (in page order) and the numbers / parts not usable. */
+export function pickLines(spec: string, page: number[]): { lines: number[]; bad: string[] } {
+  const want = new Set<number>();
+  const bad: string[] = [];
+  const max = page.length ? Math.max(...page) : 0;
+  for (const part of spec.split(/[\s,;]+/).filter(Boolean)) {
+    const m = part.match(/^(\d*)-(\d*)$/);
+    const a = m ? (m[1] ? Number(m[1]) : 1) : Number(part);
+    const b = m ? (m[2] ? Number(m[2]) : max) : a;
+    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || b < a || (m && !m[1] && !m[2])) { bad.push(part); continue; }
+    let found = false;
+    for (const n of page) if (n >= a && n <= b) { want.add(n); found = true; }
+    if (!found) bad.push(part);
+  }
+  return { lines: page.filter((n) => want.has(n)), bad };
+}
+
+type ScoreCell = { score: number | null; fast?: number | null; judge?: number | null; pass?: boolean };
+
+/** One table of the run: a column per line, a row per hypothesis (best score over windows / hits). */
+function scoreTable(run: PlaygroundRun, lineInfo: Record<number, LineInfo>) {
+  const cols = run.results.map((r) => {
+    const info = lineInfo[r.line];
+    const id = info?.id ?? r.decision.id;
+    const exp = info?.extra?.expect;
+    const e = r.explanation;
+    const c1: Record<string, ScoreCell> = {};
+    for (const row of e.check1?.rows || []) {
+      const old = c1[row.hyp];
+      if (!old || (row.score ?? -1) > (old.score ?? -1))
+        c1[row.hyp] = { score: row.score, fast: row.fast, judge: row.judged ? row.judge : null, pass: row.passed };
+    }
+    const c2: Record<string, ScoreCell> = {};
+    for (const row of e.check2?.rows || []) {
+      const pairs = row.pairs?.length ? row.pairs : [{ hyp: row.hyp, score: row.score, fast: row.fast, judge: row.judge, judged: row.judged }];
+      for (const p of pairs) {
+        const old = c2[p.hyp];
+        if (!old || (p.score ?? -1) > (old.score ?? -1))
+          c2[p.hyp] = { score: p.score, fast: p.fast, judge: p.judged ? p.judge : null, pass: (p.score ?? 0) >= (e.check2?.threshold ?? 1) };
+      }
+    }
+    return {
+      line: r.line, name: id !== null && id !== undefined && String(id) !== "" ? String(id) : `line ${r.line}`,
+      decision: r.decision.decision, reason: r.decision.reason,
+      strict: Array.isArray(r.decision.strict) ? (r.decision.strict as string[]) : [],
+      audit: r.explanation.audit || null,
+      expect: exp === null || exp === undefined || String(exp).trim() === "" ? null : String(exp).trim(),
+      c1, c2, best1: e.check1 ? e.check1.score : null,
+    };
+  });
+  // global hypotheses first, then those built from the keywords (e.g. place:Siberia), in the order they appear
+  const keys = (base: string[], pick: (c: (typeof cols)[number]) => string[]) =>
+    [...new Set([...base, ...cols.flatMap(pick)])];
+  return { cols, h1: keys(Object.keys(run.hypotheses.check1), (c) => Object.keys(c.c1)),
+    h2: keys(Object.keys(run.hypotheses.check2), (c) => Object.keys(c.c2)) };
+}
+
+function TryScores({ run, lineInfo }: { run: PlaygroundRun; lineInfo: Record<number, LineInfo> }) {
+  const { cols, h1, h2 } = useMemo(() => scoreTable(run, lineInfo), [run, lineInfo]);
+  if (!cols.length) return null;
+  const cell = (c: ScoreCell | undefined, key: number) => {
+    if (!c || c.score === null) return <td key={key} className="faint" title="not scored">–</td>;
+    const tip = `fast ${f3(c.fast)}${c.judge !== null && c.judge !== undefined ? `, judge ${f3(c.judge)}` : ""}`;
+    return <td key={key} className="mono" title={tip} style={c.pass ? { fontWeight: 700 } : undefined}>{f3(c.score)}{c.judge !== null && c.judge !== undefined ? <sup className="faint">j</sup> : null}</td>;
+  };
+  // the same table as text (tab separated: pastes into a spreadsheet or a chat)
+  const tsv = [
+    ["", ...cols.map((c) => c.name)],
+    ["decision", ...cols.map((c) => c.decision + (c.strict.length ? ` (A: ${c.strict.join(", ")})` : ""))],
+    ["expect", ...cols.map((c) => c.expect || "")],
+    ...h1.map((h) => [`check1 ${h}`, ...cols.map((c) => (c.c1[h]?.score != null ? f3(c.c1[h].score) : "-"))]),
+    ...h2.map((h) => [`check2 ${h}`, ...cols.map((c) => (c.c2[h]?.score != null ? f3(c.c2[h].score) : "-"))]),
+  ].map((r) => r.join("\t")).join("\n") + "\n";
+  return (
+    <div data-testid="try-scores">
+      <div className="row" style={{ marginBottom: 4 }}>
+        <strong>Scores</strong>
+        <span className="faint" style={{ fontSize: 12 }}>best score per hypothesis (check 1: over the windows; check 2: over the hits) · <b>bold</b> = at or above the threshold · <sup>j</sup> = decided by the judge · – = not scored</span>
+        <span className="spacer" />
+        <CopyButton text={tsv} label="Copy table" title="copy this table as tab-separated text" testid="try-scores-copy" />
+      </div>
+      <div className="table-wrap">
+        <table className="try-scores">
+          <thead>
+            <tr><th></th>{cols.map((c) => <th key={c.line} className="mono" title={`line ${c.line}`}>{c.name}</th>)}</tr>
+          </thead>
+          <tbody>
+            <tr><th>decision</th>{cols.map((c) => <td key={c.line} title={c.reason}><span className={`badge ${c.decision}`}>{c.decision}</span>{c.strict.length ? <div className="faint" title="level-A keyword: filtered without any model">A: {c.strict.join(", ")}</div> : null}{c.audit ? <div className={c.audit.decision === "keep" ? "bad" : "faint"} title={`audit: as B, the rules / models would ${c.audit.decision} it (${c.audit.reason})`}>audit: {c.audit.decision}</div> : null}</td>)}</tr>
+            <tr><th>expect</th>{cols.map((c) => <td key={c.line}>{c.expect
+              ? <span className={c.expect === c.decision ? "ok" : "bad"} title={c.expect === c.decision ? "matches" : "does not match"}>{c.expect} {c.expect === c.decision ? "✓" : "✗"}</span>
+              : <span className="faint">–</span>}</td>)}</tr>
+            {h1.map((h, i) => <tr key={`c1-${h}`} className={i === 0 ? "group" : undefined}><th>check 1 <span className="mono">{h}</span></th>{cols.map((c) => cell(c.c1[h], c.line))}</tr>)}
+            {h2.map((h, i) => <tr key={`c2-${h}`} className={i === 0 ? "group" : undefined}><th>check 2 <span className="mono">{h}</span></th>{cols.map((c) => cell(c.c2[h], c.line))}</tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function TryPanel({ ds, path, member, lines: pageLines, onResults, onControl, lineInfo }: {
   ds: string; path: string; member: string | null; lines: number[];
   onResults: (r: PlaygroundRun | null) => void;
   onControl?: (c: TryControl) => void;  // e.g. a second Run button at the bottom of the page
@@ -186,6 +317,10 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl, lineIn
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [last, setLast] = useState<PlaygroundRun | null>(null);
+  // which of the page's lines to run: empty = all of them, else e.g. "1-3, 7"
+  const [pick, setPick] = useState("");
+  const picked = useMemo(() => (pick.trim() ? pickLines(pick, pageLines) : null), [pick, pageLines]);
+  const lines = picked ? picked.lines : pageLines;
   useEffect(() => { onResults(null); setLast(null); }, [path, member]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run() {
@@ -197,8 +332,10 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl, lineIn
         path, member, lines, settings: {
           country: st.country, country_adj: st.adj, keywords: st.keywords,
           check1: st.hyp.check1, check2: st.hyp.check2, use_judge: st.useJudge,
+          check1_types: st.hyp.check1_types || {}, check2_types: st.hyp.check2_types || {},
           check1_threshold: st.check1, check2_threshold: st.check2, uncertain_band: [st.bandLo, st.bandHi],
           max_windows: st.maxWindows, check1_early_stop: st.earlyStop1, check2_early_stop: st.earlyStop2, rules: st.rules,
+          strict_rules: st.rules && st.strictRules, audit_strict: st.auditA ? 1 : 0,
         },
       });
       setLast(r);
@@ -224,11 +361,21 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl, lineIn
   }, [last]);
   const changed = (last?.results || []).filter((r) => r.previous && r.previous.decision !== r.decision.decision).length;
   const runButton = (small: boolean) => (
-    <button className={`btn primary${small ? " small" : ""}`} onClick={run} disabled={running || !svc?.running || !lines.length}
-      title={!svc?.running ? "the model service is not running (open Try settings to see how to start it)" : undefined}
-      data-testid={small ? "try-run-collapsed" : "try-run"}>
-      {running ? "Running…" : `Run on the ${lines.length} line${lines.length === 1 ? "" : "s"} of this page`}
-    </button>
+    <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+      <button className={`btn primary${small ? " small" : ""}`} onClick={run} disabled={running || !svc?.running || !lines.length}
+        title={!svc?.running ? "the model service is not running (open Try settings to see how to start it)" : undefined}
+        data-testid={small ? "try-run-collapsed" : "try-run"}>
+        {running ? "Running…" : picked
+          ? `Run on ${lines.length} of the ${pageLines.length} lines`
+          : `Run on the ${lines.length} line${lines.length === 1 ? "" : "s"} of this page`}
+      </button>
+      <label className="muted" title="line numbers of this page to run, e.g. 1-3, 7 or 5- (from 5 to the end); empty = every line of the page">
+        lines <input type="text" className="mono" value={pick} onChange={(e) => setPick(e.target.value)} placeholder="all"
+          style={{ width: 110 }} data-testid={small ? "try-lines-collapsed" : "try-lines"} />
+      </label>
+      {pick ? <button className="btn small ghost" onClick={() => setPick("")} title="run every line of the page">×</button> : null}
+      {picked?.bad.length ? <span className="badge warn" title="not lines of this page (or not a number / range)">not on this page: {picked.bad.join(", ")}</span> : null}
+    </span>
   );
 
   return (
@@ -259,6 +406,7 @@ export function TryPanel({ ds, path, member, lines, onResults, onControl, lineIn
         </div>
       ) : null}
       {error ? <div className="alert warn">{error.message}</div> : null}
+      {last ? <TryScores run={last} lineInfo={lineInfo || {}} /> : null}
     </div>
   );
 }
@@ -297,33 +445,29 @@ export function Settings({ info, st, set, onSaved }: {
           <label title="stop at the first check-1 window that passes (same decision; off = score every window)"><input type="checkbox" checked={st.earlyStop1} onChange={(e) => set({ earlyStop1: e.target.checked })} /> check 1</label>
           <label title="stop at the first hit that is not incidental (same decision; off = score every hit's sentence)"><input type="checkbox" checked={st.earlyStop2} onChange={(e) => set({ earlyStop2: e.target.checked })} /> check 2</label>
           <label><input type="checkbox" checked={st.rules} onChange={(e) => set({ rules: e.target.checked })} /> rules</label>
+          <label title="off (default): a level-A keyword filters the line, whatever the rules say. On: the rules (language menu / label / locale / company name) may mark an A hit incidental first"><input type="checkbox" checked={st.strictRules} disabled={!st.rules} onChange={(e) => set({ strictRules: e.target.checked })} /> rules apply to A</label>
+          <label title="level-A lines stay filtered, but are also run through the rules and the models: shows what they would decide (is the A word too broad?)"><input type="checkbox" checked={st.auditA} onChange={(e) => set({ auditA: e.target.checked })} /> audit A</label>
         </div>
-        <legend style={{ marginTop: 10 }}>Keywords <span className="faint">({kwCount})</span></legend>
-        <div className="row">
-          <select value={st.kwFile} onChange={(e) => {
-            const k = info.keywords.find((x) => x.name === e.target.value);
-            set({ kwFile: e.target.value, keywords: k ? k.text : "" });
-          }}>
-            <option value={BUILTIN}>{BUILTIN} for the country</option>
-            {info.keywords.map((k) => <option key={k.name} value={k.name}>keywords/{k.file} ({k.count})</option>)}
-          </select>
-        </div>
-        <div className="editor"><textarea className="mono" rows={8} value={st.keywords} spellCheck={false}
-          placeholder="one keyword per line; empty = the built-in list of the country" onChange={(e) => set({ keywords: e.target.value })} /></div>
-        <SaveBox kind="keywords" defaultName={st.kwFile === BUILTIN ? st.country.toLowerCase() : st.kwFile}
-          save={(name, overwrite) => api.saveKeywords({ name, text: st.keywords, overwrite })}
-          onSaved={(name) => { set({ kwFile: name }); onSaved(); }} />
       </fieldset>
       <fieldset>
         <legend>Hypotheses</legend>
         <div className="row">
           <select value={st.hypFile} onChange={(e) => {
             const h = info.hypotheses.find((x) => x.name === e.target.value);
-            set({ hypFile: e.target.value, hyp: (h?.data as HypothesesData) || info.builtin_hypotheses });
+            const hyp = (h?.data as HypothesesData) || info.builtin_hypotheses;
+            set({ hypFile: e.target.value, hyp, hypBase: JSON.stringify(hyp) });
           }}>
             <option value={BUILTIN}>{BUILTIN} = hypotheses/default.json</option>
             {info.hypotheses.map((h) => <option key={h.name} value={h.name} disabled={!h.data}>hypotheses/{h.file}{h.error ? " (error)" : ""}</option>)}
           </select>
+          {(() => {
+            const hf = info.hypotheses.find((h) => h.name === st.hypFile && h.data);
+            return hf && !sameHyp(hf.data as HypothesesData, st.hyp) ? (
+              <button className="btn small" data-testid="hyp-reload" title={`your copy differs from hypotheses/${hf.file} on disk: load the file (your changes here are dropped)`}
+                onClick={() => { if (window.confirm(`Load hypotheses/${hf.file} as it is on disk? Your unsaved changes here are lost.`)) set({ hyp: hf.data as HypothesesData, hypBase: JSON.stringify(hf.data) }); }}>
+                ↻ load the file</button>
+            ) : null;
+          })()}
         </div>
         {info.hypotheses.filter((h) => h.error).map((h) => <div key={h.name} className="alert warn">{h.file}: {h.error}</div>)}
         <input type="text" value={st.hyp.description || ""} placeholder="description" style={{ width: "100%" }}
@@ -332,11 +476,81 @@ export function Settings({ info, st, set, onSaved }: {
           onChange={(check1) => set({ hyp: { ...st.hyp, check1 } })} />
         <HypEditor title="Check 2 · is a hit only incidental? (empty = no check 2)" rows={st.hyp.check2}
           onChange={(check2) => set({ hyp: { ...st.hyp, check2 } })} />
+        <TypeHypEditor check={1} types={st.hyp.check1_types || {}} onChange={(check1_types) => set({ hyp: { ...st.hyp, check1_types } })} />
+        <TypeHypEditor check={2} types={st.hyp.check2_types || {}} onChange={(check2_types) => set({ hyp: { ...st.hyp, check2_types } })} />
         <div className="faint" style={{ fontSize: 12 }}>Use <span className="mono">{"{country}"}</span> and <span className="mono">{"{country_adj}"}</span>; each key = one hypothesis, the highest score counts.</div>
         <SaveBox kind="hypotheses" defaultName={st.hypFile === BUILTIN ? st.country.toLowerCase() : st.hypFile}
           save={(name, overwrite) => api.saveHypotheses({ name, data: st.hyp, overwrite })}
-          onSaved={(name) => { set({ hypFile: name }); onSaved(); }} />
+          onSaved={(name) => { set({ hypFile: name, hypBase: JSON.stringify(st.hyp) }); onSaved(); }} />
       </fieldset>
+      <fieldset className="kw-fieldset">
+        <legend>Keywords <span className="faint">({kwCount})</span></legend>
+        <div className="row">
+          <select value={st.kwFile} onChange={(e) => {
+            const k = info.keywords.find((x) => x.name === e.target.value);
+            set({ kwFile: e.target.value, keywords: k ? k.text : "", kwBase: k ? k.text : undefined });
+          }}>
+            <option value={BUILTIN}>{BUILTIN} for the country</option>
+            {info.keywords.map((k) => <option key={k.name} value={k.name}>keywords/{k.file} ({k.count})</option>)}
+          </select>
+          {(() => {
+            const kf = info.keywords.find((k) => k.name === st.kwFile);
+            return kf && !sameText(kf.text, st.keywords) ? (
+              <button className="btn small" data-testid="kw-reload" title={`your copy differs from keywords/${kf.file} on disk: load the file (your changes here are dropped)`}
+                onClick={() => { if (window.confirm(`Load keywords/${kf.file} as it is on disk? Your unsaved changes here are lost.`)) set({ keywords: kf.text, kwBase: kf.text }); }}>
+                ↻ load the file</button>
+            ) : null;
+          })()}
+          <span className="faint" style={{ fontSize: 12 }}>level A = filtered without models (strict_keyword) · B = check 1 / check 2 · plan: cmds/design/keyword_lexicon_plan.md</span>
+        </div>
+        <KeywordsEditor text={st.keywords} onChange={(keywords) => set({ keywords })} />
+        <SaveBox kind="keywords" defaultName={st.kwFile === BUILTIN ? st.country.toLowerCase() : st.kwFile}
+          save={(name, overwrite) => api.saveKeywords({ name, text: st.keywords, overwrite })}
+          onSaved={(name) => { set({ kwFile: name, kwBase: st.keywords }); onSaved(); }} />
+      </fieldset>
+    </div>
+  );
+}
+
+/** Hypotheses built from the matched keyword: one row per (keyword type, key, template). */
+function TypeHypEditor({ check, types, onChange }: { check: 1 | 2; types: TypeHyps; onChange: (t: TypeHyps) => void }) {
+  const rows = Object.entries(types).flatMap(([typ, h]) => Object.entries(h).map(([k, v]) => ({ typ, k, v })));
+  const build = (list: { typ: string; k: string; v: string }[]) => {
+    const t: TypeHyps = {};
+    for (const r of list) (t[r.typ] = t[r.typ] || {})[r.k] = r.v;
+    onChange(t);
+  };
+  const edit = (i: number, p: Partial<{ typ: string; k: string; v: string }>) => build(rows.map((r, j) => (j === i ? { ...r, ...p } : r)));
+  const typeHelp = check === 1
+    ? "a keyword type of the lexicon (region, city, person, …) or * = every keyword"
+    : "a keyword type, * = every keyword, @other = once per other meaning of the keyword ({other})";
+  const example = check === 1
+    ? { typ: "region", k: "place", v: "This text is about {kw}, {gloss}." }
+    : rows.some((r) => r.typ === "@other")
+      ? { typ: "*", k: "brand", v: "In this text, {kw} is part of a company, product or brand name." }
+      : { typ: "@other", k: "sense", v: "In this text, {kw} means {other}." };
+  return (
+    <div className="hyp-editor" data-testid={`type-hyps-${check}`}>
+      <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+        Check {check} · built from the matched keyword <span className="faint">({check === 1 ? "a window gets those of the keywords hit in it" : "a hit gets those of its keyword"}; {"{kw}"} {"{gloss}"}{check === 2 ? " {other}" : ""})</span>
+      </div>
+      {rows.map((r, i) => (
+        <div className="row" key={i} style={{ alignItems: "flex-start" }}>
+          <input type="text" className="mono" value={r.typ} list={`hyp-types-${check}`} title={typeHelp} style={{ width: 84 }}
+            onChange={(e) => edit(i, { typ: e.target.value.trim().toLowerCase() })} />
+          <input type="text" className="mono" value={r.k} style={{ width: 90 }} onChange={(e) => edit(i, { k: e.target.value })} />
+          <textarea className="hyp-text" rows={2} value={r.v} spellCheck={false} onChange={(e) => edit(i, { v: e.target.value })} />
+          <button className="btn small ghost" title="remove" onClick={() => build(rows.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      ))}
+      <datalist id={`hyp-types-${check}`}>
+        {["*", ...(check === 2 ? ["@other"] : []), "country", "demonym", "city", "region", "org", "person", "language", "event", "brand"].map((t) => <option key={t} value={t} />)}
+      </datalist>
+      <button className="btn small ghost" onClick={() => {
+        let k = example.k, n = 2;
+        while (rows.some((r) => r.typ === example.typ && r.k === k)) k = `${example.k}${n++}`;
+        build([...rows, { ...example, k }]);
+      }}>+ add keyword hypothesis</button>
     </div>
   );
 }

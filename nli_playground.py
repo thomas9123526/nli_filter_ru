@@ -171,16 +171,24 @@ class Playground:
         adj = req.get("country_adj") or known.get("adj")
         if not adj:
             raise ValueError(f"country_adj is needed for '{country}'")
-        keywords = [k for k in (req.get("keywords") or []) if isinstance(k, str) and k.strip()]
+        # keyword file lines: plain keywords or lexicon lines (tab-separated: keyword, level, type, gloss, ...)
+        keywords = nf.parse_keywords([k for k in (req.get("keywords") or []) if isinstance(k, str)])
         if not keywords:
             keywords = list(known.get("keywords", []))
         if not keywords:
             raise ValueError("no keywords")
         hyps = nli_hypotheses.validate({"check1": req.get("check1") or nli_hypotheses.DEFAULT_CHECK1,
                                         "check2": req.get("check2") if req.get("check2") is not None
-                                        else nli_hypotheses.DEFAULT_CHECK2})
+                                        else nli_hypotheses.DEFAULT_CHECK2,
+                                        "check1_types": req.get("check1_types") or {},
+                                        "check2_types": req.get("check2_types") or {}})
         check1 = nli_hypotheses.render(hyps["check1"], country, adj)
         check2 = nli_hypotheses.render(hyps["check2"], country, adj)
+        check1_types = nli_hypotheses.render_types(hyps.get("check1_types"), country, adj)
+        check2_types = nli_hypotheses.render_types(hyps.get("check2_types"), country, adj)
+        max_kw_hyps = int(req.get("max_keyword_hyps", getattr(d, "max_keyword_hyps", 4)))
+        if max_kw_hyps < 0:
+            raise ValueError("max_keyword_hyps must be 0 or more")
         lo, hi = req.get("uncertain_band") or d.uncertain_band
         if not (0 <= float(lo) < float(hi) <= 1):
             raise ValueError("uncertain_band needs 0 <= LOW < HIGH <= 1")
@@ -195,7 +203,11 @@ class Playground:
                                      check1_early_stop=None if req.get("check1_early_stop") is None
                                      else bool(req["check1_early_stop"]),
                                      check2_early_stop=None if req.get("check2_early_stop") is None
-                                     else bool(req["check2_early_stop"]))
+                                     else bool(req["check2_early_stop"]),
+                                     strict_rules=bool(req.get("strict_rules", False)),
+                                     check1_types=check1_types, check2_types=check2_types,
+                                     max_keyword_hyps=max_kw_hyps,
+                                     audit_strict=min(1.0, max(0.0, float(req.get("audit_strict", 0) or 0))))
         excludes = [x for x in (req.get("exclude_patterns") or known.get("exclude", [])) if isinstance(x, str)]
         matcher = nf.KeywordMatcher(keywords, excludes)
         rules = nf.IncidentalRules(adj, int(req.get("language_menu_min", d.language_menu_min))) \
@@ -222,13 +234,17 @@ class Playground:
             outcomes = nf.LineFilter(settings, matcher, rules, windows, scorer).process(records)
         return {"decisions": [o.decision for o in outcomes], "seconds": round(time.perf_counter() - t0, 3),
                 "pairs": {"fast": scorer.fast_pairs, "judge": scorer.judge_pairs},
-                "hypotheses": {"check1": check1, "check2": check2},
-                "keywords": matcher.keywords, "country": {"name": country, "adj": adj},
+                "hypotheses": {"check1": check1, "check2": check2,
+                               **({"check1_types": check1_types} if check1_types else {}),
+                               **({"check2_types": check2_types} if check2_types else {})},
+                "keywords": matcher.keywords, "lexicon": matcher.counts(), "country": {"name": country, "adj": adj},
                 "models": {"fast": {"model": self.fast.name}, "judge": {"model": self.judge.name} if use_judge else None},
                 "settings": {"check1_threshold": settings.check1_threshold,
                              "check2_threshold": settings.check2_threshold, "uncertain_band": [lo, hi],
                              "early_stop": settings.early_stop, "check1_early_stop": settings.check1_early_stop,
-                             "check2_early_stop": settings.check2_early_stop, "max_windows": windows.max_windows
+                             "check2_early_stop": settings.check2_early_stop, "strict_rules": settings.strict_rules,
+                             "max_keyword_hyps": settings.max_keyword_hyps, "audit_strict": settings.audit_strict,
+                             "max_windows": windows.max_windows
                              if hasattr(windows, "max_windows") else None,
                              "text_field": settings.text_field, "id_field": settings.id_field}}
 

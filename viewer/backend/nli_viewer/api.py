@@ -27,6 +27,7 @@ from .edit import EditConflict
 from .playground import Playground, PlaygroundError
 from . import runs as runs_mod
 from .results import Dataset
+from .golden import GoldenStore
 from .storage import StorageError, clean_path
 
 __all__ = ["create_app", "EDIT_HEADER"]
@@ -41,6 +42,13 @@ class EditBody(BaseModel):
     text: str
     sha1: Optional[str] = ""  # sha1 of the line as loaded; a different current line = 409 conflict
     member: Optional[str] = None  # .zip / .rar: the member file the line is in; null or "" = not an archive
+
+
+class GoldenBody(BaseModel):
+    file: str
+    row: int
+    expect: Optional[str] = None  # filter / keep; empty = remove the label
+    note: str = ""
 
 
 class LineChange(BaseModel):
@@ -148,6 +156,8 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     if not edits.is_absolute():
         edits = Path(cfg.base_dir) / edits
     pg = Playground(cfg.playground_url, str(project), str(edits / "_project"))
+    golden = GoldenStore(project / "golden")
+    app.state.golden = golden
     app.state.playground = pg
 
     def filters(decision, reason, q, kw, rule, min_score, max_score, mismatch, judged) -> Dict[str, Any]:
@@ -216,6 +226,52 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         """Decisions recomputed from the stored scores with other thresholds (no model is run)."""
         steps = [round(0.5 + 0.05 * i, 2) for i in range(10)] if sweep else []
         return ds(name).simulate(check1, check2, max_flips=max_flips, sweep=steps)
+
+    # ---- review tools: keywords, lines across files, golden set ----------------------------------
+
+    @app.get("/api/datasets/{name}/keywords", tags=["review"])
+    def keyword_stats(name: str):
+        """Per keyword over the whole dataset: hits, lines kept / filtered, reasons, labels, level-A audit, flags."""
+        return ds(name).keyword_stats()
+
+    @app.get("/api/datasets/{name}/lines", tags=["review"])
+    def lines(name: str, decision: str = "", reason: str = "", q: str = "", kw: str = "", rule: str = "",
+              min_score: Optional[float] = None, max_score: Optional[float] = None, mismatch: bool = False,
+              judged: Optional[bool] = None, labelled: Optional[bool] = None,
+              audit: str = Query("", pattern="^(|any|keep|filter)$"), scored: bool = False, single_kw: bool = False,
+              kw_state: str = Query("", pattern="^(|strict|rule|incidental|about|open)$"),
+              sort: str = Query("row", pattern="^(row|score|check1|check2|hits|id|review)$"), desc: bool = False,
+              offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
+        """Decisions of every file with these filters; sort=review: closest to a threshold first."""
+        out = ds(name).lines(offset=offset, limit=limit, sort=sort, desc=desc,
+                             labelled=labelled, audit=audit or None, scored=scored or None,
+                             single_kw=single_kw or None, kw_state=kw_state or None,
+                             **filters(decision, reason, q, kw, rule, min_score, max_score, mismatch, judged))
+        labels = golden.summary(name)["labels"]
+        for r in out["rows"]:
+            r["golden"] = labels.get(GoldenStore.key(r["file"], r["line"]))
+        return out
+
+    @app.get("/api/datasets/{name}/golden", tags=["review"])
+    def golden_get(name: str):
+        """The golden set of this dataset: where it is, how many lines, label per 'file#line'."""
+        ds(name)
+        return golden.summary(name)
+
+    @app.post("/api/datasets/{name}/golden", tags=["review"])
+    def golden_set(name: str, body: GoldenBody, request: Request):
+        """Label one line for the golden set (copies its current text; the corpus is not changed)."""
+        save_guard(request)  # writes golden/<name>.jsonl in the project: same rules as saving keyword files
+        d = ds(name)
+        rec = d.record(body.file, row=body.row, max_chars=1000)
+        dec, orig = rec["decision"], rec["original"]
+        record = orig.get("record") if orig.get("available") else None
+        text = (record or {}).get(rec["text_field"])
+        if body.expect and not isinstance(text, str):
+            raise HTTPException(409, "the line's text cannot be read from the corpus: it cannot be labelled")
+        res = golden.set(name, body.file, int(dec.get("line") or rec["line"]), text or "", body.expect or None,
+                         rid=dec.get("id"), note=body.note)
+        return {**res, "summary": {k: v for k, v in golden.summary(name).items() if k != "labels"}}
 
     @app.get("/api/datasets/{name}/find", tags=["records"])
     def find(name: str, id: str = Query(..., min_length=1), limit: int = Query(20, ge=1, le=200)):

@@ -1,12 +1,17 @@
 {
   "description": "built-in default hypotheses of nli_filter.py",
   "check1": {
-    "topic": "This text is about {country}, a {country_adj} person, a {country_adj} film, a {country_adj} song, the lyrics of a {country_adj} song, or the history of {country}.",
-    "army": "This text is about the {country_adj} army."
+    "country": "This text is about {country}.",
+    "person": "This text is about a {country_adj} person.",
+    "culture": "This text is about a {country_adj} film, song or book.",
+    "history": "This text is about the history of {country}.",
+    "geography": "This text is about the geography or nature of {country}.",
+    "army": "This text is about the {country_adj} army.",
+    "region": "This text is about Siberia, Moscow, Saint Petersburg or another region or city of {country}."
   },
   "check2": {
     "company_name": "This text mentions {country} or {country_adj} only as part of a company or brand name.",
     "language_setting": "This text mentions the {country_adj} language only as a language option or setting.",
-    "location": "This text mentions {country} only as the place where something unrelated happens."
+    "location": "This text mentions {country} or a place in {country} only in passing, as the place where something unrelated happens."
   }
 }

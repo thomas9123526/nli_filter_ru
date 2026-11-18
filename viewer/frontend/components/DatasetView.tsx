@@ -23,6 +23,8 @@ export function DatasetView() {
           {ov.data?.description ? <div className="sub">{ov.data.description}</div> : null}
         </div>
         <span className="spacer" />
+        <Link className="btn" href={href("/keywords", { ds })} title="per keyword: hits, lines kept / filtered, mistakes, flags">Keywords</Link>
+        <Link className="btn" href={href("/review", { ds })} title="lines most worth a look: close to a threshold, level-A audit, mistakes; label them for the golden set">Review</Link>
         <Link className="btn" href={href("/tune", { ds })}>Tune thresholds</Link>
         <Link className="btn" href={href("/corpus", { ds })}>Browse corpus</Link>
         <Link className="btn" href={href("/run", { ds })} title="run nli_filter.py on this dataset (arguments shown and editable)">Run filter</Link>
@@ -243,7 +245,7 @@ function FilesTable({ ds }: { ds: string }) {
 }
 
 function shortReason(r: string): string {
-  return ({ no_keyword: "no kw", rules_incidental: "rules", check1_negative: "c1 neg", check2_incidental: "c2 inc", about_country: "about", no_text: "no text", blank: "blank", bad_json: "bad" } as Record<string, string>)[r] || r;
+  return ({ no_keyword: "no kw", strict_keyword: "A kw", rules_incidental: "rules", check1_negative: "c1 neg", check2_incidental: "c2 inc", about_country: "about", no_text: "no text", blank: "blank", bad_json: "bad" } as Record<string, string>)[r] || r;
 }
 
 function FindById({ ds }: { ds: string }) {

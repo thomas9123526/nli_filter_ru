@@ -5,6 +5,7 @@ export const REASON_LABEL: Record<string, string> = {
   bad_json: "Not valid JSON",
   no_text: "No text",
   no_keyword: "No keyword",
+  strict_keyword: "Level-A keyword",
   rules_incidental: "Resolved by rules",
   check1_negative: "Check 1: not about country",
   check2_incidental: "Check 2: only incidental",
@@ -25,6 +26,7 @@ export const HIT_STATE_LABEL: Record<string, string> = {
   open: "hit: went to check 1 only",
   incidental: "hit: incidental (check 2)",
   rule: "hit: resolved by a rule",
+  strict: "hit: level-A keyword (filters the line, no model)",
 };
 
 export function score(x: number | null | undefined, digits = 3): string {

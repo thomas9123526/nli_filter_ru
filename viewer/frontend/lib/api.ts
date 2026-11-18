@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
-  LineChange, RecordResp, SimResp,
+  LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
 } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
@@ -72,6 +72,11 @@ export const api = {
   find: (ds: string, id: string, s?: AbortSignal) =>
     getJSON<{ matches: FindMatch[] }>(`/api/datasets/${enc(ds)}/find`, { id }, s),
   simulate: (ds: string, p: Params, s?: AbortSignal) => getJSON<SimResp>(`/api/datasets/${enc(ds)}/simulate`, p, s),
+  keywordStats: (ds: string, s?: AbortSignal) => getJSON<KeywordStatsResp>(`/api/datasets/${enc(ds)}/keywords`, undefined, s),
+  lines: (ds: string, p: Params, s?: AbortSignal) => getJSON<LinesResp>(`/api/datasets/${enc(ds)}/lines`, p, s),
+  golden: (ds: string, s?: AbortSignal) => getJSON<GoldenSummary>(`/api/datasets/${enc(ds)}/golden`, undefined, s),
+  setGolden: (ds: string, body: { file: string; row: number; expect: string; note?: string }) =>
+    postJSON<{ key: string; count: number; summary: { path: string; count: number; expect: Record<string, number> } }>(`/api/datasets/${enc(ds)}/golden`, body),
   browse: (ds: string, path: string, s?: AbortSignal) =>
     getJSON<{ root: string; path: string; entries: BrowseEntry[] }>(`/api/datasets/${enc(ds)}/browse`, { root: "corpus", path }, s),
   corpusLines: (ds: string, p: Params, s?: AbortSignal) => getJSON<CorpusLines>(`/api/datasets/${enc(ds)}/corpus/lines`, p, s),

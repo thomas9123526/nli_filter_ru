@@ -303,6 +303,12 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
       <div className="row">
         <strong className="mono">line {l.line}</strong>
         {l.id !== null && l.id !== undefined ? <span className="muted mono">id {String(l.id)}</span> : null}
+        {(() => {  // the line's label ("expect" field), when it has one
+          const e = l.extra?.expect;
+          if (e === null || e === undefined || String(e).trim() === "") return null;
+          const v = String(e).trim();
+          return <span className={`badge ${v === "filter" || v === "keep" ? v : "warn"}`} title="the expect field of this line" data-testid={`expect-${l.line}`}>expect {v}</span>;
+        })()}
         {l.edits ? <span className="badge warn">edited {l.edits}×</span> : null}
         {l.inserted ? <span className="badge keep" title="added in the viewer after the filter run: no decision yet">new</span> : null}
         {pending ? <span className="badge accent">unsaved change</span> : null}

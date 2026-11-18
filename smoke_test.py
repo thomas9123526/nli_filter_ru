@@ -218,7 +218,7 @@ def viewer_check(corpus: Path, out: Path, tmp: Path, n_lines: int) -> Tuple[str,
 
     cfg = ViewerConfig(datasets=[DatasetConfig(name="smoke", corpus=str(corpus), output=str(out), editable=True)],
                        cache_dir=str(tmp / "viewer_cache"), edits_dir=str(tmp / "viewer_edits"),
-                       frontend_dir=str(tmp / "nofrontend"), base_dir=str(tmp))
+                       frontend_dir=str(tmp / "nofrontend"), base_dir=str(tmp), project_dir=str(tmp / "project"))
     problems: List[str] = []
     data: Dict[str, Any] = {}
     with TestClient(create_app(cfg), client=("127.0.0.1", 50000)) as c:
@@ -241,6 +241,22 @@ def viewer_check(corpus: Path, out: Path, tmp: Path, n_lines: int) -> Tuple[str,
         data["progress_runs"] = [(r.get("state"), r.get("shard")) for r in prog.get("runs", [])]
         if len(prog.get("runs", [])) != 2 or any(r.get("state") != "done" for r in prog["runs"]):
             problems.append(f"progress files: {data['progress_runs']} (want 2 x done)")
+        # review tools: keyword stats, lines across files (review order), a golden-set label (outside the corpus)
+        import time as _time
+        kw = {}
+        for _ in range(100):
+            kw = c.get("/api/datasets/smoke/keywords").json()
+            if not kw.get("pending"):
+                break
+            _time.sleep(0.1)
+        data["keywords_with_hits"] = sum(1 for k in kw.get("keywords", []) if k["hits"])
+        if not data["keywords_with_hits"]:
+            problems.append("keywords page: no keyword with hits")
+        rv = c.get("/api/datasets/smoke/lines", params={"sort": "review", "scored": True, "limit": 5}).json()
+        data["review_rows"] = len(rv.get("rows", []))
+        g = c.post("/api/datasets/smoke/golden", json={"file": key, "row": 1, "expect": "keep"}, headers={EDIT_HEADER: "1"})
+        if g.status_code != 200 or g.json().get("count") != 1:
+            problems.append(f"golden label: HTTP {g.status_code} {g.text[:200]}")
         # edit text + a field of line 1, then undo: the file must be byte for byte as before
         path = files[0]["corpus_path"] if files else ""
         before = (corpus / path).read_bytes() if path else b""
@@ -263,7 +279,8 @@ def viewer_check(corpus: Path, out: Path, tmp: Path, n_lines: int) -> Tuple[str,
     if problems:
         return "FAIL", "; ".join(problems), data
     note = "" if data["frontend_built"] else " (web pages not built here: viewer/frontend/out missing)"
-    return "PASS", f"datasets, {data['files']} files, record, 2 progress files, edit + undo OK{note}", data
+    return "PASS", (f"datasets, {data['files']} files, record, 2 progress files, keywords ({data['keywords_with_hits']} "
+                    f"with hits), review, golden label, edit + undo OK{note}"), data
 
 
 # ---- main --------------------------------------------------------------------------------------------------
@@ -363,6 +380,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return "FAIL", "; ".join(problems) + f"; decisions: {detail}", cmp
             return status, f"2 copies, .zst + --write-split + --report OK; {detail}", {**cmp, "kept": kept, "filtered": filt}
         step(f"2 --shard copies at once on {'cuda:0' if gpus else 'cpu'} (.zst, --write-split, --report)", shards)
+
+        # replay with the run's own thresholds must give the same decisions; nli_compare must agree
+        def replay_same() -> Tuple[str, str, Dict[str, Any]]:
+            import nli_compare
+            import nli_replay
+            src, dst = tmp / "out_shards", tmp / "out_replay"
+            nli_replay.replay(src, dst, None, None, [], [])  # shards have no summary.json: default thresholds
+            r = nli_compare.compare(src, dst)
+            info = {"lines": r["lines"], "changed": len(r["changed"])}
+            if r["lines"] != n or r["changed"]:
+                return "FAIL", f"replay of the same settings changed {len(r['changed'])} of {r['lines']} lines (want 0 of {n})", info
+            return "PASS", f"nli_replay.py + nli_compare.py: {r['lines']} lines, none changed", info
+        step("replay + compare (no models): same settings give the same decisions", replay_same)
 
         if not args.skip_viewer:
             step("viewer backend on the shard results", lambda: viewer_check(zst, tmp / "out_shards", tmp, n))

@@ -312,7 +312,7 @@ def test_keywords_report_matches_a_real_run(tmp_path, monkeypatch, capsys):
     assert "Keywords report - Russia" in text and "go to the models" in text
     rep = read_json(rep_dir / "keywords_report.json")
     tsv = (rep_dir / "keywords_report.tsv").read_text(encoding="utf-8").splitlines()
-    assert tsv[0].startswith("keyword\tlines") and len(tsv) == 1 + rep["keywords"]
+    assert tsv[0].startswith("keyword\tlevel\ttype\tlines") and len(tsv) == 1 + rep["keywords"]
 
     # the same file through the filter (fake models)
     monkeypatch.setattr(nf, "NLIPool", lambda name, **kw: FakePool(name))

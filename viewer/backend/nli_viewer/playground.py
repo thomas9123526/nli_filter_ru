@@ -142,8 +142,8 @@ class Playground:
         for n in lines:
             items.append({"line": int(n), "raw": lf.line(int(n)).decode("utf-8", "replace")})
         req = dict(settings)
-        if isinstance(req.get("keywords"), str):
-            req["keywords"] = _keywords(req["keywords"])
+        if isinstance(req.get("keywords"), str):  # every line, so the service's errors give the right line numbers
+            req["keywords"] = req["keywords"].splitlines()
         latest = max(ds.runs(), key=lambda r: r.get("finished", ""), default={})
         st = latest.get("settings") or {}
         req.setdefault("text_field", ds._text_field or st.get("text_field") or "text")
@@ -172,13 +172,14 @@ class Playground:
 
 
 def _keywords(text: str) -> List[str]:
-    """Keyword file text -> keywords (same rules as nli_filter.load_keywords: '#' comments, blank lines)."""
+    """Keyword file text -> keywords (same rules as nli_filter.load_keywords: '#' comments, blank lines; the
+    keyword is the first tab-separated column of a lexicon line)."""
     out = []
     for line in text.splitlines():
         s = line.strip()
         if s and not s.startswith("#"):
-            out.append(s)
-    return out
+            out.append(s.split("	", 1)[0].strip())
+    return [k for k in out if k]
 
 
 def _previous(ds, path: str, member: Optional[str], lines: List[int]) -> Optional[Dict[int, Dict[str, Any]]]:

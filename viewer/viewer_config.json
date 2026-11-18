@@ -26,6 +26,18 @@
       "corpus": "../test_corpus_long",
       "output": "../out_test_corpus_long",
       "editable": true
+    },
+    {
+      "name": "ru_plain",
+      "title": "test_russia: russian.json",
+      "corpus": "../test_ru",
+      "output": "../out_ru_plain"
+    },
+    {
+      "name": "ru_kw",
+      "title": "test_russia: russian_kw.json",
+      "corpus": "../test_ru",
+      "output": "../out_ru_kw"
     }
   ]
 }

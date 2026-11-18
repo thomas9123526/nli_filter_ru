@@ -6,6 +6,7 @@ out_test_corpus/**
 out_test_corpus2/**
 test_corpus/**
 test_corpus2/**
+test_ru/**
 *.zst
 
 # viewer (generated)

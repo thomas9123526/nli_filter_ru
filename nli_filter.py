@@ -54,6 +54,7 @@ import re
 import sys
 import threading
 import time
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -178,32 +179,153 @@ class Hit:
     end: int
     rule: Optional[str] = None             # cheap rule that marked the hit incidental
     check2: Optional[Dict[str, Any]] = None  # best check-2 result for this hit
+    kw: Optional[int] = None               # index of the keyword in KeywordMatcher.entries
 
     @property
     def incidental(self) -> bool:
         return self.rule is not None or bool(self.check2 and self.check2.get("incidental"))
 
 
-class KeywordMatcher:
-    """Finds keyword hits: case-insensitive, longest match wins, word boundaries except for CJK keywords."""
+KEYWORD_LEVELS = ("A", "B")
+KEYWORD_COLUMNS = ("keyword", "level", "type", "gloss", "other", "exclude")
+_TYPE_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 
-    def __init__(self, keywords: Iterable[str], exclude_patterns: Iterable[str] = (), use_ahocorasick: bool = True):
-        seen, kws = set(), []
+
+@dataclass
+class KeywordEntry:
+    """One keyword of a keyword file (lexicon). A plain line is just the keyword (level B, nothing else).
+    Tab-separated columns: keyword, level (A strict / B models), type, gloss, other meanings, exclude patterns;
+    '-' or empty = not given; several other meanings / exclude patterns are separated by ' | '."""
+    keyword: str
+    level: str = "B"
+    type: Optional[str] = None
+    gloss: Optional[str] = None
+    other: List[str] = field(default_factory=list)
+    exclude: List[str] = field(default_factory=list)
+    line: Optional[int] = None              # line number in the keyword file
+
+    @property
+    def strict(self) -> bool:
+        return self.level == "A"
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Only what is set (a plain keyword -> {"keyword": ...})."""
+        d: Dict[str, Any] = {"keyword": self.keyword}
+        if self.level != "B":
+            d["level"] = self.level
+        for k in ("type", "gloss"):
+            if getattr(self, k):
+                d[k] = getattr(self, k)
+        for k in ("other", "exclude"):
+            if getattr(self, k):
+                d[k] = list(getattr(self, k))
+        return d
+
+
+def _cell(v: str) -> Optional[str]:
+    v = v.strip()
+    return None if v in ("", "-") else v
+
+
+def _multi(v: str) -> List[str]:
+    """'a | b' -> ['a', 'b']: ' | ' WITH spaces, so a regex alternation like (FL|Florida) stays whole."""
+    v = _cell(v) or ""
+    return [p.strip() for p in re.split(r"\s+\|\s+", v) if p.strip() and p.strip() != "-"]
+
+
+def parse_keyword_line(line: str, lineno: Optional[int] = None) -> Optional[KeywordEntry]:
+    """One line of a keyword file -> KeywordEntry (None for blank lines and # comments). ValueError if invalid."""
+    s = line.rstrip("\r\n")
+    if not s.strip() or s.lstrip().startswith("#"):
+        return None
+    where = f"line {lineno}: " if lineno else ""
+    cols = s.split("\t")
+    if len(cols) > len(KEYWORD_COLUMNS):
+        raise ValueError(f"{where}{len(cols)} tab-separated columns, at most {len(KEYWORD_COLUMNS)} "
+                         f"({', '.join(KEYWORD_COLUMNS)})")
+    cols += [""] * (len(KEYWORD_COLUMNS) - len(cols))
+    kw = cols[0].strip()
+    if not kw or kw == "-":
+        raise ValueError(f"{where}the first column (the keyword) is empty")
+    level = (_cell(cols[1]) or "B").upper()
+    if level not in KEYWORD_LEVELS:
+        raise ValueError(f"{where}level '{cols[1].strip()}' for '{kw}': use A (strict) or B (decided by the models)")
+    typ = _cell(cols[2])
+    if typ is not None:
+        typ = typ.lower()
+        if not _TYPE_RE.match(typ):
+            raise ValueError(f"{where}type '{cols[2].strip()}' for '{kw}': one word (letters, digits, _ or -)")
+    exclude = _multi(cols[5])
+    for p in exclude:
+        try:
+            re.compile(p)
+        except re.error as exc:
+            raise ValueError(f"{where}bad exclude pattern '{p}' for '{kw}': {exc}") from None
+    return KeywordEntry(kw, level, typ, _cell(cols[3]), _multi(cols[4]), exclude, lineno)
+
+
+def parse_keywords(lines: Iterable[str]) -> List[KeywordEntry]:
+    """Keyword file lines -> entries. All problems are collected into one ValueError."""
+    out, errors = [], []
+    for i, line in enumerate(lines, 1):
+        try:
+            e = parse_keyword_line(line, i)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        if e is not None:
+            out.append(e)
+    if errors:
+        raise ValueError("; ".join(errors[:20]) + (f"; ... {len(errors) - 20} more" if len(errors) > 20 else ""))
+    return out
+
+
+def load_lexicon(path: Optional[str]) -> List[KeywordEntry]:
+    if not path:
+        return []
+    with open(path, encoding="utf-8-sig") as fh:
+        try:
+            return parse_keywords(fh)
+        except ValueError as exc:
+            raise ValueError(f"{path}: {exc}") from None
+
+
+class KeywordMatcher:
+    """Finds keyword hits: case-insensitive, longest match wins, word boundaries except for CJK keywords.
+    Keywords are strings or KeywordEntry (lexicon lines); each hit knows its keyword (Hit.kw)."""
+
+    def __init__(self, keywords: Iterable[Any], exclude_patterns: Iterable[str] = (), use_ahocorasick: bool = True):
+        seen: Dict[str, KeywordEntry] = {}
+        entries: List[KeywordEntry] = []
+        self.warnings: List[str] = []
         for k in keywords:
-            k = k.strip()
-            if k and not k.startswith("#") and k.lower() not in seen:
-                seen.add(k.lower())
-                kws.append(k)
-        if not kws:
+            e = k if isinstance(k, KeywordEntry) else KeywordEntry(str(k))
+            e.keyword = e.keyword.strip()
+            if not e.keyword or e.keyword.startswith("#"):
+                continue
+            low = e.keyword.lower()
+            if low in seen:
+                if e.as_dict() != seen[low].as_dict() and e.as_dict() != {"keyword": e.keyword}:
+                    at = f" (line {e.line})" if e.line else ""
+                    self.warnings.append(f"keyword '{e.keyword}'{at} is listed twice: the first one is used")
+                continue
+            seen[low] = e
+            entries.append(e)
+        if not entries:
             raise ValueError("no keywords")
-        self.keywords = kws
-        self.warnings = [f"single-character keyword '{k}' will match inside ordinary words" for k in kws
-                         if len(k) == 1 and is_cjk(k)]
-        self._lower = [k.lower() for k in kws]
+        self.entries = entries
+        self.keywords = [e.keyword for e in entries]
+        self.warnings += [f"single-character keyword '{k}' will match inside ordinary words" for k in self.keywords
+                          if len(k) == 1 and is_cjk(k)]
+        self._lower = [k.lower() for k in self.keywords]
+        self._index = {k: i for i, k in enumerate(self._lower)}
         self._left = [_needs_boundary(k[0]) for k in self._lower]
         self._right = [_needs_boundary(k[-1]) for k in self._lower]
-        self._regex = _phrase_regex(kws)
+        self._regex = _phrase_regex(self.keywords)
         self.excludes = [re.compile(p) for p in exclude_patterns]
+        # per keyword: its own exclude patterns (case-insensitive)
+        self._kw_excludes = {i: [re.compile(p, re.IGNORECASE) for p in e.exclude]
+                             for i, e in enumerate(entries) if e.exclude}
         self._automaton = None
         if use_ahocorasick and ahocorasick is not None:
             a = ahocorasick.Automaton()
@@ -215,6 +337,18 @@ class KeywordMatcher:
     @property
     def engine(self) -> str:
         return "aho-corasick" if self._automaton is not None else "regex"
+
+    def entry(self, hit: "Hit") -> Optional[KeywordEntry]:
+        return self.entries[hit.kw] if hit.kw is not None else None
+
+    def counts(self) -> Dict[str, Any]:
+        """Lexicon summary: keywords per level and per type."""
+        levels = collections.Counter(e.level for e in self.entries)
+        types = collections.Counter(e.type or "-" for e in self.entries)
+        return {"keywords": len(self.entries), "levels": dict(sorted(levels.items())),
+                "types": dict(sorted(types.items())), "with_gloss": sum(1 for e in self.entries if e.gloss),
+                "with_other": sum(1 for e in self.entries if e.other),
+                "with_exclude": sum(1 for e in self.entries if e.exclude)}
 
     def find(self, text: str) -> List[Hit]:
         if not text:
@@ -230,26 +364,37 @@ class KeywordMatcher:
                     continue
                 if self._right[i] and e < n and _word_char(text[e]):
                     continue
-                cands.append((s, e))
+                cands.append((s, e, i))
             cands.sort(key=lambda c: (c[0], c[0] - c[1]))
             last = -1
-            for s, e in cands:
+            for s, e, i in cands:
                 if s >= last:
-                    hits.append(Hit(s, e))
+                    hits.append(Hit(s, e, kw=i))
                     last = e
         else:  # no pyahocorasick, or lower() changed the length (rare Unicode)
-            hits = [Hit(m.start(), m.end()) for m in self._regex.finditer(text)]
+            hits = [Hit(m.start(), m.end(), kw=self._index.get(m.group(0).lower()))
+                    for m in self._regex.finditer(text)]
         if hits and self.excludes:
             spans = [m.span() for p in self.excludes for m in p.finditer(text)]
             hits = [h for h in hits if not any(_overlaps(h.start, h.end, s, e) for s, e in spans)]
+        if hits and self._kw_excludes:
+            cache: Dict[int, List[Tuple[int, int]]] = {}
+            kept = []
+            for h in hits:
+                pats = self._kw_excludes.get(h.kw) if h.kw is not None else None
+                if pats:
+                    if h.kw not in cache:
+                        cache[h.kw] = [m.span() for p in pats for m in p.finditer(text)]
+                    if any(_overlaps(h.start, h.end, s, e) for s, e in cache[h.kw]):
+                        continue
+                kept.append(h)
+            hits = kept
         return hits
 
 
 def load_keywords(path: Optional[str]) -> List[str]:
-    if not path:
-        return []
-    with open(path, encoding="utf-8-sig") as fh:
-        return [ln.strip() for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
+    """The keywords of a keyword file (first column; load_lexicon gives the other columns too)."""
+    return [e.keyword for e in load_lexicon(path)]
 
 
 # --------------------------------------------------------------------------------------------------
@@ -463,6 +608,20 @@ class FilterSettings:
     # incidental to be kept). Both are exact shortcuts: turning them off adds scores, never changes a decision.
     check1_early_stop: Optional[bool] = None
     check2_early_stop: Optional[bool] = None
+    # level-A (strict) keywords: a line with an A hit is filtered without any model (reason strict_keyword).
+    # Absolute by default; strict_rules=True lets the cheap rules (language menu / label / locale / company name)
+    # mark an A hit incidental first, and only A hits the rules leave open decide.
+    strict_rules: bool = False
+    # hypotheses built from the matched keyword (hypothesis file check1_types / check2_types; {country} already
+    # filled in, {kw} / {gloss} / {other} filled in per keyword), and how many such hypotheses a window / hit
+    # may get at most (cost cap: the global hypotheses always run)
+    check1_types: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    check2_types: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    max_keyword_hyps: int = 4
+    # audit of level-A lines: this share (0..1) of the lines an A keyword filters is ALSO run through the rules,
+    # check 1 and check 2 as if the A words were B; the result is stored in decision["audit"] and does not
+    # change the decision (shows A words that are too broad)
+    audit_strict: float = 0.0
 
     def __post_init__(self) -> None:
         if self.check1_early_stop is None:
@@ -484,11 +643,47 @@ class LineFilter:
     def __init__(self, settings: FilterSettings, matcher: KeywordMatcher, rules: Optional[IncidentalRules],
                  windows: WindowBuilder, scorer: CascadeScorer):
         self.s, self.matcher, self.rules, self.windows, self.scorer = settings, matcher, rules, windows, scorer
+        self._kw_cache: Dict[Tuple[int, int], List[Tuple[str, str]]] = {}
+
+    def keyword_hyps(self, check: int, kw: Optional[int]) -> List[Tuple[str, str]]:
+        """(key, hypothesis) built for one keyword from check1_types / check2_types: its type's templates, the
+        '*' templates and (check 2) one '@other' hypothesis per other meaning. Key = '<template key>:<keyword>'."""
+        types = self.s.check1_types if check == 1 else self.s.check2_types
+        if not types or kw is None:
+            return []
+        ck = (check, kw)
+        if ck not in self._kw_cache:
+            e = self.matcher.entries[kw]
+            out: List[Tuple[str, str]] = []
+            for t in ([e.type] if e.type else []) + ["*"]:
+                for key, tpl in (types.get(t) or {}).items():
+                    if "{gloss}" in tpl and not e.gloss:
+                        continue  # a gloss template needs a gloss
+                    out.append((f"{key}:{e.keyword}", nli_hypotheses.fill(tpl, e.keyword, e.gloss)))
+            for key, tpl in (types.get("@other") or {}).items():
+                for i, o in enumerate(e.other, 1):
+                    suffix = f"/{i}" if len(e.other) > 1 else ""
+                    out.append((f"{key}:{e.keyword}{suffix}", nli_hypotheses.fill(tpl, e.keyword, e.gloss, o)))
+            self._kw_cache[ck] = out
+        return self._kw_cache[ck]
+
+    def _hyps(self, check: int, kws: Iterable[Optional[int]]) -> List[Tuple[str, str]]:
+        """The global hypotheses of a check + those of these keywords (in order, no repeated text, capped)."""
+        base = list((self.s.check1 if check == 1 else self.s.check2).items())
+        texts = {h for _, h in base}
+        extra: List[Tuple[str, str]] = []
+        for kw in kws:
+            for key, hyp in self.keyword_hyps(check, kw):
+                if hyp not in texts and len(extra) < self.s.max_keyword_hyps:
+                    texts.add(hyp)
+                    extra.append((key, hyp))
+        return base + extra
 
     def process(self, records: Sequence[Record]) -> List[Outcome]:
         s = self.s
         outcomes: List[Outcome] = []
         pending: List[Tuple[Outcome, List[Hit], List[Hit], List[Tuple[int, int]]]] = []
+        audited: set = set()  # indexes in pending of level-A lines run only for the audit
         for rec in records:
             d: Dict[str, Any] = {"line": rec.line, "decision": None, "reason": None}  # filled in by _final
             if s.id_field and rec.get(s.id_field) is not None:
@@ -509,12 +704,27 @@ class LineFilter:
             if not hits:
                 self._final(d, "keep", "no_keyword")
                 continue
+            strict = [h for h in hits if h.kw is not None and self.matcher.entries[h.kw].strict]
+            audit = bool(strict) and self._audit_pick(rec)
+            if strict and not s.strict_rules and not audit:  # level A: filtered, no rule, no model
+                self._final(d, "filter", "strict_keyword", text, hits)
+                continue
             if self.rules is not None:
                 self.rules.apply(text, hits)
+            # the line is a level-A line: always (default) or, with strict_rules, when an A hit is left open
+            strict_line = bool(strict) and (not s.strict_rules or any(h.rule is None for h in strict))
+            if strict_line and not audit:
+                self._final(d, "filter", "strict_keyword", text, hits)
+                continue
             open_hits = [h for h in hits if h.rule is None]
             if not open_hits:
-                self._final(d, "keep", "rules_incidental", text, hits)
+                if strict_line:  # audit: the rules alone would have kept it
+                    self._audit_final(d, "keep", "rules_incidental", None, text, hits)
+                else:
+                    self._final(d, "keep", "rules_incidental", text, hits)
                 continue
+            if strict_line:
+                audited.add(len(pending))
             pending.append((out, hits, open_hits, self.windows.check1(text, open_hits)))
 
         # check 1: window x check-1 hypothesis. Early stop (default): windows are scored in rounds of 1, 2, 4, ...
@@ -530,16 +740,21 @@ class LineFilter:
                     continue
                 for w in range(done[n], min(done[n] + size, len(wins))):
                     a, b = wins[w]
-                    for key, hyp in s.check1.items():
+                    kws = list(dict.fromkeys(h.kw for h in pending[n][2] if a <= h.start and h.end <= b)) \
+                        if s.check1_types else []
+                    for key, hyp in self._hyps(1, kws):
                         premises.append(out.text[a:b])
                         hyps.append(hyp)
-                        owners.append((n, w, key))
+                        owners.append((n, w, key, hyp))
                 done[n] = min(done[n] + size, len(wins))
             if not premises:
                 break
-            for (n, w, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
-                c1_pairs[n].append({"window": list(pending[n][3][w]), "hyp": key, "fast": _r(f), "judge": _r(j),
-                                    "score": _r(final), "_final": final})
+            for (n, w, key, hyp), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
+                pair = {"window": list(pending[n][3][w]), "hyp": key, "fast": _r(f), "judge": _r(j),
+                        "score": _r(final), "_final": final}
+                if key not in s.check1:
+                    pair["text"] = hyp  # built from a keyword: the hypothesis is not in the run's list
+                c1_pairs[n].append(pair)
             size *= 2
 
         # check 2: per open hit of check-1-positive lines, on the sentence around the hit. Hits in the same
@@ -547,21 +762,23 @@ class LineFilter:
         # line, and a line leaves at its first sentence that is not incidental (the line is filtered then anyway;
         # hits not scored keep check2 = None).
         positive = []
+        has_c2 = bool(s.check2 or s.check2_types)
         sentences: List[List[Tuple[Tuple[int, int], List[Hit]]]] = [[] for _ in pending]
         for n, (out, hits, open_hits, _) in enumerate(pending):
             best = max(c1_pairs[n], key=lambda p: p["_final"])
             is_pos = best["_final"] >= s.check1_threshold
             positive.append(is_pos)
-            if not is_pos or not s.check2:
+            if not is_pos or not has_c2:
                 continue
             ends = self.windows.sentence_ends(out.text)
-            by_span: Dict[Tuple[int, int], List[Hit]] = {}
+            by_span: Dict[Tuple[Tuple[int, int], Optional[int]], List[Hit]] = {}
             for h in open_hits:
                 span = self.windows.check2(out.text, h, ends)
-                if span not in by_span:
-                    by_span[span] = []
-                    sentences[n].append((span, by_span[span]))
-                by_span[span].append(h)
+                own = h.kw if self.keyword_hyps(2, h.kw) else None  # own hypotheses: a group of its own
+                if (span, own) not in by_span:
+                    by_span[(span, own)] = []
+                    sentences[n].append((span, by_span[(span, own)]))
+                by_span[(span, own)].append(h)
         done = [0] * len(pending)                      # sentences scored so far per line
         stopped = [False] * len(pending)
         size = 1 if s.check2_early_stop else max((len(x) for x in sentences), default=0)
@@ -570,26 +787,29 @@ class LineFilter:
             for n, sents in enumerate(sentences):
                 if stopped[n] or done[n] >= len(sents):
                     continue
-                for (a, b), group in sents[done[n]:done[n] + size]:
-                    for key, hyp in s.check2.items():
+                for gi, ((a, b), group) in enumerate(sents[done[n]:done[n] + size], done[n]):
+                    for key, hyp in self._hyps(2, [group[0].kw] if s.check2_types else []):
                         premises.append(pending[n][0].text[a:b])
                         hyps.append(hyp)
-                        owners.append((n, a, b, group, key))
+                        owners.append((n, gi, a, b, group, key, hyp))
                 done[n] = min(done[n] + size, len(sents))
             if not premises:
                 break
-            best2: Dict[Tuple[int, int, int], Dict[str, Any]] = {}
-            all2: Dict[Tuple[int, int, int], List[Dict[str, Any]]] = {}  # every hypothesis's scores (shown)
-            for (n, a, b, group, key), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
-                all2.setdefault((n, a, b), []).append({"hyp": key, "fast": _r(f), "judge": _r(j), "score": _r(final)})
-                cur = best2.get((n, a, b))
+            best2: Dict[Tuple[int, int], Dict[str, Any]] = {}
+            all2: Dict[Tuple[int, int], List[Dict[str, Any]]] = {}  # every hypothesis's scores (shown)
+            for (n, gi, a, b, group, key, hyp), (f, j, final) in zip(owners, self.scorer.score(premises, hyps)):
+                row = {"hyp": key, "fast": _r(f), "judge": _r(j), "score": _r(final)}
+                if key not in s.check2:
+                    row["text"] = hyp  # built from a keyword
+                all2.setdefault((n, gi), []).append(row)
+                cur = best2.get((n, gi))
                 if cur is None or final > cur["_final"]:
-                    best2[(n, a, b)] = {"window": [a, b], "hyp": key, "fast": _r(f), "judge": _r(j),
-                                        "score": _r(final), "_final": final, "incidental": final >= s.check2_threshold,
-                                        "_group": group}
-            for (n, a, b), res in best2.items():
+                    best2[(n, gi)] = {"window": [a, b], "hyp": key, "fast": _r(f), "judge": _r(j),
+                                      "score": _r(final), "_final": final, "incidental": final >= s.check2_threshold,
+                                      "_group": group, **({"text": hyp} if key not in s.check2 else {})}
+            for (n, gi), res in best2.items():
                 group = res.pop("_group")
-                res["pairs"] = all2[(n, a, b)]
+                res["pairs"] = all2[(n, gi)]
                 for h in group:
                     h.check2 = dict(res)
                 if not res["incidental"] and s.check2_early_stop:
@@ -607,15 +827,45 @@ class LineFilter:
             if stopped[n] and done[n] < len(sentences[n]):
                 out.decision["check2_skipped"] = sum(len(g) for _, g in sentences[n][done[n]:])  # hits not scored
             if not positive[n]:
-                self._final(out.decision, "keep", "check1_negative", out.text, hits)
-            elif s.check2 and all(h.incidental for h in open_hits):
-                self._final(out.decision, "keep", "check2_incidental", out.text, hits)
+                verdict = ("keep", "check1_negative")
+            elif has_c2 and all(h.incidental for h in open_hits):
+                verdict = ("keep", "check2_incidental")
             else:
-                self._final(out.decision, "filter", "about_country", out.text, hits)
+                verdict = ("filter", "about_country")
+            if n in audited:
+                self._audit_final(out.decision, verdict[0], verdict[1], out.decision.pop("check1"), out.text, hits)
+            else:
+                self._final(out.decision, verdict[0], verdict[1], out.text, hits)
         return outcomes
 
-    @staticmethod
-    def _final(d: Dict[str, Any], decision: str, reason: str, text: Optional[str] = None,
+    def _audit_pick(self, rec: Record) -> bool:
+        """Is this level-A line in the audit sample? (deterministic: same lines on every run)"""
+        rate = self.s.audit_strict
+        if rate <= 0:
+            return False
+        if rate >= 1:
+            return True
+        return zlib.crc32(f"{rec.source}:{rec.line}".encode("utf-8", "replace")) % 1_000_000 < rate * 1_000_000
+
+    def _audit_final(self, d: Dict[str, Any], decision: str, reason: str, check1: Optional[Dict[str, Any]],
+                     text: str, hits: List[Hit]) -> None:
+        """A level-A line run for the audit: store what the rules / models would decide, filter it anyway."""
+        a: Dict[str, Any] = {"decision": decision, "reason": reason}
+        if check1 is not None:
+            a["check1"] = check1
+        for k in ("check2_skipped",):
+            if k in d:
+                a[k] = d.pop(k)
+        a["hits"] = [{"kw": text[h.start:h.end], "span": [h.start, h.end],
+                      **({"rule": h.rule} if h.rule else {}),
+                      **({"check2": {k: v for k, v in h.check2.items() if k != "_final"}} if h.check2 else {})}
+                     for h in hits]
+        for h in hits:  # the real decision: a level-A filter, as without the audit
+            h.rule, h.check2 = None, None
+        d["audit"] = a
+        self._final(d, "filter", "strict_keyword", text, hits)
+
+    def _final(self, d: Dict[str, Any], decision: str, reason: str, text: Optional[str] = None,
                hits: Optional[List[Hit]] = None) -> None:
         d["decision"] = decision
         d["reason"] = reason
@@ -623,12 +873,20 @@ class LineFilter:
             rows = []
             for h in hits:
                 row: Dict[str, Any] = {"kw": text[h.start:h.end], "span": [h.start, h.end]}
+                e = self.matcher.entries[h.kw] if h.kw is not None else None
+                if e is not None:
+                    if e.keyword != row["kw"]:
+                        row["keyword"] = e.keyword  # as in the keyword file (the text may differ in case)
+                    if e.strict:
+                        row["level"] = "A"
                 if h.rule:
                     row["rule"] = h.rule
                 if h.check2:
                     row["check2"] = {k: v for k, v in h.check2.items() if k != "_final"}
                 rows.append(row)
             d["hits"] = rows
+            if reason == "strict_keyword":
+                d["strict"] = sorted({r.get("keyword", r["kw"]) for r in rows if r.get("level") == "A" and "rule" not in r})
 
 
 # --------------------------------------------------------------------------------------------------
@@ -636,7 +894,7 @@ class LineFilter:
 # --------------------------------------------------------------------------------------------------
 
 REASONS = ["blank", "bad_json", "no_text", "no_keyword", "rules_incidental", "check1_negative",
-           "check2_incidental", "about_country"]
+           "check2_incidental", "about_country", "strict_keyword"]
 
 
 class RunStats:
@@ -656,6 +914,7 @@ class RunStats:
         self.by_group: Dict[str, collections.Counter] = {g: collections.Counter(c)
                                                          for g, c in ev.get("by_group", {}).items()}
         self.mistakes: List[Dict[str, Any]] = list(ev.get("mistakes", []))
+        self.audit = collections.Counter(d.get("audit", {}))  # level-A audit: lines, would_keep, would_filter
 
     def add(self, out: Outcome, group_field: Optional[str], max_mistakes: int = 200) -> None:
         d = out.decision
@@ -670,6 +929,9 @@ class RunStats:
                 self.check2_hits += 1
         if "check1" in d:
             self.check1_windows += len({tuple(p["window"]) for p in d["check1"]["pairs"]})
+        if "audit" in d:
+            self.audit["lines"] += 1
+            self.audit["would_" + d["audit"]["decision"]] += 1
         expect = str(d.get("expect", "")).strip().lower()
         if expect not in ("filter", "keep"):
             return
@@ -698,6 +960,7 @@ class RunStats:
         for g, c in other.by_group.items():
             self.by_group.setdefault(g, collections.Counter()).update(c)
         self.mistakes.extend(other.mistakes)
+        self.audit.update(other.audit)
 
     @staticmethod
     def metrics(c: collections.Counter) -> Dict[str, Any]:
@@ -714,6 +977,8 @@ class RunStats:
                "reasons": {k: self.reasons.get(k, 0) for k in REASONS if self.reasons.get(k)},
                "rules": dict(self.rules), "hits": self.hits, "check1_windows": self.check1_windows,
                "check2_hits": self.check2_hits}
+        if self.audit:
+            out["audit"] = dict(self.audit)
         if self.confusion:
             out["eval"] = {"confusion": dict(self.confusion), "metrics": self.metrics(self.confusion),
                            "by_group": {g: dict(c) for g, c in sorted(self.by_group.items())},
@@ -1080,7 +1345,8 @@ def format_summary(summary: Dict[str, Any], show: int = 20) -> str:
     meaning = {"blank": "empty line", "bad_json": "line is not valid JSON (kept)", "no_text": "text field missing/empty",
                "no_keyword": "no country keyword", "rules_incidental": "all hits resolved by CPU rules",
                "check1_negative": "NLI: not about the country", "check2_incidental": "NLI: all hits incidental",
-               "about_country": "FILTERED: about the country"}
+               "about_country": "FILTERED: about the country",
+               "strict_keyword": "FILTERED: a level-A keyword (no model)"}
     for k in REASONS:
         v = st["reasons"].get(k, 0)
         if v:
@@ -1184,6 +1450,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="fast scores in [LOW, HIGH] go to the judge (default 0.6 0.95)")
     g = p.add_argument_group("rules and windows")
     g.add_argument("--no-rules", action="store_true", help="disable the cheap CPU rules")
+    g.add_argument("--max-keyword-hyps", type=int, default=4,
+                   help="at most this many hypotheses built from the matched keywords (hypothesis file "
+                        "check1_types / check2_types) per check-1 window and per check-2 hit (default 4)")
+    g.add_argument("--audit-strict", type=float, default=0.0, metavar="SHARE",
+                   help="also run this share (0..1, e.g. 0.05) of the lines a level-A keyword filters through the "
+                        "rules and the models, and store what they would decide in the decision's 'audit' (the "
+                        "decision stays filter): shows level-A words that are too broad (default 0 = off)")
+    g.add_argument("--strict-rules", action="store_true",
+                   help="let the cheap rules mark a level-A keyword hit incidental before it filters the line "
+                        "(default: a level-A hit filters the line, rules or not)")
     g.add_argument("--language-menu-min", type=int, default=3, help="language names in a row for a menu (default 3)")
     g.add_argument("--company-names-file", help="company/brand names, one per line; hits inside them are incidental")
     g.add_argument("--check1-chars", type=int, default=1000, help="check-1 window size in characters (~250 tokens)")
@@ -1263,7 +1539,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     kw_file = args.keywords_file
     if not kw_file and (HERE / "keywords" / f"{country.lower()}.txt").is_file():
         kw_file = str(HERE / "keywords" / f"{country.lower()}.txt")
-    keywords = load_keywords(kw_file) if kw_file else list(known.get("keywords", []))
+    try:
+        keywords: List[Any] = load_lexicon(kw_file) if kw_file else list(known.get("keywords", []))
+    except (OSError, ValueError) as exc:
+        print(f"error: keywords file: {exc}", file=sys.stderr)
+        return 2
     keywords += args.keyword
     if not keywords:
         print(f"error: no keywords for '{country}': give --keywords-file or --keyword", file=sys.stderr)
@@ -1279,6 +1559,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     hyp_file = args.hypotheses_file or (str(nli_hypotheses.find_file(country)) if nli_hypotheses.find_file(country)
                                         else None)
     base1, base2 = DEFAULT_CHECK1, DEFAULT_CHECK2
+    types1: Dict[str, Dict[str, str]] = {}
+    types2: Dict[str, Dict[str, str]] = {}
     if hyp_file:
         try:
             data = nli_hypotheses.load(hyp_file)
@@ -1286,10 +1568,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"error: --hypotheses-file: {exc}", file=sys.stderr)
             return 2
         base1, base2 = data["check1"], data["check2"]
+        types1, types2 = data.get("check1_types") or {}, data.get("check2_types") or {}
         log.warning("hypotheses from %s", hyp_file)
     check1 = _render(_kv(args.check1_hyp, "--check1-hyp") or base1, country, adj, "check-1")
     check2 = {} if args.no_check2 else _render(_kv(args.check2_hyp, "--check2-hyp") or base2,
                                                country, adj, "check-2")
+    # --check1-hyp / --check2-hyp replace a check's hypotheses: the file's keyword templates of that check too
+    check1_types = {} if args.check1_hyp else nli_hypotheses.render_types(types1, country, adj)
+    check2_types = {} if (args.no_check2 or args.check2_hyp) else nli_hypotheses.render_types(types2, country, adj)
+    if args.max_keyword_hyps < 0:
+        print("error: --max-keyword-hyps must be 0 or more", file=sys.stderr)
+        return 2
+    if not 0 <= args.audit_strict <= 1:
+        print("error: --audit-strict must be between 0 and 1", file=sys.stderr)
+        return 2
     lo, hi = args.uncertain_band
     if not (0 <= lo < hi <= 1):
         print("error: --uncertain-band needs 0 <= LOW < HIGH <= 1", file=sys.stderr)
@@ -1361,7 +1653,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                   args.text_field, args.id_field or None, args.expect_field or None,
                                   args.group_field or None, early_stop=not args.no_early_stop,
                                   check1_early_stop=not (args.no_early_stop or args.no_check1_early_stop),
-                                  check2_early_stop=not (args.no_early_stop or args.no_check2_early_stop))
+                                  check2_early_stop=not (args.no_early_stop or args.no_check2_early_stop),
+                                  strict_rules=args.strict_rules, check1_types=check1_types,
+                                  check2_types=check2_types, max_keyword_hyps=args.max_keyword_hyps,
+                                  audit_strict=args.audit_strict)
         rules = None if args.no_rules else IncidentalRules(adj, args.language_menu_min, company_names=company_names)
         scorer = CascadeScorer(fast, judge, (lo, hi))
         line_filter = LineFilter(settings, matcher, rules,
@@ -1403,13 +1698,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     pairs = scorer.fast_pairs + scorer.judge_pairs
     summary = {
         "country": {"name": country, "adj": adj, "keywords": matcher.keywords, "keywords_file": kw_file,
-                    "exclude_patterns": excludes},
-        "hypotheses": {"check1": check1, "check2": check2, "file": hyp_file},
+                    "exclude_patterns": excludes, "lexicon": matcher.counts(),
+                    "lexicon_meta": {e.keyword: {k: v for k, v in e.as_dict().items() if k != "keyword"}
+                                     for e in matcher.entries if len(e.as_dict()) > 1}},
+        "hypotheses": {"check1": check1, "check2": check2, "file": hyp_file,
+                       **({"check1_types": check1_types} if check1_types else {}),
+                       **({"check2_types": check2_types} if check2_types else {})},
         "settings": {"check1_threshold": args.check1_threshold, "check2_threshold": args.check2_threshold,
                      "uncertain_band": [lo, hi], "rules": not args.no_rules,
                      "language_menu_min": args.language_menu_min, "check1_chars": args.check1_chars,
                      "check2_chars": args.check2_chars, "max_windows": args.max_windows,
-                     "early_stop": not args.no_early_stop,
+                     "early_stop": not args.no_early_stop, "strict_rules": args.strict_rules,
+                     "max_keyword_hyps": args.max_keyword_hyps, "audit_strict": args.audit_strict,
                      "check1_early_stop": settings.check1_early_stop, "check2_early_stop": settings.check2_early_stop,
                      "text_field": args.text_field, "id_field": args.id_field, "expect_field": args.expect_field,
                      "chunk_lines": args.chunk_lines, "inflight": inflight, "write_split": args.write_split,
@@ -1492,8 +1792,8 @@ def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[I
     would save), examples. Totals estimate the model work of a real run.
     """
     canon = {k.lower(): k for k in matcher.keywords}
-    per = {k: {"keyword": k, "hits": 0, "lines": 0, "rule_hits": 0, "open_hits": 0, "nli_lines": 0,
-               "only_lines": 0, "examples": []} for k in matcher.keywords}
+    per = {e.keyword: {"keyword": e.keyword, "level": e.level, "type": e.type, "hits": 0, "lines": 0, "rule_hits": 0,
+                       "open_hits": 0, "nli_lines": 0, "only_lines": 0, "examples": []} for e in matcher.entries}
     tot = collections.Counter()
     n_examples = 3
     t0 = time.perf_counter()
@@ -1517,9 +1817,13 @@ def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[I
                 if not hits:
                     continue
                 tot["hit_lines"] += 1
-                if rules is not None:
+                # level A: the line is filtered without models (with --strict-rules: unless the rules resolve it)
+                strict = [h for h in hits if h.kw is not None and matcher.entries[h.kw].strict]
+                strict_line = bool(strict) and not args.strict_rules
+                if rules is not None and not strict_line:
                     rules.apply(text, hits)
-                open_hits = [h for h in hits if h.rule is None]
+                strict_line = strict_line or any(h.rule is None for h in strict)
+                open_hits = [] if strict_line else [h for h in hits if h.rule is None]
                 by_kw: Dict[str, List[Hit]] = collections.defaultdict(list)
                 for h in hits:
                     by_kw[canon.get(text[h.start:h.end].lower(), text[h.start:h.end])].append(h)
@@ -1542,6 +1846,11 @@ def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[I
                                    text[h.end:b] + ("..." if b < len(text) else ""))
                         s["examples"].append({"source": str(rec.source), "line": rec.line,
                                               "text": " ".join(snippet.split())})
+                if strict_line:
+                    tot["strict_lines"] += 1
+                    for k in {canon.get(text[h.start:h.end].lower(), text[h.start:h.end]) for h in strict}:
+                        per[k]["strict_lines"] = per[k].get("strict_lines", 0) + 1
+                    continue
                 if not open_hits:
                     tot["rules_lines"] += 1
                     continue
@@ -1561,10 +1870,10 @@ def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[I
     rows = sorted(per.values(), key=lambda s: (-s["nli_lines"], -s["lines"], s["keyword"].lower()))
     unused = sorted((s["keyword"] for s in rows if s["lines"] == 0), key=str.lower)
     summary = {
-        "country": country, "keywords_file": kw_file, "keywords": len(matcher.keywords), "engine": matcher.engine,
+        "country": country, "keywords_file": kw_file, "keywords": len(matcher.keywords), "lexicon": matcher.counts(), "engine": matcher.engine,
         "files": len(files), "failed_files": tot["failed_files"], "limit": args.limit,
         "lines": lines, "text_lines": tot["text_lines"], "bytes": tot["bytes"], "seconds": round(seconds, 2),
-        "lines_with_keyword": tot["hit_lines"], "lines_rules_only": tot["rules_lines"],
+        "lines_with_keyword": tot["hit_lines"], "lines_strict": tot["strict_lines"], "lines_rules_only": tot["rules_lines"],
         "lines_to_models": tot["nli_lines"],
         "estimate": {"check1_windows": tot["check1_windows"], "check1_pairs": pairs_c1,
                      "check2_pairs_at_most": tot["open_hits"] * len(check2),
@@ -1576,11 +1885,11 @@ def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[I
     with open(out_dir / "keywords_report.json", "w", encoding="utf-8") as fh:
         json.dump(summary, fh, ensure_ascii=False, indent=1)
     with open(out_dir / "keywords_report.tsv", "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("keyword\tlines\tlines_to_models\tonly_this_keyword\thits\trule_hits\texample\n")
+        fh.write("keyword\tlevel\ttype\tlines\tlines_to_models\tonly_this_keyword\tlevel_a_lines\thits\trule_hits\texample\n")
         for s in rows:
             ex = s["examples"][0]["text"].replace("\t", " ") if s["examples"] else ""
-            fh.write(f"{s['keyword']}\t{s['lines']}\t{s['nli_lines']}\t{s['only_lines']}\t{s['hits']}\t"
-                     f"{s['rule_hits']}\t{ex}\n")
+            fh.write(f"{s['keyword']}\t{s.get('level') or 'B'}\t{s.get('type') or ''}\t{s['lines']}\t{s['nli_lines']}\t"
+                     f"{s['only_lines']}\t{s.get('strict_lines', 0)}\t{s['hits']}\t{s['rule_hits']}\t{ex}\n")
 
     def pct(a: float) -> str:
         return _pct(a, lines).strip()
@@ -1590,6 +1899,7 @@ def keywords_report(files: List[str], matcher: KeywordMatcher, rules: Optional[I
                        f"{len(files)} file(s), no models", "=" * 78,
          f" lines               {lines:>12,}" + (f"   (sample: --limit {args.limit})" if args.limit else ""),
          f" with a keyword      {tot['hit_lines']:>12,}   {pct(tot['hit_lines'])}",
+         f"   level-A keyword   {tot['strict_lines']:>12,}   {pct(tot['strict_lines'])}   (filtered, no model)",
          f"   kept by the rules {tot['rules_lines']:>12,}   {pct(tot['rules_lines'])}   (language menus / labels, no model)",
          f"   go to the models  {tot['nli_lines']:>12,}   {pct(tot['nli_lines'])}",
          f" estimated model work: check 1 {pairs_c1:,} pairs ({tot['check1_windows']:,} windows x {len(check1)} "

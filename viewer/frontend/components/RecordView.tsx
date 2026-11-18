@@ -119,7 +119,7 @@ export function RecordView() {
       {rec ? (
         <div className="grid side" style={{ opacity: res.loading ? 0.6 : 1 }}>
           <div className="stack">
-            <Verdict rec={rec} />
+            <Verdict rec={rec} ds={ds} file={f} />
             <div className="panel flush">
               <div className="panel-head">
                 <h2>Original text</h2>
@@ -210,7 +210,7 @@ function NavLink({ to, label }: { to: string | null; label: string }) {
   return to ? <Link href={to}>{label}</Link> : <span className="faint">{label}</span>;
 }
 
-function Verdict({ rec }: { rec: RecordResp }) {
+function Verdict({ rec, ds, file }: { rec: RecordResp; ds: string; file: string }) {
   const v = rec.explanation.verdict;
   const ex = rec.explanation.expect;
   return (
@@ -223,9 +223,42 @@ function Verdict({ rec }: { rec: RecordResp }) {
       </div>
       <div className="summary">{v.summary}</div>
       {v.steps.length ? <ul>{v.steps.map((s, i) => <li key={i}>{s}</li>)}</ul> : null}
+      {rec.explanation.audit ? (
+        <div className={`alert ${rec.explanation.audit.decision === "keep" ? "warn" : ""}`} data-testid="audit">
+          <strong>Level-A audit:</strong> run as if its A keywords were B, the {rec.explanation.audit.check1 === null ? "rules" : "models"} would <strong>{rec.explanation.audit.decision}</strong> this line
+          ({rec.explanation.audit.reason}{rec.explanation.audit.check1 !== null ? `, check 1 ${score(rec.explanation.audit.check1)} '${rec.explanation.audit.check1_hyp}'` : ""}
+          {rec.explanation.audit.check2 !== null ? `, lowest check 2 ${score(rec.explanation.audit.check2)}` : ""}{rec.explanation.audit.rules.length ? `, rules: ${rec.explanation.audit.rules.join(", ")}` : ""}).
+          The decision stays filter.{rec.explanation.audit.decision === "keep" ? " If this happens often for this word, it may be too broad for level A." : ""}
+        </div>
+      ) : null}
+      <GoldenLabel ds={ds} file={file} rec={rec} />
       {!rec.id_check.match ? (
         <div className="alert warn">The id in the decisions file ({String(rec.id_check.decision_id)}) differs from the id of the corpus line ({String(rec.id_check.original_id)}): the corpus file may have changed since the run.</div>
       ) : null}
+    </div>
+  );
+}
+
+/** Label this line for the golden set (golden/<dataset>.jsonl; the corpus is not changed). */
+function GoldenLabel({ ds, file, rec }: { ds: string; file: string; rec: RecordResp }) {
+  const [tick, setTick] = useState(0);
+  const g = useApi(`golden:${ds}:${tick}`, (s) => api.golden(ds, s));
+  const [err, setErr] = useState<string | null>(null);
+  const line = rec.decision && typeof rec.decision.line === "number" ? rec.decision.line : rec.line;
+  const cur = g.data?.labels[`${file}#${line}`] || null;
+  async function set(expect: string) {
+    setErr(null);
+    try { await api.setGolden(ds, { file, row: rec.row, expect }); setTick((t) => t + 1); } catch (e) { setErr((e as Error).message); }
+  }
+  return (
+    <div className="row golden-cell" style={{ marginTop: 8 }} data-testid="golden-label">
+      <span className="faint" style={{ fontSize: 12 }} title={g.data?.path}>golden set:</span>
+      {(["filter", "keep"] as const).map((e) => (
+        <button key={e} className={`btn small${cur === e ? (e === "filter" ? " lbl-filter" : " lbl-keep") : " ghost"}`}
+          onClick={() => set(cur === e ? "" : e)} title={cur === e ? "remove the label" : `label this line: ${e}`}>{e}</button>
+      ))}
+      {cur ? <span className="faint" style={{ fontSize: 12 }}>labelled “{cur}”{g.data ? ` · ${g.data.count} in the set` : ""}</span> : null}
+      {err ? <span className="badge warn">not saved: {err}</span> : null}
     </div>
   );
 }
@@ -316,7 +349,7 @@ function Hits({ rec, setActive, jump }: { rec: RecordResp; setActive: (ids: numb
               onMouseEnter={() => setActive([m.id])} onMouseLeave={() => setActive([])}>
               <td><span className={`swatch ${m.state}`} /> <strong>{m.kw}</strong></td>
               <td className="mono faint">{m.start}–{m.end}</td>
-              <td>{m.rule ? RULE_LABEL[m.rule] || m.rule : m.state === "incidental" ? "incidental" : m.state === "about" ? "not incidental" : "check 1 only"}</td>
+              <td>{m.rule ? RULE_LABEL[m.rule] || m.rule : m.state === "strict" ? "level A: filters the line" : m.state === "incidental" ? "incidental" : m.state === "about" ? "not incidental" : rec.decision.reason === "strict_keyword" ? "not scored (level-A keyword decided)" : "check 1 only"}</td>
             </tr>
           ))}
         </tbody>

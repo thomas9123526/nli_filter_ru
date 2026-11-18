@@ -1,0 +1,25 @@
+{
+  "description": "russian.json with hypotheses built from the matched keyword (step 3): the region list replaced by type templates",
+  "check1": {
+    "country": "This text is about {country}.",
+    "person": "This text is about a {country_adj} person.",
+    "culture": "This text is about a {country_adj} film, song or book.",
+    "history": "This text is about the history of {country}.",
+    "army": "This text is about the {country_adj} army."
+  },
+  "check2": {
+    "company_name": "This text mentions {country} or {country_adj} only as part of a company or brand name.",
+    "language_setting": "This text mentions the {country_adj} language only as a language option or setting.",
+    "location": "This text mentions {country} or a place in {country} only in passing, as the place where something unrelated happens."
+  },
+  "check1_types": {
+    "region": {"place": "This text is about {kw}, {gloss}."},
+    "city": {"place": "This text is about {kw}, {gloss}."},
+    "person": {"person": "This text is about {kw}, {gloss}."},
+    "org": {"org": "This text is about {kw}, {gloss}."},
+    "country": {"place": "This text is about {kw}, {gloss}."}
+  },
+  "check2_types": {
+    "@other": {"sense": "In this text, {kw} means {other}."}
+  }
+}

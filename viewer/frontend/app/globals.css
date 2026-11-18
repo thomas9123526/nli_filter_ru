@@ -244,6 +244,7 @@ tr.jump { cursor: pointer; }
 .doc .hit.open { background: var(--hit-open); color: var(--hit-open-text); }
 .doc .hit.incidental { background: var(--hit-incidental); color: var(--hit-incidental-text); }
 .doc .hit.rule { background: var(--hit-rule); color: var(--hit-rule-text); }
+.doc .hit.strict { background: var(--hit-about); color: var(--hit-about-text); outline: 2px solid var(--filter); outline-offset: -1px; font-weight: 700; }
 .doc .active { box-shadow: 0 0 0 2px var(--active); }
 .doc mark.find { background: #fde047; color: #111; border-radius: 2px; padding: 0; }
 .doc mark.find.current { background: #fb923c; box-shadow: 0 0 0 2px #ea580c; }
@@ -258,6 +259,7 @@ tr.jump { cursor: pointer; }
 .swatch.open { background: var(--hit-open); }
 .swatch.incidental { background: var(--hit-incidental); }
 .swatch.rule { background: var(--hit-rule); }
+.swatch.strict { background: var(--hit-about); outline: 2px solid var(--filter); outline-offset: -1px; }
 .swatch.w1 { background: var(--win1-best); }
 .swatch.w2 { border: none; border-bottom: 2px dotted var(--win2); border-radius: 0; height: 8px; }
 
@@ -338,3 +340,66 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
 .progress-bar.done > div { background: var(--keep); }
 .progress-bar.failed > div, .progress-bar.stopped > div { background: var(--filter); }
 .progress-bar.stale > div { background: var(--warn); }
+
+/* Try: score table (a column per line, a row per hypothesis) */
+.try-scores { width: auto; font-size: 12px; }
+.try-scores th, .try-scores td { padding: 3px 8px; white-space: nowrap; text-align: right; border-bottom: 1px solid var(--border); }
+.try-scores thead th { text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.try-scores tbody th { text-align: left; font-weight: 500; }
+.try-scores tr.group > * { border-top: 2px solid var(--border); }
+.try-scores .ok { color: var(--keep, green); }
+.try-scores .bad { color: var(--filter, #c00); font-weight: 700; }
+
+/* keyword lexicon editor (Try settings) */
+.try-grid .kw-fieldset { grid-column: 1 / -1; }
+.kw-editor { display: grid; gap: 8px; min-width: 0; }
+.kw-toolbar { gap: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 2px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg button.on.lvl-A { background: var(--filter-soft); color: var(--filter); }
+.seg button.on.lvl-B { background: var(--keep-soft); color: var(--keep); }
+.kw-table-wrap { max-height: 520px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.kw-table { font-size: 13px; }
+.kw-table td { padding: 3px 6px; vertical-align: top; border-bottom: 1px solid var(--border); }
+.kw-table input[type="text"] { padding: 3px 6px; font-size: 13px; }
+.kw-table tr.selected td { background: var(--accent-soft); }
+.kw-table tr.has-error td:first-child { box-shadow: inset 3px 0 0 var(--filter); }
+.kw-table tr.kw-section td { background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 600; padding-top: 6px; }
+.kw-table input.invalid { border-color: var(--filter); background: var(--filter-soft); }
+.kw-problems { margin-top: 2px; font-size: 11px; line-height: 1.35; }
+.kw-p.error { color: var(--filter); }
+.kw-p.warn { color: var(--warn); }
+.kw-p.hint { color: var(--faint); }
+.chips-input { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 150px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+.chips-input input[type="text"] { border: 0; outline: none; flex: 1; min-width: 70px; padding: 2px; background: transparent; }
+.chips-input .chip { display: inline-flex; align-items: center; gap: 3px; margin: 0; }
+.chip.bad { border-color: var(--filter); color: var(--filter); }
+.chip.struck { text-decoration: line-through; opacity: .75; }
+.chip-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 1px; font-size: 13px; line-height: 1; }
+.kw-bulk { padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); gap: 8px; }
+.kw-test { display: grid; gap: 6px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 8px; }
+.kw-test textarea { width: 100%; }
+.kw-test-text { white-space: pre-wrap; line-height: 1.7; padding: 6px 8px; background: var(--panel-2); border-radius: 6px; }
+mark.kw-hit { border-radius: 3px; padding: 0 1px; }
+mark.kw-hit.lvl-A { background: var(--filter-soft); color: var(--filter); font-weight: 600; }
+mark.kw-hit.lvl-B { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+mark.kw-excluded { background: transparent; text-decoration: line-through; color: var(--faint); }
+
+/* review tools: Keywords and Review pages */
+.kw-summary { gap: 6px; }
+.kw-stats td { vertical-align: top; }
+.kw-stats tr.selected td { background: var(--accent-soft); }
+.kw-lines-cell { background: var(--panel-2); padding: 6px 10px; }
+.lines-table { font-size: 13px; }
+.lines-table td { vertical-align: top; }
+.lines-table .ok { color: var(--keep); }
+.lines-table .bad { color: var(--filter); font-weight: 700; }
+.kw-stats .bad { color: var(--filter); font-weight: 700; }
+.golden-cell { white-space: nowrap; }
+.golden-cell .btn + .btn { margin-left: 4px; }
+.btn.lbl-filter { background: var(--filter-soft); color: var(--filter); border-color: var(--filter); }
+.btn.lbl-keep { background: var(--keep-soft); color: var(--keep); border-color: var(--keep); }
+tr.line-preview td { background: var(--panel-2); }
+.preview-text { white-space: pre-wrap; line-height: 1.55; padding: 6px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; max-height: 320px; overflow: auto; }

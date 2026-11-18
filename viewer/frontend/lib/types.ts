@@ -95,6 +95,7 @@ export type DecisionRow = {
   c2: number | null;
   expect: string | null;
   ok: boolean | null;
+  audit?: string | null;   // level-A audit: what the rules / models would decide
 };
 
 export type Facets = {
@@ -124,7 +125,8 @@ export type Mark = {
   end: number;
   hit?: number;
   kw?: string;
-  state?: "rule" | "incidental" | "about" | "open";
+  state?: "rule" | "incidental" | "about" | "open" | "strict";
+  level?: "A" | "B";
   rule?: string | null;
   check2?: Check2 | null;
   best?: boolean;
@@ -182,6 +184,8 @@ export type Explanation = {
   check2: { threshold: number; rows: Check2Row[]; all_incidental: boolean } | null;
   verdict: { decision: string; reason: string; summary: string; steps: string[] };
   expect: { value: string; correct: boolean } | null;
+  // level-A line run for the audit: what the rules / models would decide (the decision stays filter)
+  audit?: { decision: string; reason: string; check1: number | null; check1_hyp: string | null; check2: number | null; rules: string[] } | null;
   models: {
     fast: string | null;
     judge: string | null;
@@ -227,6 +231,24 @@ export type RecordResp = {
 };
 
 export type FindMatch = DecisionRow & { file: string };
+
+// ---- review tools ----
+
+export type KeywordFlag = { kind: "unused" | "noisy" | "rules" | "wrong" | "broad" | "no_audit"; text: string };
+export type KeywordStat = {
+  keyword: string; level: "A" | "B"; type: string | null; gloss: string | null; other: string[]; exclude: string[];
+  in_list: boolean; hits: number; lines: number; filter: number; keep: number;
+  rule_hits: number; incidental_hits: number; about_hits: number; strict_hits: number; open_hits: number;
+  labelled: number; wrong: number; only_lines: number; only_filter: number; audited: number; audit_keep: number;
+  reasons: Record<string, number>; flags: KeywordFlag[];
+};
+export type KeywordStatsResp = { keywords: KeywordStat[]; files: number; pending: number };
+export type LineRow = DecisionRow & { file: string; golden?: string | null };
+export type LinesResp = {
+  total: number; offset: number; limit: number; rows: LineRow[]; pending: number;
+  thresholds: { check1: number; check2: number };
+};
+export type GoldenSummary = { path: string; count: number; expect: Record<string, number>; labels: Record<string, string> };
 
 export type SimMetrics = { tp: number; fp: number; tn: number; fn: number; n: number; accuracy: number; precision: number | null; recall: number | null; f1: number | null } | null;
 export type SimCounts = { filter: number; keep: number; to_filter: number; to_keep: number; estimated: number };
@@ -331,7 +353,13 @@ export type EditStatus = { editable: boolean; problem: string | null; dataset_ed
 
 // ---- try settings (nli_playground.py) ----
 
-export type HypothesesData = { description?: string; check1: Record<string, string>; check2: Record<string, string> };
+// check1_types / check2_types: hypotheses built from the matched keyword: keyword type ("region", "*", "@other")
+// -> key -> template with {kw}, {gloss} (and {other} under "@other")
+export type TypeHyps = Record<string, Record<string, string>>;
+export type HypothesesData = {
+  description?: string; check1: Record<string, string>; check2: Record<string, string>;
+  check1_types?: TypeHyps; check2_types?: TypeHyps;
+};
 
 export type PlaygroundInfo = {
   service: { url: string; running: boolean; fast?: string; judge?: string | null; devices?: string[]; error?: string; start?: string };
@@ -356,7 +384,7 @@ export type PlaygroundRun = {
   pairs: { fast: number; judge: number };
   keywords: string[];
   country: { name: string; adj: string };
-  hypotheses: { check1: Record<string, string>; check2: Record<string, string> };
+  hypotheses: { check1: Record<string, string>; check2: Record<string, string>; check1_types?: TypeHyps; check2_types?: TypeHyps };
   previous_pending: boolean;
 };
 

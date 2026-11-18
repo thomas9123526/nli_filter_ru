@@ -37,7 +37,7 @@ import nli_formats  # noqa: E402  (project root, put on sys.path by .storage)
 __all__ = ["Dataset", "FileResult", "DecisionIndex", "stem", "REASONS"]
 
 _SUFFIXES = nli_formats.INPUT_SUFFIXES  # .jsonl .json .ndjson .gz .zst .zstd .zip .rar .parquet
-REASONS = ["blank", "bad_json", "no_text", "no_keyword", "rules_incidental", "check1_negative",
+REASONS = ["blank", "bad_json", "no_text", "no_keyword", "strict_keyword", "rules_incidental", "check1_negative",
            "check2_incidental", "about_country"]
 _RUN_PREFIX = "summary"
 
@@ -80,14 +80,34 @@ CREATE TABLE d (
   rules TEXT,                -- rules that resolved hits, '|'-joined
   c2 REAL,                   -- lowest check-2 score among hits that went to check 2
   expect TEXT,
-  ok INTEGER                 -- 1/0 when expect is filter/keep, else NULL
+  ok INTEGER,                -- 1/0 when expect is filter/keep, else NULL
+  audit TEXT                 -- level-A audit: what the rules / models would decide (filter / keep), else NULL
+);
+CREATE TABLE h (             -- one row per keyword hit
+  row INTEGER,               -- d.row
+  k TEXT,                    -- the keyword, lowercased (as in the keyword file when the run wrote it)
+  show TEXT,                 -- the keyword as written
+  level TEXT,                -- A or B
+  state TEXT                 -- strict / rule / incidental / about / open
 );
 """
 _INDEXES = """
 CREATE INDEX ix_line ON d(line);
 CREATE INDEX ix_id ON d(id);
 CREATE INDEX ix_reason ON d(reason);
+CREATE INDEX ix_h_k ON h(k);
+CREATE INDEX ix_h_row ON h(row);
 """
+
+_INDEX_VERSION = "decision-index-v2"  # v2: + per-hit table h, + audit column
+
+
+def _review_key(t1: float, t2: float) -> str:
+    """SQL: how far the line's deciding score is from its threshold (smaller = less sure). Check 2 counts when
+    check 1 passed; lines without scores go last."""
+    t1, t2 = float(t1), float(t2)
+    return (f"(CASE WHEN c1 IS NULL THEN 9 WHEN c2 IS NOT NULL AND c1 >= {t1} "
+            f"THEN MIN(ABS(c1 - {t1}), ABS(c2 - {t2})) ELSE ABS(c1 - {t1}) END)")
 
 _SORTS = {"row": "row", "line": "line", "score": "c1", "check1": "c1", "check2": "c2", "hits": "hits", "id": "id"}
 
@@ -103,6 +123,72 @@ class _Conn:
 
     def close(self) -> None:
         pass
+
+
+def _read_lexicon(path: str) -> Dict[str, Dict[str, Any]]:
+    """Level / type / gloss / other / exclude of a local keyword file (tab-separated lexicon lines; the same
+    columns as nli_filter.parse_keyword_line). Missing or unreadable file: {}."""
+    out: Dict[str, Dict[str, Any]] = {}
+    try:
+        text = Path(path).read_text(encoding="utf-8-sig")
+    except (OSError, ValueError):
+        return out
+
+    def cell(v: str) -> Optional[str]:
+        v = v.strip()
+        return None if v in ("", "-") else v
+
+    def multi(v: str) -> List[str]:
+        import re as _re
+        return [x.strip() for x in _re.split(r"\s+\|\s+", cell(v) or "") if x.strip() and x.strip() != "-"]
+
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#") or "	" not in line:
+            continue
+        c = (line.split("	") + [""] * 6)[:6]
+        kw = c[0].strip()
+        if not kw:
+            continue
+        m: Dict[str, Any] = {"keyword": kw}
+        if (cell(c[1]) or "B").upper() == "A":
+            m["level"] = "A"
+        for i, k in ((2, "type"), (3, "gloss")):
+            if cell(c[i]):
+                m[k] = cell(c[i]).lower() if k == "type" else cell(c[i])
+        for i, k in ((4, "other"), (5, "exclude")):
+            if multi(c[i]):
+                m[k] = multi(c[i])
+        out.setdefault(kw.lower(), m)
+    return out
+
+
+# when a keyword deserves a look (shown on the Keywords page)
+NOISY_MIN_LINES = 20       # enough lines to judge
+NOISY_KEEP_SHARE = 0.9     # B keyword: this share of its lines kept -> mostly junk hits
+RULES_SHARE = 0.8          # this share of its hits resolved by rules
+AUDIT_MIN = 5              # A keyword: audited lines needed
+AUDIT_KEEP_SHARE = 0.3     # A keyword: the models would keep this share -> too broad?
+
+
+def _keyword_flags(r: Dict[str, Any]) -> List[Dict[str, str]]:
+    out = []
+    if not r["hits"]:
+        out.append({"kind": "unused", "text": "no hit in this dataset"})
+        return out
+    if r["level"] == "B" and r["lines"] >= NOISY_MIN_LINES and r["keep"] >= NOISY_KEEP_SHARE * r["lines"]:
+        out.append({"kind": "noisy", "text": f"{r['keep'] / r['lines']:.0%} of its lines kept: add exclude patterns "
+                                             "or other meanings, or remove it"})
+    if r["hits"] >= 5 and r.get("rule_hits", 0) >= RULES_SHARE * r["hits"]:
+        out.append({"kind": "rules", "text": f"{r['rule_hits'] / r['hits']:.0%} of its hits are language menus / "
+                                             "labels / locale codes (rules)"})
+    if r.get("wrong"):
+        out.append({"kind": "wrong", "text": f"{r['wrong']} labelled line(s) decided wrongly"})
+    if r["level"] == "A" and r.get("audited", 0) >= AUDIT_MIN and r["audit_keep"] >= AUDIT_KEEP_SHARE * r["audited"]:
+        out.append({"kind": "broad", "text": f"the models would keep {r['audit_keep'] / r['audited']:.0%} of its "
+                                             "audited lines: too broad for level A?"})
+    if r["level"] == "A" and not r.get("audited"):
+        out.append({"kind": "no_audit", "text": "level A, never audited (run with --audit-strict 0.05)"})
+    return out
 
 
 class DecisionIndex:
@@ -122,7 +208,7 @@ class DecisionIndex:
         if self._db:
             return True
         st, path = self.decisions.storage, self.decisions.path
-        key = self.cache.key("decision-index-v1", st.uri, path, st.fingerprint(path))
+        key = self.cache.key(_INDEX_VERSION, st.uri, path, st.fingerprint(path))
         db = self.cache.dir(key) / "decisions.sqlite"
         if db.exists():
             with self._lock:
@@ -153,7 +239,7 @@ class DecisionIndex:
             if self._db:
                 return self._db
             st, path = self.decisions.storage, self.decisions.path
-            key = self.cache.key("decision-index-v1", st.uri, path, st.fingerprint(path))
+            key = self.cache.key(_INDEX_VERSION, st.uri, path, st.fingerprint(path))
             d = self.cache.dir(key)
             db = d / "decisions.sqlite"
             with self.cache.lock(key):
@@ -173,19 +259,26 @@ class DecisionIndex:
             con.execute("PRAGMA journal_mode=OFF")
             con.execute("PRAGMA synchronous=OFF")
             con.execute("BEGIN")
-            con.execute(_SCHEMA)
-            batch = []
+            for stmt in _SCHEMA.split(";"):
+                if stmt.strip():
+                    con.execute(stmt)
+            batch, hbatch = [], []
+            ins_d = "INSERT INTO d VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             for row, raw in self.decisions.iter_lines():
                 try:
                     d = _loads(raw)
                 except ValueError:
                     continue
                 batch.append(self._row(row, d))
+                hbatch += self._hits(row, d)
                 if len(batch) >= 5000:
-                    con.executemany("INSERT INTO d VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
-                    batch = []
+                    con.executemany(ins_d, batch)
+                    con.executemany("INSERT INTO h VALUES (?,?,?,?,?)", hbatch)
+                    batch, hbatch = [], []
             if batch:
-                con.executemany("INSERT INTO d VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+                con.executemany(ins_d, batch)
+            if hbatch:
+                con.executemany("INSERT INTO h VALUES (?,?,?,?,?)", hbatch)
             for stmt in _INDEXES.strip().splitlines():
                 con.execute(stmt)
             con.execute("COMMIT")
@@ -207,9 +300,66 @@ class DecisionIndex:
             ok = int(expect.lower() == d.get("decision"))
         return (row, d.get("line"), d.get("source"), None if d.get("id") is None else str(d.get("id")),
                 d.get("decision"), d.get("reason"), c1.get("score"), judged, len(hits),
-                "|".join(sorted({h.get("kw", "") for h in hits})) or None,
+                "|".join(sorted({h.get("keyword") or h.get("kw", "") for h in hits})) or None,
                 "|".join(sorted({h["rule"] for h in hits if h.get("rule")})) or None,
-                min(c2s) if c2s else None, None if expect is None else str(expect), ok)
+                min(c2s) if c2s else None, None if expect is None else str(expect), ok,
+                (d.get("audit") or {}).get("decision"))
+
+    @staticmethod
+    def _hits(row: int, d: Dict[str, Any]) -> List[Tuple]:
+        out = []
+        for h in d.get("hits") or []:
+            show = h.get("keyword") or h.get("kw") or ""
+            c2 = h.get("check2")
+            state = ("rule" if h.get("rule") else "strict" if h.get("level") == "A" else
+                     ("incidental" if c2.get("incidental") else "about") if c2 else "open")
+            out.append((row, show.lower(), show, h.get("level") or "B", state))
+        return out
+
+    def keyword_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Per keyword (lowercased): hits by state, and the lines with it by decision / reason / label / audit.
+        Cached: an index belongs to one version of its decisions file (a rewritten file gets a new index)."""
+        cached = getattr(self, "_kwstats", None)
+        if cached is not None:
+            return json.loads(cached)
+        out = self._keyword_stats()
+        self._kwstats = json.dumps(out)
+        return out
+
+    def _keyword_stats(self) -> Dict[str, Dict[str, Any]]:
+        con = self._connect()
+        out: Dict[str, Dict[str, Any]] = {}
+        try:
+            for k, show, level, hits, rule, inc, about, strict, open_ in con.execute(
+                    "SELECT k, MIN(show), MAX(level), COUNT(*), SUM(state='rule'), SUM(state='incidental'), "
+                    "SUM(state='about'), SUM(state='strict'), SUM(state='open') FROM h GROUP BY k"):
+                out[k] = {"keyword": show, "level": level, "hits": hits, "rule_hits": rule, "incidental_hits": inc,
+                          "about_hits": about, "strict_hits": strict, "open_hits": open_, "lines": 0, "filter": 0,
+                          "keep": 0, "labelled": 0, "wrong": 0, "only_lines": 0, "only_filter": 0,
+                          "audited": 0, "audit_keep": 0, "reasons": {}}
+            sql = ("WITH kl AS (SELECT DISTINCT k, row FROM h), n AS (SELECT row, COUNT(*) nk FROM kl GROUP BY row) "
+                   "SELECT kl.k, d.decision, d.reason, d.ok, n.nk = 1, d.audit, COUNT(*) FROM kl "
+                   "JOIN d ON d.row = kl.row JOIN n ON n.row = kl.row GROUP BY 1, 2, 3, 4, 5, 6")
+            for k, decision, reason, ok, only, audit, c in con.execute(sql):
+                s = out.get(k)
+                if s is None:
+                    continue
+                s["lines"] += c
+                if decision in ("filter", "keep"):
+                    s[decision] += c
+                s["reasons"][reason] = s["reasons"].get(reason, 0) + c
+                if ok is not None:
+                    s["labelled"] += c
+                    s["wrong"] += c if ok == 0 else 0
+                if only:
+                    s["only_lines"] += c
+                    s["only_filter"] += c if decision == "filter" else 0
+                if audit:
+                    s["audited"] += c
+                    s["audit_keep"] += c if audit == "keep" else 0
+        finally:
+            con.close()
+        return out
 
     def _connect(self) -> "_Conn":
         """Read-only connection, one per thread and index (opening one per query is slow on Windows)."""
@@ -223,8 +373,23 @@ class DecisionIndex:
 
     @staticmethod
     def _where(decision=None, reason=None, q=None, kw=None, rule=None, min_score=None, max_score=None,
-               mismatch=False, judged=None) -> Tuple[str, List[Any]]:
+               mismatch=False, judged=None, labelled=None, audit=None, scored=None, single_kw=None,
+               kw_state=None) -> Tuple[str, List[Any]]:
         cond, args = [], []
+        if labelled is not None:
+            cond.append("ok IS NOT NULL" if labelled else "ok IS NULL")
+        if audit:  # 'any' / 'keep' / 'filter'
+            if audit == "any":
+                cond.append("audit IS NOT NULL")
+            else:
+                cond.append("audit = ?"); args.append(audit)
+        if scored:
+            cond.append("c1 IS NOT NULL")
+        if single_kw:  # lines with one keyword (any number of hits of it)
+            cond.append("row IN (SELECT row FROM h GROUP BY row HAVING COUNT(DISTINCT k) = 1)")
+        if kw_state:  # with kw: lines where that keyword's hit was in this state
+            cond.append("row IN (SELECT row FROM h WHERE k = ? AND state = ?)")
+            args += [str(kw or "").lower(), kw_state]
         if decision:
             cond.append("decision = ?"); args.append(decision)
         if reason:
@@ -235,8 +400,8 @@ class DecisionIndex:
                 cond.append("(line = ? OR id LIKE ?)"); args += [int(q), f"%{q}%"]
             else:
                 cond.append("(id LIKE ? OR kws LIKE ?)"); args += [f"%{q}%", f"%{q}%"]
-        if kw:
-            cond.append("('|' || kws || '|') LIKE ?"); args.append(f"%|{kw}|%")
+        if kw:  # through the hit table: any spelling / case of the keyword
+            cond.append("row IN (SELECT row FROM h WHERE k = ?)"); args.append(str(kw).lower())
         if rule:
             cond.append("rules LIKE ?"); args.append(f"%{rule}%")
         if min_score is not None:
@@ -250,10 +415,13 @@ class DecisionIndex:
         return (" WHERE " + " AND ".join(cond)) if cond else "", args
 
     def query(self, offset: int = 0, limit: int = 50, sort: str = "row", desc: bool = False,
-              **filters: Any) -> Dict[str, Any]:
+              t1: float = 0.8, t2: float = 0.8, **filters: Any) -> Dict[str, Any]:
         where, args = self._where(**filters)
-        col = _SORTS.get(sort, "row")
-        order = f"{col} {'DESC' if desc else 'ASC'}" + ("" if col == "row" else ", row")
+        if sort == "review":  # closest to a threshold first: the decisions a small score change would flip
+            order = f"{_review_key(t1, t2)} ASC, row"
+        else:
+            col = _SORTS.get(sort, "row")
+            order = f"{col} {'DESC' if desc else 'ASC'}" + ("" if col == "row" else ", row")
         con = self._connect()
         try:
             total = con.execute(f"SELECT COUNT(*) FROM d{where}", args).fetchone()[0]
@@ -266,6 +434,7 @@ class DecisionIndex:
     @staticmethod
     def _out(r: sqlite3.Row) -> Dict[str, Any]:
         d = dict(r)
+        d.pop("margin", None)
         d["kws"] = d["kws"].split("|") if d["kws"] else []
         d["rules"] = d["rules"].split("|") if d["rules"] else []
         d["judged"] = None if d["judged"] is None else bool(d["judged"])
@@ -893,6 +1062,98 @@ class Dataset:
             out["sweep"].append({"check1": t, "check2": check2, "filter": c["filter"], "estimated": c["estimated"],
                                  "metrics": m})
         return out
+
+    # ---- review tools: keywords, lines across files ---------------------------------------------------
+
+    def lexicon(self) -> Dict[str, Any]:
+        """The latest run's keyword list and lexicon details (level, type, gloss, ...) by lowercased keyword."""
+        run = max(self.runs(), key=lambda r: r.get("finished", ""), default={})
+        c = run.get("country") or {}
+        meta = {k.lower(): dict(v, keyword=k) for k, v in (c.get("lexicon_meta") or {}).items()}
+        if not meta and c.get("keywords_file"):  # runs before 2026-11-18: read the keyword file if it is here
+            meta = _read_lexicon(str(c["keywords_file"]))
+        for k in c.get("keywords") or []:
+            meta.setdefault(k.lower(), {"keyword": k})
+        return meta
+
+    def keyword_stats(self, wait: bool = False) -> Dict[str, Any]:
+        """Per keyword over every decisions file: hits by state, lines by decision / reason, labels, audit;
+        plus flags that point at keywords worth a look. Files whose index is not built yet are built in the
+        background (pending) unless wait=True."""
+        total: Dict[str, Dict[str, Any]] = {}
+        pending = files = 0
+        for fr in self.files():
+            if not fr.decisions_path:
+                continue
+            files += 1
+            idx = self.decisions(fr.key)
+            if not wait and not idx.ready():
+                idx.build_in_background()
+                pending += 1
+                continue
+            for k, st in idx.keyword_stats().items():
+                t = total.setdefault(k, {key: (dict() if key == "reasons" else 0) for key in st if key not in ("keyword", "level")})
+                t.setdefault("keyword", st["keyword"])
+                t["level"] = max(t.get("level") or "B", st["level"] or "B")
+                for key, v in st.items():
+                    if key == "reasons":
+                        for r, c in v.items():
+                            t["reasons"][r] = t["reasons"].get(r, 0) + c
+                    elif key not in ("keyword", "level"):
+                        t[key] = t.get(key, 0) + (v or 0)
+        meta = self.lexicon()
+        rows = []
+        for k in sorted(set(total) | set(meta)):
+            st = total.get(k) or {"keyword": meta[k]["keyword"], "hits": 0, "lines": 0, "filter": 0, "keep": 0,
+                                  "reasons": {}}
+            m = meta.get(k, {})
+            row = {**{key: 0 for key in ("hits", "lines", "filter", "keep", "rule_hits", "incidental_hits",
+                                         "about_hits", "strict_hits", "open_hits", "labelled", "wrong",
+                                         "only_lines", "only_filter", "audited", "audit_keep")},
+                   **st, "keyword": m.get("keyword") or st["keyword"], "level": m.get("level") or st.get("level") or "B",
+                   "type": m.get("type"), "gloss": m.get("gloss"), "other": m.get("other") or [],
+                   "exclude": m.get("exclude") or [], "in_list": k in meta}
+            row["flags"] = _keyword_flags(row)
+            rows.append(row)
+        rows.sort(key=lambda r: (-r["lines"], r["keyword"].lower()))
+        return {"keywords": rows, "files": files, "pending": pending}
+
+    def lines(self, offset: int = 0, limit: int = 50, sort: str = "row", desc: bool = False,
+              **filters: Any) -> Dict[str, Any]:
+        """Decisions across every file with these filters (rows carry their file). sort: row (file order),
+        score / check2 / hits / id, or review (closest to a threshold first)."""
+        run = max(self.runs(), key=lambda r: r.get("finished", ""), default={})
+        st = run.get("settings") or {}
+        t1, t2 = st.get("check1_threshold", 0.8), st.get("check2_threshold", 0.8)
+        need = offset + limit
+        rows, total, pending = [], 0, 0
+        for fr in self.files():
+            if not fr.decisions_path:
+                continue
+            idx = self.decisions(fr.key)
+            if not idx.ready():
+                idx.build_in_background()
+                pending += 1
+                continue
+            res = idx.query(offset=0, limit=need, sort=sort, desc=desc, t1=t1, t2=t2, **filters)
+            total += res["total"]
+            rows += [{"file": fr.key, **r} for r in res["rows"]]
+        if sort == "review":
+            def key(r):
+                c1, c2 = r.get("c1"), r.get("c2")
+                if c1 is None:
+                    return 9.0
+                if c2 is not None and c1 >= t1:
+                    return min(abs(c1 - t1), abs(c2 - t2))
+                return abs(c1 - t1)
+            rows.sort(key=lambda r: (key(r), r["file"], r["row"]))
+        elif sort != "row":
+            col = _SORTS.get(sort, "row")
+            rows.sort(key=lambda r: (r.get(col) is not None, r.get(col) if r.get(col) is not None else 0), reverse=desc)
+            if not desc:  # empty values last also when ascending
+                rows.sort(key=lambda r: r.get(col) is None)
+        return {"total": total, "offset": offset, "limit": limit, "rows": rows[offset:offset + limit],
+                "pending": pending, "thresholds": {"check1": t1, "check2": t2}}
 
     def find_id(self, value: str, limit: int = 20) -> List[Dict[str, Any]]:
         """Rows with this id in any file (indexes the decisions files that are not indexed yet)."""

@@ -29,6 +29,7 @@ REASON_TEXT = {
     "check1_negative": "Kept: the NLI model says the text is not about the country (check 1 below threshold).",
     "check2_incidental": "Kept: the text looked like it is about the country, but every remaining keyword hit is only incidental (check 2).",
     "about_country": "Filtered: the text is about the country (check 1 passed) and not every hit is incidental.",
+    "strict_keyword": "Filtered: the text has a level-A (strict) keyword: no model was asked.",
 }
 
 
@@ -103,8 +104,10 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
         c2 = h.get("check2")
         state = "rule" if h.get("rule") else ("incidental" if c2 and c2.get("incidental") else
                                               ("about" if c2 else "open"))
+        if h.get("level") == "A" and not h.get("rule"):
+            state = "strict"
         marks.append({"id": len(marks), "kind": "hit", "hit": i, "start": s, "end": e, "kw": h.get("kw"),
-                      "state": state, "rule": h.get("rule"), "check2": c2})
+                      "state": state, "rule": h.get("rule"), "check2": c2, "level": h.get("level") or "B"})
     c1 = decision.get("check1") or {}
     win_ids: Dict[Tuple[int, int], int] = {}
     for p in c1.get("pairs", []):
@@ -134,7 +137,7 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
     for p in c1.get("pairs", []):
         check1_rows.append({
             "window": p.get("window"), "window_mark": win_ids.get(tuple(p.get("window", [0, 0]))),
-            "hyp": p.get("hyp"), "hypothesis": _hyp_text(run, "check1", p.get("hyp")),
+            "hyp": p.get("hyp"), "hypothesis": p.get("text") or _hyp_text(run, "check1", p.get("hyp")),
             "fast": p.get("fast"), "judge": p.get("judge"), "score": p.get("score"),
             "judged": p.get("judge") is not None, "passed": (p.get("score") or 0) >= t1,
             "window_text": window_text(p.get("window", [0, 0])),
@@ -145,12 +148,12 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
             c2 = m["check2"]
             check2_rows.append({
                 "hit": m["hit"], "hit_mark": m["id"], "kw": m["kw"], "span": [m["start"], m["end"]],
-                "window": c2.get("window"), "hyp": c2.get("hyp"), "hypothesis": _hyp_text(run, "check2", c2.get("hyp")),
+                "window": c2.get("window"), "hyp": c2.get("hyp"), "hypothesis": c2.get("text") or _hyp_text(run, "check2", c2.get("hyp")),
                 "fast": c2.get("fast"), "judge": c2.get("judge"), "score": c2.get("score"),
                 "judged": c2.get("judge") is not None, "incidental": bool(c2.get("incidental")),
                 "window_text": window_text(c2.get("window", [0, 0])),
                 # every check-2 hypothesis's scores (decisions written since 2026-11-17; older ones: best only)
-                "pairs": [{"hyp": p.get("hyp"), "hypothesis": _hyp_text(run, "check2", p.get("hyp")),
+                "pairs": [{"hyp": p.get("hyp"), "hypothesis": p.get("text") or _hyp_text(run, "check2", p.get("hyp")),
                            "fast": p.get("fast"), "judge": p.get("judge"), "score": p.get("score"),
                            "judged": p.get("judge") is not None, "best": p.get("hyp") == c2.get("hyp")}
                           for p in c2.get("pairs") or []],
@@ -163,6 +166,11 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
     if n_hits:
         steps.append(f"{n_hits} keyword hit{'s' if n_hits != 1 else ''}: "
                      + ", ".join(f"'{h.get('kw')}'" for h in hits[:8]) + (" ..." if n_hits > 8 else ""))
+    strict = [h for h in hits if h.get("level") == "A" and not h.get("rule")]
+    if strict:
+        names = sorted({h.get("keyword") or h.get("kw") for h in strict})
+        steps.append("level-A (strict) keyword: " + ", ".join(f"'{k}'" for k in names[:8])
+                     + (" - filtered without any model" if reason == "strict_keyword" else ""))
     ruled = [h for h in hits if h.get("rule")]
     if ruled:
         steps.append("resolved by rules: " + ", ".join(f"'{h.get('kw')}' ({h['rule']})" for h in ruled[:8]))
@@ -189,6 +197,19 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
         steps.append(f"check 2 stopped early: {n} more hit{'s' if n != 1 else ''} not scored "
                      f"(one hit was already not incidental, so the line is filtered)")
     summary = REASON_TEXT.get(reason, f"{decision.get('decision')}: {reason}")
+    audit = None
+    a = decision.get("audit")
+    if isinstance(a, dict) and a.get("decision"):
+        ac1 = a.get("check1") or {}
+        c2s = [h["check2"] for h in a.get("hits") or [] if h.get("check2")]
+        audit = {"decision": a["decision"], "reason": a.get("reason"), "check1": ac1.get("score"),
+                 "check1_hyp": ac1.get("hyp"), "check2": min((c["score"] for c in c2s if c.get("score") is not None),
+                                                             default=None),
+                 "rules": sorted({h["rule"] for h in a.get("hits") or [] if h.get("rule")})}
+        detail = (f"check 1 {_fmt(audit['check1'])} ('{audit['check1_hyp']}')" if audit["check1"] is not None
+                  else ", ".join(audit["rules"]) or "")
+        steps.append(f"audit (level A run as if B): the rules / models would {audit['decision']} it "
+                     f"({audit['reason']}{'; ' + detail if detail else ''}) - the decision stays filter")
     expect = decision.get("expect")
     expect_info = None
     if isinstance(expect, str) and expect.lower() in ("filter", "keep"):
@@ -203,6 +224,7 @@ def explain(text: Optional[str], decision: Dict[str, Any], run: Optional[Dict[st
         if check2_rows else None,
         "verdict": {"decision": decision.get("decision"), "reason": reason, "summary": summary, "steps": steps},
         "expect": expect_info,
+        "audit": audit,
         "models": {"fast": fast, "judge": judge, "band": band, "check1_threshold": t1, "check2_threshold": t2,
                    "fast_info": models.get("fast"), "judge_info": models.get("judge")},
     }
