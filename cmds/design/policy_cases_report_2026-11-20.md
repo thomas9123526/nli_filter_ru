@@ -13,7 +13,10 @@ is in the appendix [policy_cases_results_2026-11-20.md](policy_cases_results_202
 
 ## 1. Summary
 
-- **83 of 125 case texts (66 %) get the expected action** today. Subjects (level 1) do well (45 / 56). Narratives
+> **Update (policy v3, measured):** 102 of 125 (82 %), 19 texts fixed, none broken. Level 2 went from 25 to 39 of
+> 52. See section 10. Sections 1–9 describe v2 and the analysis that led to v3.
+
+- **83 of 125 case texts (66 %) get the expected action** with v2. Subjects (level 1) do well (45 / 56). Narratives
   (level 2) do badly (25 / 52).
 - **The narrative hypotheses themselves work.** On their own "yes" texts most score 0.95–1.00, and on their near
   misses mostly 0.00–0.10. They fail because the cascade in front of them stops the text first.
@@ -239,3 +242,71 @@ permitted content from mixed paragraphs. Attribute-and-refute needs a vetted fac
 3. On a GPU: per-label rounds on real data, with the judge, and bge-m3 for non-English text.
 4. Add the missing cases from section 6 to `tools/build_cases.py` (cases v3).
 5. Prototype the sentence-level split for conflict and narrative-in-factual-text paragraphs.
+
+## 10. Update: policy v3, measured
+
+`policy/russia_policy_v3.json` applies the fixes from section 4, and was measured on the same 125 texts
+(`out_label_cases_v3`, ModernBERT only, no judge, CPU). Every text and result:
+[policy_cases_results_v3_2026-11-20.md](policy_cases_results_v3_2026-11-20.md).
+
+### What v3 changes
+
+| | Change | Kept? |
+|---|---|---|
+| A | gate threshold 0.5 → 0.12 | yes |
+| B | level 2 for every paragraph past the gate (`run_if 2` = gate or marker) | yes |
+| C | `narrative_opens_gate`: a level-2 remove label ≥ 0.8 lets a gate-negative paragraph through | yes |
+| D | gate wording "… or the war between Russia and Ukraine" | **no: measured, it hurt** (below) |
+| E | `keywords/russia_v3.txt`: + Soviet, Soviets, Russian Empire, Tsarist, Kremlin-backed, pro-Kremlin, Putin | yes |
+| F | debunk guard: "reports **or refutes** claims made by others …" | yes |
+
+**D was dropped after measuring.** With the longer gate wording, ModernBERT's gate scores fell on plainly
+Russia-related texts: Moscow Zoo 0.62 → 0.04, a "Russian troops and armour pour into Ukraine" headline 0.84 → 0.06,
+Obama on Russia 0.64 → 0.11. That first v3 run reached 95 / 125 (76 %) and broke 3 texts. C already lets war narratives
+through that do not mention Russia, so v3 keeps v2's gate wording.
+
+### Results
+
+| Group | v1 (113 texts) | v2 | v3 |
+|---|---|---|---|
+| Level 0 · gate | 4 / 6 | 4 / 6 | 4 / 6 |
+| Level 1 · subject | 37 / 48 | 45 / 56 | 48 / 56 |
+| **Level 2 · framing** | 23 / 48 | 25 / 52 | **39 / 52** |
+| Edge cases | 9 / 11 | 9 / 11 | **11 / 11** |
+| **All** | 73 / 113 (65 %) | 83 / 125 (66 %) | **102 / 125 (82 %)** |
+
+The simulation in section 4 predicted 81 % for A + B + C. The measured 82 % includes E (the "Soviet" keyword fixed a
+text that was never checked before). Model work: 2,828 pairs vs v2's 2,800. On these texts C and B cost little,
+because most paragraphs pass the gate at 0.12 anyway.
+
+**Fixed by v3 (19 texts, none broken):**
+
+| Fix | Texts |
+|---|---|
+| C, a narrative opens the gate | `narr_nazi` yes (2: one opened by `narr_nazi`, one by `hostility_ukrainians`), `hostility_ukrainians` yes (2), `narr_ukraine_not_nation` yes 2 |
+| B, level 2 after the gate | `narr_annexation` yes (2), `narr_language` yes (2), `narr_nato_blame` yes (2) |
+| A, gate 0.12 | `science_technology` yes 2, `edge_price_in_tech`, `edge_debunk` 2, `reports_or_debunks` yes 2, `culture_entertainment` near 1, `narr_nazi` near 2 |
+| E, keywords | `history_soviet` yes 2 ("Soviet" alone) |
+| F, guard wording | `narr_ukraine_not_nation` near 1 (fact-check → review) |
+
+### The 23 texts still wrong, by cause
+
+| Cause | Texts | Next step |
+|---|---|---|
+| **Quoted to refute, still scored as the narrative** | `narr_traditional_values` near 1 + 2, `hostility_ukrainians` near 1, `narr_nazi` near 1 | the debunk guard: lower its threshold, more refutation examples, or let it turn any level-2 remove into review |
+| **Narrative just below 0.8** | `narr_war_justification` yes 2 (0.77), `narr_atrocity_denial` yes 2 (0.64), the marker-only text (`gate_marker`) | per-label thresholds from `eval` on checked labels; run with the judge |
+| **Seed texts with unchecked draft labels** | `economy_business` yes 1, `geography` yes 1, `history_soviet` yes 1, `lifestyle_traditions` yes 1, `literature_art` yes 1, `sport` yes 1, `narr_soviet_nostalgia` yes 1 | check the drafts: several of these drafts are debatable (section 3), so the "miss" may be the draft's |
+| **Near misses expected "review"** (benchmark labels with a review subject) that came out keep / pass | `narr_language` near 1, `narr_russian_greatness` near 2, `narr_soviet_nostalgia` near 2, `narr_ukraine_not_nation` near 2 | review the expectations: a fact-check that is kept is not a harmful error |
+| **No keyword / gate still low** | `economy_business` yes 2, `involves_russia` yes 2, `war_ukraine` near 2, `narr_nato_blame` near 2 | the reviewed Wikidata keyword candidates; bge-m3 for the gate |
+
+Only 5 of the 23 are stricter than expected: the four refuted-narrative near misses (removed or sent to review
+instead of kept) and `literature_art` yes 1 (a fiction dialogue about Baba Yaga, expected review, removed as
+culture). The other 18 keep more than expected, which is the safer error for A's model. That makes the debunk guard
+the next target.
+
+### Next steps after v3
+
+1. **The debunk guard** (the only remaining source of wrongly removed text in the cases).
+2. **Check the seed drafts**, then `eval`: per-label thresholds instead of 0.8, which addresses the "just below 0.8" group.
+3. **Run v3 with the DeBERTa judge** and compare (the Try page does this by default).
+4. **Real data:** v3 on the OLMo seed sample on a GPU, then the per-label rounds.
