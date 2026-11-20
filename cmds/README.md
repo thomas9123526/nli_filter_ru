@@ -48,5 +48,8 @@
 | | `how_it_works.md` | How keywords, country, hypotheses and models decide a line; what the output files contain |
 | | `devices_and_progress.md` | `--device` / `--mode` / workers, how well it scales on many GPUs or CPUs, progress in the viewer |
 | | `network_packages.md` | Which files import the SFTP / S3 / FTP packages (only `nli_storage.py`, and only when a server URL is used) |
+| | `model_references.md` | Reading guide for the 32 model papers + 2 source files in `models\` (method, base models, limits, conformal guarantees) and what each means for `nli_filter.py` |
+| | `model_references.bib` | BibTeX for all model references |
+| | `references_conversation.md` | Record of the session that found, downloaded and sorted the references |
 
 Run every command from the project folder `D:\hkc\nli_filter2`, not from `cmds`.
