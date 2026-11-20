@@ -256,6 +256,49 @@ class Playground:
                              "text_field": settings.text_field, "id_field": settings.id_field}}
 
 
+MAX_LABEL_TEXTS = 20
+MAX_LABEL_CHARS = 20000
+
+
+def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
+    """POST /label: nli_label.py's policy labels on a few texts (the viewer's policy Try page).
+    {"texts": [str], "policy": "policy/russia_policy.json" | "policy_data": {...}, "all_labels": true,
+     "force_gate": false, "use_judge": true} -> one labels row per text (paragraphs, scores, levels, action)."""
+    import nli_label
+    from nli_names import NameRewriter
+    if pg.fast is None:
+        raise ValueError("this service was started with --no-models: no text can be scored")
+    texts = req.get("texts")
+    if not isinstance(texts, list) or not texts or not all(isinstance(t, str) for t in texts):
+        raise ValueError("'texts' must be a non-empty list of strings")
+    if len(texts) > MAX_LABEL_TEXTS or any(len(t) > MAX_LABEL_CHARS for t in texts):
+        raise ValueError(f"at most {MAX_LABEL_TEXTS} texts of {MAX_LABEL_CHARS} characters")
+    if isinstance(req.get("policy_data"), dict):
+        policy = nli_label.Policy(req["policy_data"], "policy_data")
+    else:
+        rel = str(req.get("policy") or "policy/russia_policy.json")
+        path = (HERE / rel).resolve()
+        if (HERE / "policy").resolve() not in path.parents or path.suffix != ".json":
+            raise ValueError("'policy' must be a .json file in the project's policy folder")
+        policy = nli_label.Policy.load(str(path))
+    matcher, rules, markers = nli_label.build_matchers(policy)
+    records = [Record("try", i + 1, {"text": t}, t.encode("utf-8")) for i, t in enumerate(texts)]
+    lo, hi = req.get("uncertain_band") or (0.6, 0.95)
+    use_judge = bool(req.get("use_judge", True)) and pg.judge is not None
+    t0 = time.perf_counter()
+    with pg.lock:  # the models are shared: one request at a time
+        scorer = nf.CascadeScorer(pg.fast, pg.judge if use_judge else None, (float(lo), float(hi)))
+        lab = nli_label.Labeller(policy, matcher, rules, scorer, NameRewriter.from_files(),
+                                 all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
+                                 force_gate=bool(req.get("force_gate", False)))
+        outs = lab.process(records)
+    return {"rows": [o.row for o in outs], "clean": [(o.clean or {}).get("text") for o in outs],
+            "rewrites": [o.rewrites for o in outs], "seconds": round(time.perf_counter() - t0, 3),
+            "pairs": {"fast": scorer.fast_pairs, "judge": scorer.judge_pairs},
+            "models": {"fast": pg.fast.name, "judge": pg.judge.name if use_judge else None},
+            "policy": policy.summary()}
+
+
 def make_handler(pg: Playground):
     class Handler(BaseHTTPRequestHandler):
         server_version = "nli_playground"
@@ -293,6 +336,8 @@ def make_handler(pg: Playground):
                                                          req.get("script")))
                 if path.startswith("/jobs/") and path.endswith("/stop"):
                     return self._send(200, pg.jobs.stop(path.split("/")[2]))
+                if path == "/label":
+                    return self._send(200, label_texts(pg, req))
                 if path != "/filter":
                     return self._send(404, {"detail": "unknown path"})
                 return self._send(200, pg.run(req))

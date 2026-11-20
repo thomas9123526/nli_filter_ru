@@ -10,6 +10,7 @@ Interactive API documentation: /docs
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -80,6 +81,15 @@ class RunBody(BaseModel):
     member: Optional[str] = None
     lines: List[int]                    # corpus line numbers to run
     settings: Dict[str, Any] = {}       # keywords, check1, check2, thresholds, use_judge, ... (see nli_playground.py)
+
+
+class TryLabelBody(BaseModel):
+    texts: List[str]
+    policy: Optional[str] = None                 # a file in the project's policy/ folder
+    policy_data: Optional[Dict[str, Any]] = None  # or a whole policy (edited thresholds / hypotheses)
+    all_labels: bool = True                      # score every label (the decision still follows the cascade)
+    force_gate: bool = False                     # label the text even without a keyword hit
+    use_judge: bool = True
 
 
 class StartRunBody(BaseModel):
@@ -467,6 +477,30 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         """policy/*.json files of the project (for the start form)."""
         pol = project / "policy"
         return {"policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json")) if pol.is_dir() else []}
+
+    @app.get("/api/labels/cases", tags=["labels"])
+    def label_cases():
+        """labels/cases_*.json: the policy Try page's cases (tools/build_cases.py), newest version."""
+        files = sorted((f for f in (project / "labels").glob("cases_v*.json") if f.stem[7:].isdigit()),
+                       key=lambda f: int(f.stem[7:]))  # cases_v1.json, cases_v2.json, ... (not *_results.json)
+        if not files:
+            raise HTTPException(404, "no labels/cases_v*.json: run python tools/build_cases.py")
+        data = json.loads(files[-1].read_text(encoding="utf-8"))
+        data["file"] = f"labels/{files[-1].name}"
+        return data
+
+    @app.post("/api/labels/try", tags=["labels"])
+    def label_try(body: TryLabelBody):
+        """Policy labels (level 0 / 1 / 2, decision) on up to 20 texts, through the model service."""
+        if not body.texts or len(body.texts) > 20:
+            raise HTTPException(400, "1 to 20 texts")
+        req: Dict[str, Any] = {"texts": body.texts, "all_labels": body.all_labels, "force_gate": body.force_gate,
+                               "use_judge": body.use_judge}
+        if body.policy_data is not None:
+            req["policy_data"] = body.policy_data
+        else:
+            req["policy"] = body.policy or "policy/russia_policy.json"
+        return pg.label(req)
 
     @app.get("/api/labels/{name}", tags=["labels"])
     def label_run(name: str):

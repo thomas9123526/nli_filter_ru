@@ -74,6 +74,10 @@ class Playground:
 
     # ---- nli_filter.py runs (started by the service, in its torch environment) -------------------
 
+    def label(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        """nli_label.py policy labels on a few texts (the policy Try page). Slow on a CPU: ~1 s per label."""
+        return self._call("/label", body, timeout=1800)
+
     def start_job(self, args: List[str], env: Dict[str, str], label: str,
                   script: str = "nli_filter.py") -> Dict[str, Any]:
         return self._call("/jobs", {"args": args, "env": env, "label": label, "script": script}, timeout=30)

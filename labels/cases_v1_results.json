@@ -1,0 +1,4688 @@
+{
+ "created": "2026-11-20 16:43:04",
+ "models": "modernbert, no judge, CPU",
+ "results": [
+  {
+   "case": "involves_russia:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9732,
+      "culture_entertainment": 0.0007,
+      "celebrities": 0.0004,
+      "lifestyle_traditions": 0.0026,
+      "literature_art": 0.0021,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0699,
+      "geography": 0.0106,
+      "politics_government": 0.014,
+      "war_ukraine": 0.004,
+      "economy_business": 0.0051,
+      "history_soviet": 0.1697,
+      "sport": 0.0002,
+      "narr_ukraine_not_nation": 0.0035,
+      "narr_nazi": 0.0004,
+      "narr_war_justification": 0.0013,
+      "narr_nato_blame": 0.0004,
+      "narr_annexation": 0.0128,
+      "narr_atrocity_denial": 0.0029,
+      "narr_language": 0.0029,
+      "narr_russian_greatness": 0.0066,
+      "narr_soviet_nostalgia": 0.0028,
+      "hostility_ukrainians": 0.0007,
+      "hostility_russians": 0.001,
+      "reports_or_debunks": 0.4251
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#75#824-1476"
+  },
+  {
+   "case": "involves_russia:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0393,
+      "culture_entertainment": 0.0008,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0019,
+      "literature_art": 0.0009,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0171,
+      "geography": 0.0106,
+      "politics_government": 0.0039,
+      "war_ukraine": 0.0117,
+      "economy_business": 0.0052,
+      "history_soviet": 0.0182,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0008,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0082,
+      "narr_nato_blame": 0.0012,
+      "narr_annexation": 0.0169,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0004,
+      "narr_russian_greatness": 0.0009,
+      "narr_soviet_nostalgia": 0.001,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.001,
+      "reports_or_debunks": 0.251
+     }
+    }
+   ],
+   "from": "benchmark: a-involves_russia-yes-1"
+  },
+  {
+   "case": "involves_russia:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "pass",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0053,
+      "culture_entertainment": 0.0083,
+      "celebrities": 0.0134,
+      "lifestyle_traditions": 0.0134,
+      "literature_art": 0.028,
+      "cost_of_living": 0.0053,
+      "science_technology": 0.054,
+      "geography": 0.0156,
+      "politics_government": 0.0216,
+      "war_ukraine": 0.0351,
+      "economy_business": 0.0151,
+      "history_soviet": 0.0199,
+      "sport": 0.0092,
+      "narr_ukraine_not_nation": 0.0021,
+      "narr_nazi": 0.0023,
+      "narr_war_justification": 0.0074,
+      "narr_nato_blame": 0.0037,
+      "narr_annexation": 0.0188,
+      "narr_atrocity_denial": 0.0103,
+      "narr_language": 0.0057,
+      "narr_russian_greatness": 0.0019,
+      "narr_soviet_nostalgia": 0.0016,
+      "hostility_ukrainians": 0.0058,
+      "hostility_russians": 0.0064,
+      "reports_or_debunks": 0.285
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#57#3770-4121"
+  },
+  {
+   "case": "involves_russia:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-involves_russia-near-1"
+  },
+  {
+   "case": "culture_entertainment:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "culture_entertainment"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9901,
+      "culture_entertainment": 0.9903,
+      "celebrities": 0.0028,
+      "lifestyle_traditions": 0.0093,
+      "literature_art": 0.0313,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0228,
+      "geography": 0.0014,
+      "politics_government": 0.003,
+      "war_ukraine": 0.0007,
+      "economy_business": 0.0153,
+      "history_soviet": 0.0345,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0021,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0016,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0029,
+      "narr_atrocity_denial": 0.0012,
+      "narr_language": 0.0111,
+      "narr_russian_greatness": 0.0326,
+      "narr_soviet_nostalgia": 0.0138,
+      "hostility_ukrainians": 0.0002,
+      "hostility_russians": 0.0006,
+      "reports_or_debunks": 0.3555
+     }
+    }
+   ],
+   "from": "benchmark: a-culture_entertainment-yes-1"
+  },
+  {
+   "case": "culture_entertainment:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "culture_entertainment"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9946,
+      "culture_entertainment": 0.9962,
+      "celebrities": 0.0019,
+      "lifestyle_traditions": 0.0058,
+      "literature_art": 0.0339,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0071,
+      "geography": 0.0083,
+      "politics_government": 0.0028,
+      "war_ukraine": 0.0007,
+      "economy_business": 0.01,
+      "history_soviet": 0.0842,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0033,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0006,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0642,
+      "narr_atrocity_denial": 0.0028,
+      "narr_language": 0.0031,
+      "narr_russian_greatness": 0.0283,
+      "narr_soviet_nostalgia": 0.0149,
+      "hostility_ukrainians": 0.0002,
+      "hostility_russians": 0.0001,
+      "reports_or_debunks": 0.5474
+     }
+    }
+   ],
+   "from": "benchmark: a-culture_entertainment-yes-2"
+  },
+  {
+   "case": "culture_entertainment:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.3295,
+      "culture_entertainment": 0.0044,
+      "celebrities": 0.0032,
+      "lifestyle_traditions": 0.0026,
+      "literature_art": 0.0039,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0004,
+      "geography": 0.001,
+      "politics_government": 0.0116,
+      "war_ukraine": 0.0052,
+      "economy_business": 0.0091,
+      "history_soviet": 0.0773,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0026,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0049,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0409,
+      "narr_atrocity_denial": 0.0115,
+      "narr_language": 0.0054,
+      "narr_russian_greatness": 0.004,
+      "narr_soviet_nostalgia": 0.0011,
+      "hostility_ukrainians": 0.0008,
+      "hostility_russians": 0.0032,
+      "reports_or_debunks": 0.5912
+     }
+    }
+   ],
+   "from": "benchmark: a-culture_entertainment-near-1"
+  },
+  {
+   "case": "culture_entertainment:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-culture_entertainment-near-2"
+  },
+  {
+   "case": "celebrities:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "celebrities"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.997,
+      "culture_entertainment": 0.998,
+      "celebrities": 0.9992,
+      "lifestyle_traditions": 0.0626,
+      "literature_art": 0.0287,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0034,
+      "geography": 0.0036,
+      "politics_government": 0.002,
+      "war_ukraine": 0.0007,
+      "economy_business": 0.006,
+      "history_soviet": 0.0448,
+      "sport": 0.0423,
+      "narr_ukraine_not_nation": 0.0072,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0023,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0413,
+      "narr_atrocity_denial": 0.0012,
+      "narr_language": 0.0045,
+      "narr_russian_greatness": 0.0442,
+      "narr_soviet_nostalgia": 0.0025,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.2386
+     }
+    }
+   ],
+   "from": "benchmark: a-celebrities-yes-1"
+  },
+  {
+   "case": "celebrities:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "celebrities"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.995,
+      "culture_entertainment": 0.015,
+      "celebrities": 0.9988,
+      "lifestyle_traditions": 0.013,
+      "literature_art": 0.0027,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0054,
+      "geography": 0.006,
+      "politics_government": 0.0061,
+      "war_ukraine": 0.0011,
+      "economy_business": 0.1188,
+      "history_soviet": 0.0593,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0035,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0027,
+      "narr_nato_blame": 0.0004,
+      "narr_annexation": 0.0117,
+      "narr_atrocity_denial": 0.0006,
+      "narr_language": 0.0028,
+      "narr_russian_greatness": 0.0391,
+      "narr_soviet_nostalgia": 0.0018,
+      "hostility_ukrainians": 0.0027,
+      "hostility_russians": 0.0046,
+      "reports_or_debunks": 0.4297
+     }
+    }
+   ],
+   "from": "benchmark: a-celebrities-yes-2"
+  },
+  {
+   "case": "celebrities:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-celebrities-near-1"
+  },
+  {
+   "case": "celebrities:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-celebrities-near-2"
+  },
+  {
+   "case": "lifestyle_traditions:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "lifestyle_traditions"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9912,
+      "culture_entertainment": 0.0007,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.1976,
+      "literature_art": 0.0411,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0079,
+      "geography": 0.0026,
+      "politics_government": 0.0051,
+      "war_ukraine": 0.0103,
+      "economy_business": 0.0009,
+      "history_soviet": 0.1615,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0029,
+      "narr_nazi": 0.0005,
+      "narr_war_justification": 0.0024,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0312,
+      "narr_atrocity_denial": 0.0006,
+      "narr_language": 0.0113,
+      "narr_russian_greatness": 0.0049,
+      "narr_soviet_nostalgia": 0.0012,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0012,
+      "reports_or_debunks": 0.3139
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#29#6043-6561"
+  },
+  {
+   "case": "lifestyle_traditions:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "lifestyle_traditions"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9976,
+      "culture_entertainment": 0.0476,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.9988,
+      "literature_art": 0.1041,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0099,
+      "geography": 0.0046,
+      "politics_government": 0.0017,
+      "war_ukraine": 0.0008,
+      "economy_business": 0.0023,
+      "history_soviet": 0.1213,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.002,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0011,
+      "narr_nato_blame": 0.0004,
+      "narr_annexation": 0.0229,
+      "narr_atrocity_denial": 0.0012,
+      "narr_language": 0.0019,
+      "narr_russian_greatness": 0.027,
+      "narr_soviet_nostalgia": 0.0039,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0005,
+      "reports_or_debunks": 0.2204
+     }
+    }
+   ],
+   "from": "benchmark: a-lifestyle_traditions-yes-1"
+  },
+  {
+   "case": "lifestyle_traditions:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-lifestyle_traditions-near-1"
+  },
+  {
+   "case": "lifestyle_traditions:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-lifestyle_traditions-near-2"
+  },
+  {
+   "case": "literature_art:yes",
+   "text": 0,
+   "expected": "review",
+   "got": "remove",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "literature_art"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9893,
+      "culture_entertainment": 0.9325,
+      "celebrities": 0.586,
+      "lifestyle_traditions": 0.1116,
+      "literature_art": 0.97,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0203,
+      "geography": 0.0079,
+      "politics_government": 0.0554,
+      "war_ukraine": 0.0843,
+      "economy_business": 0.028,
+      "history_soviet": 0.8619,
+      "sport": 0.041,
+      "narr_ukraine_not_nation": 0.0049,
+      "narr_nazi": 0.0024,
+      "narr_war_justification": 0.0243,
+      "narr_nato_blame": 0.0015,
+      "narr_annexation": 0.0514,
+      "narr_atrocity_denial": 0.0192,
+      "narr_language": 0.0139,
+      "narr_russian_greatness": 0.0263,
+      "narr_soviet_nostalgia": 0.0027,
+      "hostility_ukrainians": 0.0311,
+      "hostility_russians": 0.9009,
+      "reports_or_debunks": 0.1754
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#2#7267-7513"
+  },
+  {
+   "case": "literature_art:yes",
+   "text": 1,
+   "expected": "review",
+   "got": "review",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "literature_art"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "review_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.989,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0109,
+      "literature_art": 0.9991,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0016,
+      "geography": 0.0002,
+      "politics_government": 0.0012,
+      "war_ukraine": 0.0002,
+      "economy_business": 0.0012,
+      "history_soviet": 0.2087,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0021,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0005,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0921,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0004,
+      "narr_russian_greatness": 0.0082,
+      "narr_soviet_nostalgia": 0.0018,
+      "hostility_ukrainians": 0.0007,
+      "hostility_russians": 0.0019,
+      "reports_or_debunks": 0.1956
+     }
+    }
+   ],
+   "from": "benchmark: a-literature_art-yes-1"
+  },
+  {
+   "case": "literature_art:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-literature_art-near-1"
+  },
+  {
+   "case": "literature_art:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-literature_art-near-2"
+  },
+  {
+   "case": "cost_of_living:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "cost_of_living"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9964,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0014,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.9936,
+      "science_technology": 0.0002,
+      "geography": 0.0054,
+      "politics_government": 0.0017,
+      "war_ukraine": 0.0055,
+      "economy_business": 0.0719,
+      "history_soviet": 0.1233,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0011,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.001,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0088,
+      "narr_atrocity_denial": 0.0001,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0082,
+      "narr_soviet_nostalgia": 0.0001,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0005,
+      "reports_or_debunks": 0.2008
+     }
+    }
+   ],
+   "from": "benchmark: a-cost_of_living-yes-1"
+  },
+  {
+   "case": "cost_of_living:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "cost_of_living"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "remove_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.997,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.003,
+      "literature_art": 0.0005,
+      "cost_of_living": 0.9802,
+      "science_technology": 0.0001,
+      "geography": 0.0037,
+      "politics_government": 0.0072,
+      "war_ukraine": 0.0086,
+      "economy_business": 0.0092,
+      "history_soviet": 0.6314,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0005,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0021,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0366,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0017,
+      "narr_russian_greatness": 0.0067,
+      "narr_soviet_nostalgia": 0.0026,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0004,
+      "reports_or_debunks": 0.3163
+     }
+    }
+   ],
+   "from": "benchmark: a-cost_of_living-yes-2"
+  },
+  {
+   "case": "cost_of_living:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-cost_of_living-near-1"
+  },
+  {
+   "case": "cost_of_living:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-cost_of_living-near-2"
+  },
+  {
+   "case": "science_technology:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "science_technology"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.6937,
+      "culture_entertainment": 0.0004,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0127,
+      "literature_art": 0.0076,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.3488,
+      "geography": 0.0023,
+      "politics_government": 0.0013,
+      "war_ukraine": 0.0011,
+      "economy_business": 0.0018,
+      "history_soviet": 0.6153,
+      "sport": 0.0004,
+      "narr_ukraine_not_nation": 0.0013,
+      "narr_nazi": 0.0006,
+      "narr_war_justification": 0.0026,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0403,
+      "narr_atrocity_denial": 0.0041,
+      "narr_language": 0.0075,
+      "narr_russian_greatness": 0.005,
+      "narr_soviet_nostalgia": 0.0141,
+      "hostility_ukrainians": 0.0008,
+      "hostility_russians": 0.003,
+      "reports_or_debunks": 0.1633
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#44#351-1816"
+  },
+  {
+   "case": "science_technology:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "science_technology"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.2742,
+      "culture_entertainment": 0.0004,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0035,
+      "literature_art": 0.0011,
+      "cost_of_living": 0.0,
+      "science_technology": 0.9929,
+      "geography": 0.0009,
+      "politics_government": 0.0017,
+      "war_ukraine": 0.0002,
+      "economy_business": 0.0919,
+      "history_soviet": 0.0117,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0003,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0009,
+      "narr_nato_blame": 0.0,
+      "narr_annexation": 0.0057,
+      "narr_atrocity_denial": 0.001,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0058,
+      "narr_soviet_nostalgia": 0.0013,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0007,
+      "reports_or_debunks": 0.4545
+     }
+    }
+   ],
+   "from": "benchmark: b-science_technology-yes-1"
+  },
+  {
+   "case": "science_technology:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9634,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0016,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.0,
+      "science_technology": 0.8734,
+      "geography": 0.0023,
+      "politics_government": 0.0012,
+      "war_ukraine": 0.0001,
+      "economy_business": 0.0071,
+      "history_soviet": 0.0041,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0003,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0005,
+      "narr_nato_blame": 0.0,
+      "narr_annexation": 0.001,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0001,
+      "narr_russian_greatness": 0.0052,
+      "narr_soviet_nostalgia": 0.0034,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0005,
+      "reports_or_debunks": 0.6621
+     }
+    }
+   ],
+   "from": "benchmark: b-science_technology-near-1"
+  },
+  {
+   "case": "science_technology:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: b-science_technology-near-2"
+  },
+  {
+   "case": "geography:yes",
+   "text": 0,
+   "expected": "review",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "science_technology",
+    "geography",
+    "history_soviet"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9654,
+      "culture_entertainment": 0.0008,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0024,
+      "literature_art": 0.0017,
+      "cost_of_living": 0.0,
+      "science_technology": 0.311,
+      "geography": 0.0217,
+      "politics_government": 0.0098,
+      "war_ukraine": 0.0038,
+      "economy_business": 0.0033,
+      "history_soviet": 0.0155,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0003,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0005,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0105,
+      "narr_atrocity_denial": 0.0001,
+      "narr_language": 0.0003,
+      "narr_russian_greatness": 0.0048,
+      "narr_soviet_nostalgia": 0.0013,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.0005,
+      "reports_or_debunks": 0.1058
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#38#1263-1552"
+  },
+  {
+   "case": "geography:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "geography"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9967,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0007,
+      "literature_art": 0.0007,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0419,
+      "geography": 0.9967,
+      "politics_government": 0.002,
+      "war_ukraine": 0.0025,
+      "economy_business": 0.0021,
+      "history_soviet": 0.3729,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0015,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0024,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0057,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.016,
+      "narr_soviet_nostalgia": 0.0036,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.0003,
+      "reports_or_debunks": 0.245
+     }
+    }
+   ],
+   "from": "benchmark: b-geography-yes-1"
+  },
+  {
+   "case": "geography:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9949,
+      "culture_entertainment": 0.0114,
+      "celebrities": 0.0008,
+      "lifestyle_traditions": 0.031,
+      "literature_art": 0.0106,
+      "cost_of_living": 0.0032,
+      "science_technology": 0.0138,
+      "geography": 0.0081,
+      "politics_government": 0.0108,
+      "war_ukraine": 0.0203,
+      "economy_business": 0.0232,
+      "history_soviet": 0.3808,
+      "sport": 0.0003,
+      "narr_ukraine_not_nation": 0.002,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0126,
+      "narr_nato_blame": 0.0009,
+      "narr_annexation": 0.0586,
+      "narr_atrocity_denial": 0.001,
+      "narr_language": 0.0015,
+      "narr_russian_greatness": 0.0048,
+      "narr_soviet_nostalgia": 0.003,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0001,
+      "reports_or_debunks": 0.0445
+     }
+    }
+   ],
+   "from": "benchmark: b-geography-near-1"
+  },
+  {
+   "case": "geography:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "pass",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0001,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0077,
+      "literature_art": 0.0022,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0011,
+      "geography": 0.0019,
+      "politics_government": 0.0002,
+      "war_ukraine": 0.0009,
+      "economy_business": 0.0006,
+      "history_soviet": 0.0023,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0004,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0023,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0001,
+      "narr_atrocity_denial": 0.0005,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0,
+      "narr_soviet_nostalgia": 0.0008,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0012,
+      "reports_or_debunks": 0.2015
+     }
+    }
+   ],
+   "from": "benchmark: b-geography-near-2"
+  },
+  {
+   "case": "politics_government:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9261,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0005,
+      "literature_art": 0.0001,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0004,
+      "geography": 0.0006,
+      "politics_government": 0.0325,
+      "war_ukraine": 0.0086,
+      "economy_business": 0.0062,
+      "history_soviet": 0.0382,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0008,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0029,
+      "narr_nato_blame": 0.0004,
+      "narr_annexation": 0.0062,
+      "narr_atrocity_denial": 0.001,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0018,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0005,
+      "reports_or_debunks": 0.3727
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#47#2132-2345"
+  },
+  {
+   "case": "politics_government:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9972,
+      "culture_entertainment": 0.0009,
+      "celebrities": 0.0005,
+      "lifestyle_traditions": 0.0053,
+      "literature_art": 0.006,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0034,
+      "geography": 0.0026,
+      "politics_government": 0.9476,
+      "war_ukraine": 0.0064,
+      "economy_business": 0.1085,
+      "history_soviet": 0.3397,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0016,
+      "narr_nazi": 0.0002,
+      "narr_war_justification": 0.0029,
+      "narr_nato_blame": 0.0006,
+      "narr_annexation": 0.0437,
+      "narr_atrocity_denial": 0.0006,
+      "narr_language": 0.0006,
+      "narr_russian_greatness": 0.01,
+      "narr_soviet_nostalgia": 0.0022,
+      "hostility_ukrainians": 0.0016,
+      "hostility_russians": 0.0051,
+      "reports_or_debunks": 0.6004
+     }
+    }
+   ],
+   "from": "benchmark: b-politics_government-yes-1"
+  },
+  {
+   "case": "politics_government:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: b-politics_government-near-1"
+  },
+  {
+   "case": "politics_government:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9498,
+      "culture_entertainment": 0.0016,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0114,
+      "literature_art": 0.0011,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0071,
+      "geography": 0.002,
+      "politics_government": 0.002,
+      "war_ukraine": 0.0002,
+      "economy_business": 0.0062,
+      "history_soviet": 0.0285,
+      "sport": 0.0004,
+      "narr_ukraine_not_nation": 0.0011,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0021,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.026,
+      "narr_atrocity_denial": 0.0019,
+      "narr_language": 0.0012,
+      "narr_russian_greatness": 0.0086,
+      "narr_soviet_nostalgia": 0.0011,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.1396
+     }
+    }
+   ],
+   "from": "benchmark: b-politics_government-near-2"
+  },
+  {
+   "case": "war_ukraine:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.8353,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0005,
+      "lifestyle_traditions": 0.0009,
+      "literature_art": 0.0003,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0009,
+      "geography": 0.0044,
+      "politics_government": 0.0161,
+      "war_ukraine": 0.9124,
+      "economy_business": 0.0009,
+      "history_soviet": 0.0108,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0003,
+      "narr_nazi": 0.0004,
+      "narr_war_justification": 0.0017,
+      "narr_nato_blame": 0.0004,
+      "narr_annexation": 0.0004,
+      "narr_atrocity_denial": 0.0014,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0007,
+      "narr_soviet_nostalgia": 0.0003,
+      "hostility_ukrainians": 0.0004,
+      "hostility_russians": 0.0015,
+      "reports_or_debunks": 0.4465
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#62#10493-10710"
+  },
+  {
+   "case": "war_ukraine:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9325,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0009,
+      "literature_art": 0.0007,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0088,
+      "geography": 0.0079,
+      "politics_government": 0.0049,
+      "war_ukraine": 0.9798,
+      "economy_business": 0.0018,
+      "history_soviet": 0.0796,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0011,
+      "narr_nazi": 0.0013,
+      "narr_war_justification": 0.0041,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0374,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0034,
+      "narr_russian_greatness": 0.0026,
+      "narr_soviet_nostalgia": 0.0011,
+      "hostility_ukrainians": 0.0036,
+      "hostility_russians": 0.0025,
+      "reports_or_debunks": 0.7212
+     }
+    }
+   ],
+   "from": "benchmark: b-war_ukraine-yes-1"
+  },
+  {
+   "case": "war_ukraine:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9475,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0002,
+      "literature_art": 0.0001,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0002,
+      "geography": 0.0019,
+      "politics_government": 0.0402,
+      "war_ukraine": 0.003,
+      "economy_business": 0.002,
+      "history_soviet": 0.0064,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0002,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.003,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0005,
+      "narr_atrocity_denial": 0.003,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0031,
+      "narr_soviet_nostalgia": 0.0008,
+      "hostility_ukrainians": 0.0004,
+      "hostility_russians": 0.0011,
+      "reports_or_debunks": 0.3155
+     }
+    }
+   ],
+   "from": "benchmark: b-war_ukraine-near-1"
+  },
+  {
+   "case": "war_ukraine:near",
+   "text": 1,
+   "expected": "review",
+   "got": "untouched",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet"
+   ],
+   "paragraphs": [],
+   "from": "benchmark: b-war_ukraine-near-2"
+  },
+  {
+   "case": "economy_business:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "review",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "economy_business"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "review_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9931,
+      "culture_entertainment": 0.0021,
+      "celebrities": 0.0637,
+      "lifestyle_traditions": 0.0095,
+      "literature_art": 0.0016,
+      "cost_of_living": 0.0006,
+      "science_technology": 0.0013,
+      "geography": 0.0013,
+      "politics_government": 0.1246,
+      "war_ukraine": 0.0128,
+      "economy_business": 0.7745,
+      "history_soviet": 0.8508,
+      "sport": 0.0012,
+      "narr_ukraine_not_nation": 0.0044,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0094,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0143,
+      "narr_atrocity_denial": 0.0032,
+      "narr_language": 0.0139,
+      "narr_russian_greatness": 0.0064,
+      "narr_soviet_nostalgia": 0.0018,
+      "hostility_ukrainians": 0.0185,
+      "hostility_russians": 0.0258,
+      "reports_or_debunks": 0.2902
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#11#610-920"
+  },
+  {
+   "case": "economy_business:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "untouched",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "economy_business"
+   ],
+   "paragraphs": [],
+   "from": "benchmark: b-economy_business-yes-1"
+  },
+  {
+   "case": "economy_business:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: b-economy_business-near-1"
+  },
+  {
+   "case": "economy_business:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: b-economy_business-near-2"
+  },
+  {
+   "case": "history_soviet:yes",
+   "text": 0,
+   "expected": "review",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9796,
+      "culture_entertainment": 0.0003,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0013,
+      "literature_art": 0.0005,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0804,
+      "geography": 0.0009,
+      "politics_government": 0.0486,
+      "war_ukraine": 0.0138,
+      "economy_business": 0.0121,
+      "history_soviet": 0.1794,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0003,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0023,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0014,
+      "narr_atrocity_denial": 0.0005,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0074,
+      "narr_soviet_nostalgia": 0.0018,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.0006,
+      "reports_or_debunks": 0.158
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#26#3139-3332"
+  },
+  {
+   "case": "history_soviet:yes",
+   "text": 1,
+   "expected": "review",
+   "got": "untouched",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet"
+   ],
+   "paragraphs": [],
+   "from": "benchmark: a-history_soviet-yes-1"
+  },
+  {
+   "case": "history_soviet:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9908,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0031,
+      "literature_art": 0.0002,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0004,
+      "geography": 0.0014,
+      "politics_government": 0.965,
+      "war_ukraine": 0.003,
+      "economy_business": 0.0028,
+      "history_soviet": 0.3668,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0058,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0043,
+      "narr_nato_blame": 0.0,
+      "narr_annexation": 0.041,
+      "narr_atrocity_denial": 0.0011,
+      "narr_language": 0.0011,
+      "narr_russian_greatness": 0.0115,
+      "narr_soviet_nostalgia": 0.0009,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0006,
+      "reports_or_debunks": 0.4526
+     }
+    }
+   ],
+   "from": "benchmark: a-history_soviet-near-1"
+  },
+  {
+   "case": "history_soviet:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9507,
+      "culture_entertainment": 0.0025,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0029,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0003,
+      "geography": 0.001,
+      "politics_government": 0.9966,
+      "war_ukraine": 0.0016,
+      "economy_business": 0.0025,
+      "history_soviet": 0.042,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0014,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0029,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0865,
+      "narr_atrocity_denial": 0.0006,
+      "narr_language": 0.0005,
+      "narr_russian_greatness": 0.0473,
+      "narr_soviet_nostalgia": 0.0017,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0001,
+      "reports_or_debunks": 0.2312
+     }
+    }
+   ],
+   "from": "benchmark: a-history_soviet-near-2"
+  },
+  {
+   "case": "sport:yes",
+   "text": 0,
+   "expected": "review",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "sport"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0064,
+      "culture_entertainment": 0.0041,
+      "celebrities": 0.0005,
+      "lifestyle_traditions": 0.0001,
+      "literature_art": 0.0003,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0006,
+      "geography": 0.0003,
+      "politics_government": 0.0011,
+      "war_ukraine": 0.0007,
+      "economy_business": 0.0007,
+      "history_soviet": 0.015,
+      "sport": 0.0006,
+      "narr_ukraine_not_nation": 0.0001,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0004,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0004,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0006,
+      "narr_russian_greatness": 0.0001,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0009,
+      "reports_or_debunks": 0.0721
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#65#0-295"
+  },
+  {
+   "case": "sport:yes",
+   "text": 1,
+   "expected": "review",
+   "got": "review",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "sport"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "review_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.6769,
+      "culture_entertainment": 0.0009,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0016,
+      "literature_art": 0.0017,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0011,
+      "geography": 0.0023,
+      "politics_government": 0.0009,
+      "war_ukraine": 0.0003,
+      "economy_business": 0.0055,
+      "history_soviet": 0.0237,
+      "sport": 0.9811,
+      "narr_ukraine_not_nation": 0.0043,
+      "narr_nazi": 0.0002,
+      "narr_war_justification": 0.0009,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0244,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0034,
+      "narr_russian_greatness": 0.0649,
+      "narr_soviet_nostalgia": 0.0019,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0011,
+      "reports_or_debunks": 0.1529
+     }
+    }
+   ],
+   "from": "benchmark: a-sport-yes-1"
+  },
+  {
+   "case": "sport:near",
+   "text": 0,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-sport-near-1"
+  },
+  {
+   "case": "sport:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: a-sport-near-2"
+  },
+  {
+   "case": "narr_ukraine_not_nation:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet",
+    "narr_ukraine_not_nation"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9751,
+      "culture_entertainment": 0.0019,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0055,
+      "literature_art": 0.101,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0009,
+      "geography": 0.0245,
+      "politics_government": 0.0075,
+      "war_ukraine": 0.044,
+      "economy_business": 0.0013,
+      "history_soviet": 0.8696,
+      "sport": 0.0002,
+      "narr_ukraine_not_nation": 0.1018,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0281,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.9484,
+      "narr_atrocity_denial": 0.0019,
+      "narr_language": 0.0046,
+      "narr_russian_greatness": 0.426,
+      "narr_soviet_nostalgia": 0.0106,
+      "hostility_ukrainians": 0.0007,
+      "hostility_russians": 0.0006,
+      "reports_or_debunks": 0.1234
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_ukraine_not_nation-yes-1"
+  },
+  {
+   "case": "narr_ukraine_not_nation:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "narr_ukraine_not_nation"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0514,
+      "culture_entertainment": 0.0014,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0038,
+      "literature_art": 0.008,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0007,
+      "geography": 0.0036,
+      "politics_government": 0.0083,
+      "war_ukraine": 0.0868,
+      "economy_business": 0.0009,
+      "history_soviet": 0.036,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.9988,
+      "narr_nazi": 0.0016,
+      "narr_war_justification": 0.0156,
+      "narr_nato_blame": 0.0009,
+      "narr_annexation": 0.0469,
+      "narr_atrocity_denial": 0.0217,
+      "narr_language": 0.0086,
+      "narr_russian_greatness": 0.0047,
+      "narr_soviet_nostalgia": 0.0124,
+      "hostility_ukrainians": 0.7318,
+      "hostility_russians": 0.0713,
+      "reports_or_debunks": 0.1323
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_ukraine_not_nation-yes-2"
+  },
+  {
+   "case": "narr_ukraine_not_nation:near",
+   "text": 0,
+   "expected": "review",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "history_soviet",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9508,
+      "culture_entertainment": 0.0007,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0017,
+      "literature_art": 0.0172,
+      "cost_of_living": 0.0002,
+      "science_technology": 0.0023,
+      "geography": 0.005,
+      "politics_government": 0.274,
+      "war_ukraine": 0.0302,
+      "economy_business": 0.0033,
+      "history_soviet": 0.2607,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.9974,
+      "narr_nazi": 0.0002,
+      "narr_war_justification": 0.0031,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.006,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0032,
+      "narr_russian_greatness": 0.0114,
+      "narr_soviet_nostalgia": 0.0013,
+      "hostility_ukrainians": 0.0011,
+      "hostility_russians": 0.0008,
+      "reports_or_debunks": 0.9086
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_ukraine_not_nation-near-1"
+  },
+  {
+   "case": "narr_ukraine_not_nation:near",
+   "text": 1,
+   "expected": "review",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.017,
+      "culture_entertainment": 0.0014,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0027,
+      "literature_art": 0.0267,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0002,
+      "geography": 0.0067,
+      "politics_government": 0.0145,
+      "war_ukraine": 0.0013,
+      "economy_business": 0.0016,
+      "history_soviet": 0.033,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0001,
+      "narr_nazi": 0.0003,
+      "narr_war_justification": 0.0045,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0011,
+      "narr_atrocity_denial": 0.0005,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0013,
+      "narr_soviet_nostalgia": 0.0008,
+      "hostility_ukrainians": 0.0002,
+      "hostility_russians": 0.0011,
+      "reports_or_debunks": 0.4248
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_ukraine_not_nation-near-2"
+  },
+  {
+   "case": "narr_nazi:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "narr_nazi"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0208,
+      "culture_entertainment": 0.0016,
+      "celebrities": 0.0004,
+      "lifestyle_traditions": 0.0032,
+      "literature_art": 0.0127,
+      "cost_of_living": 0.0002,
+      "science_technology": 0.0025,
+      "geography": 0.001,
+      "politics_government": 0.0066,
+      "war_ukraine": 0.1558,
+      "economy_business": 0.0058,
+      "history_soviet": 0.0721,
+      "sport": 0.0003,
+      "narr_ukraine_not_nation": 0.0013,
+      "narr_nazi": 0.9452,
+      "narr_war_justification": 0.0201,
+      "narr_nato_blame": 0.0022,
+      "narr_annexation": 0.0523,
+      "narr_atrocity_denial": 0.0064,
+      "narr_language": 0.0031,
+      "narr_russian_greatness": 0.0196,
+      "narr_soviet_nostalgia": 0.003,
+      "hostility_ukrainians": 0.2651,
+      "hostility_russians": 0.0416,
+      "reports_or_debunks": 0.1431
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nazi-yes-1"
+  },
+  {
+   "case": "narr_nazi:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_nazi"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0521,
+      "culture_entertainment": 0.0007,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0007,
+      "literature_art": 0.002,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0009,
+      "geography": 0.0008,
+      "politics_government": 0.0023,
+      "war_ukraine": 0.0381,
+      "economy_business": 0.0026,
+      "history_soviet": 0.074,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0002,
+      "narr_nazi": 0.0212,
+      "narr_war_justification": 0.005,
+      "narr_nato_blame": 0.0169,
+      "narr_annexation": 0.0116,
+      "narr_atrocity_denial": 0.0127,
+      "narr_language": 0.0009,
+      "narr_russian_greatness": 0.0038,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.9863,
+      "hostility_russians": 0.3637,
+      "reports_or_debunks": 0.153
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nazi-yes-2"
+  },
+  {
+   "case": "narr_nazi:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "review",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "review_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9615,
+      "culture_entertainment": 0.0,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0008,
+      "literature_art": 0.0008,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0002,
+      "geography": 0.0005,
+      "politics_government": 0.1159,
+      "war_ukraine": 0.9918,
+      "economy_business": 0.0013,
+      "history_soviet": 0.0374,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0009,
+      "narr_nazi": 0.0567,
+      "narr_war_justification": 0.0008,
+      "narr_nato_blame": 0.0005,
+      "narr_annexation": 0.0038,
+      "narr_atrocity_denial": 0.0001,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0093,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.9027,
+      "hostility_russians": 0.0337,
+      "reports_or_debunks": 0.8762
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nazi-near-1"
+  },
+  {
+   "case": "narr_nazi:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.1213,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0003,
+      "lifestyle_traditions": 0.0039,
+      "literature_art": 0.0005,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0012,
+      "geography": 0.0034,
+      "politics_government": 0.0116,
+      "war_ukraine": 0.9503,
+      "economy_business": 0.011,
+      "history_soviet": 0.0184,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0005,
+      "narr_nazi": 0.0026,
+      "narr_war_justification": 0.0366,
+      "narr_nato_blame": 0.002,
+      "narr_annexation": 0.0055,
+      "narr_atrocity_denial": 0.0036,
+      "narr_language": 0.0018,
+      "narr_russian_greatness": 0.001,
+      "narr_soviet_nostalgia": 0.0012,
+      "hostility_ukrainians": 0.002,
+      "hostility_russians": 0.0044,
+      "reports_or_debunks": 0.4899
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nazi-near-2"
+  },
+  {
+   "case": "narr_war_justification:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_war_justification"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.973,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0029,
+      "literature_art": 0.0005,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0002,
+      "geography": 0.006,
+      "politics_government": 0.0442,
+      "war_ukraine": 0.478,
+      "economy_business": 0.0019,
+      "history_soviet": 0.0259,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0013,
+      "narr_nazi": 0.0003,
+      "narr_war_justification": 0.9934,
+      "narr_nato_blame": 0.0018,
+      "narr_annexation": 0.1301,
+      "narr_atrocity_denial": 0.003,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0322,
+      "narr_soviet_nostalgia": 0.0031,
+      "hostility_ukrainians": 0.0007,
+      "hostility_russians": 0.0007,
+      "reports_or_debunks": 0.2049
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_war_justification-yes-1"
+  },
+  {
+   "case": "narr_war_justification:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_war_justification"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9875,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0006,
+      "literature_art": 0.0003,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0005,
+      "geography": 0.0089,
+      "politics_government": 0.0404,
+      "war_ukraine": 0.9399,
+      "economy_business": 0.0018,
+      "history_soviet": 0.0708,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0057,
+      "narr_nazi": 0.0012,
+      "narr_war_justification": 0.7658,
+      "narr_nato_blame": 0.0011,
+      "narr_annexation": 0.4244,
+      "narr_atrocity_denial": 0.0016,
+      "narr_language": 0.0019,
+      "narr_russian_greatness": 0.2697,
+      "narr_soviet_nostalgia": 0.0121,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.1358
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_war_justification-yes-2"
+  },
+  {
+   "case": "narr_war_justification:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9867,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.001,
+      "literature_art": 0.0005,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0003,
+      "geography": 0.0048,
+      "politics_government": 0.3328,
+      "war_ukraine": 0.9984,
+      "economy_business": 0.0022,
+      "history_soviet": 0.0273,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0006,
+      "narr_nazi": 0.0019,
+      "narr_war_justification": 0.0625,
+      "narr_nato_blame": 0.0023,
+      "narr_annexation": 0.002,
+      "narr_atrocity_denial": 0.0094,
+      "narr_language": 0.0003,
+      "narr_russian_greatness": 0.0036,
+      "narr_soviet_nostalgia": 0.0002,
+      "hostility_ukrainians": 0.0009,
+      "hostility_russians": 0.0006,
+      "reports_or_debunks": 0.8084
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_war_justification-near-1"
+  },
+  {
+   "case": "narr_war_justification:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9687,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0013,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0008,
+      "geography": 0.0231,
+      "politics_government": 0.0088,
+      "war_ukraine": 0.9962,
+      "economy_business": 0.0014,
+      "history_soviet": 0.046,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0004,
+      "narr_nazi": 0.0004,
+      "narr_war_justification": 0.0002,
+      "narr_nato_blame": 0.0,
+      "narr_annexation": 0.0011,
+      "narr_atrocity_denial": 0.0009,
+      "narr_language": 0.0016,
+      "narr_russian_greatness": 0.0027,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.0017,
+      "hostility_russians": 0.0016,
+      "reports_or_debunks": 0.2372
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_war_justification-near-2"
+  },
+  {
+   "case": "narr_nato_blame:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_nato_blame"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.2211,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0038,
+      "literature_art": 0.001,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0007,
+      "geography": 0.0085,
+      "politics_government": 0.0111,
+      "war_ukraine": 0.0005,
+      "economy_business": 0.0036,
+      "history_soviet": 0.0138,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0014,
+      "narr_nazi": 0.001,
+      "narr_war_justification": 0.001,
+      "narr_nato_blame": 0.9938,
+      "narr_annexation": 0.0438,
+      "narr_atrocity_denial": 0.003,
+      "narr_language": 0.0042,
+      "narr_russian_greatness": 0.0001,
+      "narr_soviet_nostalgia": 0.0007,
+      "hostility_ukrainians": 0.0282,
+      "hostility_russians": 0.0439,
+      "reports_or_debunks": 0.1931
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nato_blame-yes-1"
+  },
+  {
+   "case": "narr_nato_blame:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_nato_blame"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.1403,
+      "culture_entertainment": 0.0004,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0006,
+      "literature_art": 0.001,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0001,
+      "geography": 0.0022,
+      "politics_government": 0.0041,
+      "war_ukraine": 0.0005,
+      "economy_business": 0.0031,
+      "history_soviet": 0.022,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0012,
+      "narr_nazi": 0.0007,
+      "narr_war_justification": 0.0013,
+      "narr_nato_blame": 0.9955,
+      "narr_annexation": 0.0912,
+      "narr_atrocity_denial": 0.0078,
+      "narr_language": 0.0073,
+      "narr_russian_greatness": 0.0012,
+      "narr_soviet_nostalgia": 0.0008,
+      "hostility_ukrainians": 0.4863,
+      "hostility_russians": 0.1798,
+      "reports_or_debunks": 0.1432
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nato_blame-yes-2"
+  },
+  {
+   "case": "narr_nato_blame:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.8382,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.005,
+      "literature_art": 0.0012,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0011,
+      "geography": 0.0148,
+      "politics_government": 0.0492,
+      "war_ukraine": 0.1715,
+      "economy_business": 0.0023,
+      "history_soviet": 0.0252,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0001,
+      "narr_nazi": 0.0002,
+      "narr_war_justification": 0.0111,
+      "narr_nato_blame": 0.0017,
+      "narr_annexation": 0.0029,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0005,
+      "narr_russian_greatness": 0.0022,
+      "narr_soviet_nostalgia": 0.0012,
+      "hostility_ukrainians": 0.002,
+      "hostility_russians": 0.0031,
+      "reports_or_debunks": 0.9076
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nato_blame-near-1"
+  },
+  {
+   "case": "narr_nato_blame:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0446,
+      "culture_entertainment": 0.0003,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0003,
+      "literature_art": 0.0008,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0005,
+      "geography": 0.0944,
+      "politics_government": 0.0078,
+      "war_ukraine": 0.0045,
+      "economy_business": 0.0025,
+      "history_soviet": 0.0196,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0027,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0047,
+      "narr_nato_blame": 0.0018,
+      "narr_annexation": 0.0094,
+      "narr_atrocity_denial": 0.0005,
+      "narr_language": 0.0009,
+      "narr_russian_greatness": 0.0004,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.0002,
+      "hostility_russians": 0.0004,
+      "reports_or_debunks": 0.2476
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_nato_blame-near-2"
+  },
+  {
+   "case": "narr_annexation:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_annexation"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9905,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0026,
+      "literature_art": 0.0032,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0006,
+      "geography": 0.034,
+      "politics_government": 0.1199,
+      "war_ukraine": 0.0228,
+      "economy_business": 0.0209,
+      "history_soviet": 0.1931,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0024,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0127,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.9817,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0009,
+      "narr_russian_greatness": 0.9489,
+      "narr_soviet_nostalgia": 0.0016,
+      "hostility_ukrainians": 0.0063,
+      "hostility_russians": 0.004,
+      "reports_or_debunks": 0.0934
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_annexation-yes-1"
+  },
+  {
+   "case": "narr_annexation:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_annexation"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9921,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0012,
+      "literature_art": 0.0026,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0017,
+      "geography": 0.0153,
+      "politics_government": 0.0534,
+      "war_ukraine": 0.4359,
+      "economy_business": 0.0055,
+      "history_soviet": 0.1127,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0055,
+      "narr_nazi": 0.0004,
+      "narr_war_justification": 0.0588,
+      "narr_nato_blame": 0.0008,
+      "narr_annexation": 0.9796,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0004,
+      "narr_russian_greatness": 0.8355,
+      "narr_soviet_nostalgia": 0.0015,
+      "hostility_ukrainians": 0.0008,
+      "hostility_russians": 0.0004,
+      "reports_or_debunks": 0.1429
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_annexation-yes-2"
+  },
+  {
+   "case": "narr_annexation:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.8305,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0007,
+      "literature_art": 0.0004,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0006,
+      "geography": 0.0032,
+      "politics_government": 0.0301,
+      "war_ukraine": 0.5874,
+      "economy_business": 0.0008,
+      "history_soviet": 0.0135,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.014,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.001,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0143,
+      "narr_atrocity_denial": 0.0141,
+      "narr_language": 0.0009,
+      "narr_russian_greatness": 0.0162,
+      "narr_soviet_nostalgia": 0.0006,
+      "hostility_ukrainians": 0.0036,
+      "hostility_russians": 0.0037,
+      "reports_or_debunks": 0.8682
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_annexation-near-1"
+  },
+  {
+   "case": "narr_annexation:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "benchmark: c-narr_annexation-near-2"
+  },
+  {
+   "case": "narr_atrocity_denial:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_atrocity_denial"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9532,
+      "culture_entertainment": 0.0036,
+      "celebrities": 0.0004,
+      "lifestyle_traditions": 0.0022,
+      "literature_art": 0.0079,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.009,
+      "geography": 0.0013,
+      "politics_government": 0.0314,
+      "war_ukraine": 0.8825,
+      "economy_business": 0.0023,
+      "history_soviet": 0.4395,
+      "sport": 0.0002,
+      "narr_ukraine_not_nation": 0.0018,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0009,
+      "narr_nato_blame": 0.0016,
+      "narr_annexation": 0.0099,
+      "narr_atrocity_denial": 0.9942,
+      "narr_language": 0.0003,
+      "narr_russian_greatness": 0.0081,
+      "narr_soviet_nostalgia": 0.002,
+      "hostility_ukrainians": 0.0082,
+      "hostility_russians": 0.0128,
+      "reports_or_debunks": 0.4703
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_atrocity_denial-yes-1"
+  },
+  {
+   "case": "narr_atrocity_denial:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_atrocity_denial"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9681,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0021,
+      "literature_art": 0.002,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0012,
+      "geography": 0.0033,
+      "politics_government": 0.017,
+      "war_ukraine": 0.9903,
+      "economy_business": 0.0025,
+      "history_soviet": 0.0521,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0029,
+      "narr_nazi": 0.0004,
+      "narr_war_justification": 0.0116,
+      "narr_nato_blame": 0.0026,
+      "narr_annexation": 0.0131,
+      "narr_atrocity_denial": 0.6393,
+      "narr_language": 0.0033,
+      "narr_russian_greatness": 0.0099,
+      "narr_soviet_nostalgia": 0.0014,
+      "hostility_ukrainians": 0.0526,
+      "hostility_russians": 0.0346,
+      "reports_or_debunks": 0.7846
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_atrocity_denial-yes-2"
+  },
+  {
+   "case": "narr_atrocity_denial:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9951,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0017,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0133,
+      "geography": 0.0055,
+      "politics_government": 0.2568,
+      "war_ukraine": 0.986,
+      "economy_business": 0.0009,
+      "history_soviet": 0.1222,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0006,
+      "narr_nazi": 0.0005,
+      "narr_war_justification": 0.0028,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0013,
+      "narr_atrocity_denial": 0.0036,
+      "narr_language": 0.0008,
+      "narr_russian_greatness": 0.001,
+      "narr_soviet_nostalgia": 0.0006,
+      "hostility_ukrainians": 0.0036,
+      "hostility_russians": 0.0022,
+      "reports_or_debunks": 0.8481
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_atrocity_denial-near-1"
+  },
+  {
+   "case": "narr_atrocity_denial:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9729,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.002,
+      "literature_art": 0.0003,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0002,
+      "geography": 0.0033,
+      "politics_government": 0.8914,
+      "war_ukraine": 0.1147,
+      "economy_business": 0.0011,
+      "history_soviet": 0.0683,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0009,
+      "narr_nazi": 0.0003,
+      "narr_war_justification": 0.0003,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0006,
+      "narr_atrocity_denial": 0.0005,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0005,
+      "narr_soviet_nostalgia": 0.0001,
+      "hostility_ukrainians": 0.0015,
+      "hostility_russians": 0.0055,
+      "reports_or_debunks": 0.7282
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_atrocity_denial-near-2"
+  },
+  {
+   "case": "narr_language:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "narr_language"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9838,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0019,
+      "literature_art": 0.0179,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0047,
+      "geography": 0.0018,
+      "politics_government": 0.0955,
+      "war_ukraine": 0.0295,
+      "economy_business": 0.0047,
+      "history_soviet": 0.5234,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.023,
+      "narr_nazi": 0.0006,
+      "narr_war_justification": 0.0031,
+      "narr_nato_blame": 0.001,
+      "narr_annexation": 0.0358,
+      "narr_atrocity_denial": 0.001,
+      "narr_language": 0.9993,
+      "narr_russian_greatness": 0.0513,
+      "narr_soviet_nostalgia": 0.0037,
+      "hostility_ukrainians": 0.0519,
+      "hostility_russians": 0.0242,
+      "reports_or_debunks": 0.3343
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_language-yes-1"
+  },
+  {
+   "case": "narr_language:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "narr_language"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9698,
+      "culture_entertainment": 0.0011,
+      "celebrities": 0.0003,
+      "lifestyle_traditions": 0.0119,
+      "literature_art": 0.22,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0092,
+      "geography": 0.0018,
+      "politics_government": 0.0215,
+      "war_ukraine": 0.0508,
+      "economy_business": 0.0051,
+      "history_soviet": 0.541,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0089,
+      "narr_nazi": 0.0003,
+      "narr_war_justification": 0.0022,
+      "narr_nato_blame": 0.0005,
+      "narr_annexation": 0.0838,
+      "narr_atrocity_denial": 0.0043,
+      "narr_language": 0.9971,
+      "narr_russian_greatness": 0.0478,
+      "narr_soviet_nostalgia": 0.0124,
+      "hostility_ukrainians": 0.1011,
+      "hostility_russians": 0.1295,
+      "reports_or_debunks": 0.2822
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_language-yes-2"
+  },
+  {
+   "case": "narr_language:near",
+   "text": 0,
+   "expected": "review",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.8963,
+      "culture_entertainment": 0.0006,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0029,
+      "literature_art": 0.0387,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0081,
+      "geography": 0.0008,
+      "politics_government": 0.0205,
+      "war_ukraine": 0.0058,
+      "economy_business": 0.0012,
+      "history_soviet": 0.5296,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.001,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.001,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0198,
+      "narr_atrocity_denial": 0.0001,
+      "narr_language": 0.0039,
+      "narr_russian_greatness": 0.003,
+      "narr_soviet_nostalgia": 0.0029,
+      "hostility_ukrainians": 0.0002,
+      "hostility_russians": 0.001,
+      "reports_or_debunks": 0.6584
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_language-near-1"
+  },
+  {
+   "case": "narr_language:near",
+   "text": 1,
+   "expected": "pass",
+   "got": "pass",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0012,
+      "culture_entertainment": 0.0,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0001,
+      "literature_art": 0.0002,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0002,
+      "geography": 0.0001,
+      "politics_government": 0.0021,
+      "war_ukraine": 0.0091,
+      "economy_business": 0.0003,
+      "history_soviet": 0.0465,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0002,
+      "narr_nazi": 0.0006,
+      "narr_war_justification": 0.0035,
+      "narr_nato_blame": 0.0008,
+      "narr_annexation": 0.004,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0001,
+      "narr_russian_greatness": 0.0001,
+      "narr_soviet_nostalgia": 0.0016,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0007,
+      "reports_or_debunks": 0.2675
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_language-near-2"
+  },
+  {
+   "case": "narr_russian_greatness:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "narr_russian_greatness"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9979,
+      "culture_entertainment": 0.0028,
+      "celebrities": 0.0004,
+      "lifestyle_traditions": 0.0327,
+      "literature_art": 0.0356,
+      "cost_of_living": 0.0002,
+      "science_technology": 0.0031,
+      "geography": 0.0144,
+      "politics_government": 0.0174,
+      "war_ukraine": 0.0196,
+      "economy_business": 0.0029,
+      "history_soviet": 0.2913,
+      "sport": 0.0002,
+      "narr_ukraine_not_nation": 0.0038,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0232,
+      "narr_nato_blame": 0.0005,
+      "narr_annexation": 0.7961,
+      "narr_atrocity_denial": 0.0012,
+      "narr_language": 0.0065,
+      "narr_russian_greatness": 0.9988,
+      "narr_soviet_nostalgia": 0.0097,
+      "hostility_ukrainians": 0.0016,
+      "hostility_russians": 0.0011,
+      "reports_or_debunks": 0.0808
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_russian_greatness-yes-1"
+  },
+  {
+   "case": "narr_russian_greatness:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet",
+    "narr_russian_greatness"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9992,
+      "culture_entertainment": 0.0059,
+      "celebrities": 0.0015,
+      "lifestyle_traditions": 0.0197,
+      "literature_art": 0.8493,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0015,
+      "geography": 0.0144,
+      "politics_government": 0.0259,
+      "war_ukraine": 0.0336,
+      "economy_business": 0.0133,
+      "history_soviet": 0.3304,
+      "sport": 0.0005,
+      "narr_ukraine_not_nation": 0.0105,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0229,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.6893,
+      "narr_atrocity_denial": 0.0033,
+      "narr_language": 0.0091,
+      "narr_russian_greatness": 0.9991,
+      "narr_soviet_nostalgia": 0.0399,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0005,
+      "reports_or_debunks": 0.1022
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_russian_greatness-yes-2"
+  },
+  {
+   "case": "narr_russian_greatness:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9958,
+      "culture_entertainment": 0.0006,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0046,
+      "literature_art": 0.0101,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.003,
+      "geography": 0.0042,
+      "politics_government": 0.1595,
+      "war_ukraine": 0.0065,
+      "economy_business": 0.0028,
+      "history_soviet": 0.4635,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0067,
+      "narr_nazi": 0.0003,
+      "narr_war_justification": 0.0021,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0054,
+      "narr_atrocity_denial": 0.0005,
+      "narr_language": 0.0035,
+      "narr_russian_greatness": 0.0076,
+      "narr_soviet_nostalgia": 0.0016,
+      "hostility_ukrainians": 0.0005,
+      "hostility_russians": 0.0035,
+      "reports_or_debunks": 0.7899
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_russian_greatness-near-1"
+  },
+  {
+   "case": "narr_russian_greatness:near",
+   "text": 1,
+   "expected": "review",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "geography",
+    "history_soviet"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9993,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0012,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0002,
+      "geography": 0.9526,
+      "politics_government": 0.1165,
+      "war_ukraine": 0.0038,
+      "economy_business": 0.001,
+      "history_soviet": 0.3264,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0028,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0076,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0249,
+      "narr_atrocity_denial": 0.0007,
+      "narr_language": 0.0012,
+      "narr_russian_greatness": 0.0833,
+      "narr_soviet_nostalgia": 0.0009,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0004,
+      "reports_or_debunks": 0.1733
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_russian_greatness-near-2"
+  },
+  {
+   "case": "narr_soviet_nostalgia:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet",
+    "narr_soviet_nostalgia"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.3953,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0026,
+      "literature_art": 0.0051,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0008,
+      "geography": 0.0022,
+      "politics_government": 0.0227,
+      "war_ukraine": 0.0067,
+      "economy_business": 0.0037,
+      "history_soviet": 0.6823,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0033,
+      "narr_nazi": 0.0002,
+      "narr_war_justification": 0.0025,
+      "narr_nato_blame": 0.009,
+      "narr_annexation": 0.045,
+      "narr_atrocity_denial": 0.0012,
+      "narr_language": 0.001,
+      "narr_russian_greatness": 0.0001,
+      "narr_soviet_nostalgia": 0.0028,
+      "hostility_ukrainians": 0.0005,
+      "hostility_russians": 0.0068,
+      "reports_or_debunks": 0.3111
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#17#11249-11520"
+  },
+  {
+   "case": "narr_soviet_nostalgia:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "remove",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet",
+    "narr_soviet_nostalgia"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9935,
+      "culture_entertainment": 0.0637,
+      "celebrities": 0.0032,
+      "lifestyle_traditions": 0.6872,
+      "literature_art": 0.531,
+      "cost_of_living": 0.0056,
+      "science_technology": 0.0033,
+      "geography": 0.0039,
+      "politics_government": 0.0224,
+      "war_ukraine": 0.0061,
+      "economy_business": 0.0075,
+      "history_soviet": 0.9947,
+      "sport": 0.0002,
+      "narr_ukraine_not_nation": 0.0037,
+      "narr_nazi": 0.0003,
+      "narr_war_justification": 0.0069,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0427,
+      "narr_atrocity_denial": 0.0046,
+      "narr_language": 0.0067,
+      "narr_russian_greatness": 0.8942,
+      "narr_soviet_nostalgia": 0.9669,
+      "hostility_ukrainians": 0.0051,
+      "hostility_russians": 0.0143,
+      "reports_or_debunks": 0.1145
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_soviet_nostalgia-yes-1"
+  },
+  {
+   "case": "narr_soviet_nostalgia:near",
+   "text": 0,
+   "expected": "review",
+   "got": "review",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "review_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9991,
+      "culture_entertainment": 0.0011,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0058,
+      "literature_art": 0.0032,
+      "cost_of_living": 0.0002,
+      "science_technology": 0.0006,
+      "geography": 0.002,
+      "politics_government": 0.0101,
+      "war_ukraine": 0.0051,
+      "economy_business": 0.013,
+      "history_soviet": 0.9922,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0015,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0024,
+      "narr_nato_blame": 0.0002,
+      "narr_annexation": 0.0089,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0052,
+      "narr_soviet_nostalgia": 0.0015,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0006,
+      "reports_or_debunks": 0.7528
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_soviet_nostalgia-near-1"
+  },
+  {
+   "case": "narr_soviet_nostalgia:near",
+   "text": 1,
+   "expected": "review",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "history_soviet"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9934,
+      "culture_entertainment": 0.0008,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0062,
+      "literature_art": 0.0024,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.002,
+      "geography": 0.008,
+      "politics_government": 0.1656,
+      "war_ukraine": 0.001,
+      "economy_business": 0.0066,
+      "history_soviet": 0.1831,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0018,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0042,
+      "narr_nato_blame": 0.0,
+      "narr_annexation": 0.0114,
+      "narr_atrocity_denial": 0.0011,
+      "narr_language": 0.0022,
+      "narr_russian_greatness": 0.0044,
+      "narr_soviet_nostalgia": 0.0001,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.2333
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_soviet_nostalgia-near-2"
+  },
+  {
+   "case": "hostility_ukrainians:yes",
+   "text": 0,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "hostility_ukrainians"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.3828,
+      "culture_entertainment": 0.0007,
+      "celebrities": 0.0003,
+      "lifestyle_traditions": 0.0053,
+      "literature_art": 0.0226,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0034,
+      "geography": 0.003,
+      "politics_government": 0.0086,
+      "war_ukraine": 0.7455,
+      "economy_business": 0.0085,
+      "history_soviet": 0.3426,
+      "sport": 0.0005,
+      "narr_ukraine_not_nation": 0.002,
+      "narr_nazi": 0.0013,
+      "narr_war_justification": 0.005,
+      "narr_nato_blame": 0.001,
+      "narr_annexation": 0.0059,
+      "narr_atrocity_denial": 0.0113,
+      "narr_language": 0.0073,
+      "narr_russian_greatness": 0.0122,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.9995,
+      "hostility_russians": 0.0601,
+      "reports_or_debunks": 0.377
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_ukrainians-yes-1"
+  },
+  {
+   "case": "hostility_ukrainians:yes",
+   "text": 1,
+   "expected": "remove",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "hostility_ukrainians"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0263,
+      "culture_entertainment": 0.0054,
+      "celebrities": 0.0009,
+      "lifestyle_traditions": 0.0152,
+      "literature_art": 0.0182,
+      "cost_of_living": 0.0007,
+      "science_technology": 0.0124,
+      "geography": 0.0029,
+      "politics_government": 0.0103,
+      "war_ukraine": 0.6271,
+      "economy_business": 0.0248,
+      "history_soviet": 0.0609,
+      "sport": 0.0008,
+      "narr_ukraine_not_nation": 0.0038,
+      "narr_nazi": 0.0064,
+      "narr_war_justification": 0.0027,
+      "narr_nato_blame": 0.0148,
+      "narr_annexation": 0.0337,
+      "narr_atrocity_denial": 0.0095,
+      "narr_language": 0.0125,
+      "narr_russian_greatness": 0.005,
+      "narr_soviet_nostalgia": 0.0037,
+      "hostility_ukrainians": 0.9995,
+      "hostility_russians": 0.0334,
+      "reports_or_debunks": 0.1696
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_ukrainians-yes-2"
+  },
+  {
+   "case": "hostility_ukrainians:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "remove",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "remove",
+     "reason": "narrative",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.982,
+      "culture_entertainment": 0.0058,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0021,
+      "literature_art": 0.0018,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0032,
+      "geography": 0.0016,
+      "politics_government": 0.2567,
+      "war_ukraine": 0.9521,
+      "economy_business": 0.0012,
+      "history_soviet": 0.1919,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0083,
+      "narr_nazi": 0.0016,
+      "narr_war_justification": 0.0037,
+      "narr_nato_blame": 0.0007,
+      "narr_annexation": 0.0192,
+      "narr_atrocity_denial": 0.0006,
+      "narr_language": 0.0012,
+      "narr_russian_greatness": 0.0028,
+      "narr_soviet_nostalgia": 0.0005,
+      "hostility_ukrainians": 0.9979,
+      "hostility_russians": 0.0155,
+      "reports_or_debunks": 0.6965
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_ukrainians-near-1"
+  },
+  {
+   "case": "hostility_ukrainians:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.0157,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0018,
+      "literature_art": 0.0013,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0001,
+      "geography": 0.0016,
+      "politics_government": 0.0054,
+      "war_ukraine": 0.0115,
+      "economy_business": 0.0012,
+      "history_soviet": 0.03,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0003,
+      "narr_nazi": 0.0011,
+      "narr_war_justification": 0.0081,
+      "narr_nato_blame": 0.0006,
+      "narr_annexation": 0.009,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0008,
+      "narr_russian_greatness": 0.0012,
+      "narr_soviet_nostalgia": 0.0011,
+      "hostility_ukrainians": 0.0004,
+      "hostility_russians": 0.003,
+      "reports_or_debunks": 0.3569
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_ukrainians-near-2"
+  },
+  {
+   "case": "hostility_russians:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "hostility_russians"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9991,
+      "culture_entertainment": 0.0006,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0009,
+      "literature_art": 0.0083,
+      "cost_of_living": 0.0002,
+      "science_technology": 0.0006,
+      "geography": 0.0064,
+      "politics_government": 0.005,
+      "war_ukraine": 0.158,
+      "economy_business": 0.0012,
+      "history_soviet": 0.6104,
+      "sport": 0.0003,
+      "narr_ukraine_not_nation": 0.0012,
+      "narr_nazi": 0.0015,
+      "narr_war_justification": 0.0008,
+      "narr_nato_blame": 0.0016,
+      "narr_annexation": 0.0006,
+      "narr_atrocity_denial": 0.0066,
+      "narr_language": 0.0042,
+      "narr_russian_greatness": 0.0015,
+      "narr_soviet_nostalgia": 0.0012,
+      "hostility_ukrainians": 0.0216,
+      "hostility_russians": 0.9992,
+      "reports_or_debunks": 0.128
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_russians-yes-1"
+  },
+  {
+   "case": "hostility_russians:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "hostility_russians"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9998,
+      "culture_entertainment": 0.0005,
+      "celebrities": 0.0013,
+      "lifestyle_traditions": 0.0039,
+      "literature_art": 0.0059,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.0007,
+      "geography": 0.0014,
+      "politics_government": 0.0083,
+      "war_ukraine": 0.2032,
+      "economy_business": 0.0027,
+      "history_soviet": 0.7966,
+      "sport": 0.0011,
+      "narr_ukraine_not_nation": 0.0047,
+      "narr_nazi": 0.0032,
+      "narr_war_justification": 0.0002,
+      "narr_nato_blame": 0.0029,
+      "narr_annexation": 0.0006,
+      "narr_atrocity_denial": 0.0161,
+      "narr_language": 0.0021,
+      "narr_russian_greatness": 0.0011,
+      "narr_soviet_nostalgia": 0.0006,
+      "hostility_ukrainians": 0.0426,
+      "hostility_russians": 0.9994,
+      "reports_or_debunks": 0.0893
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_russians-yes-2"
+  },
+  {
+   "case": "hostility_russians:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9975,
+      "culture_entertainment": 0.0009,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0037,
+      "literature_art": 0.0014,
+      "cost_of_living": 0.0002,
+      "science_technology": 0.0016,
+      "geography": 0.0024,
+      "politics_government": 0.9985,
+      "war_ukraine": 0.9973,
+      "economy_business": 0.0009,
+      "history_soviet": 0.6413,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0013,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0002,
+      "narr_nato_blame": 0.0006,
+      "narr_annexation": 0.002,
+      "narr_atrocity_denial": 0.0011,
+      "narr_language": 0.0008,
+      "narr_russian_greatness": 0.0024,
+      "narr_soviet_nostalgia": 0.0017,
+      "hostility_ukrainians": 0.0167,
+      "hostility_russians": 0.0186,
+      "reports_or_debunks": 0.2374
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_russians-near-1"
+  },
+  {
+   "case": "hostility_russians:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.991,
+      "culture_entertainment": 0.0003,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0064,
+      "literature_art": 0.0004,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0006,
+      "geography": 0.0055,
+      "politics_government": 0.0295,
+      "war_ukraine": 0.0234,
+      "economy_business": 0.0081,
+      "history_soviet": 0.1416,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0047,
+      "narr_nazi": 0.0021,
+      "narr_war_justification": 0.0043,
+      "narr_nato_blame": 0.0008,
+      "narr_annexation": 0.026,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0005,
+      "narr_russian_greatness": 0.0022,
+      "narr_soviet_nostalgia": 0.001,
+      "hostility_ukrainians": 0.0055,
+      "hostility_russians": 0.0267,
+      "reports_or_debunks": 0.8041
+     }
+    }
+   ],
+   "from": "benchmark: c-hostility_russians-near-2"
+  },
+  {
+   "case": "reports_or_debunks:yes",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.6407,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0007,
+      "literature_art": 0.0003,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0047,
+      "geography": 0.0018,
+      "politics_government": 0.0348,
+      "war_ukraine": 0.0111,
+      "economy_business": 0.0026,
+      "history_soviet": 0.0181,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0008,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0026,
+      "narr_nato_blame": 0.0036,
+      "narr_annexation": 0.0031,
+      "narr_atrocity_denial": 0.0011,
+      "narr_language": 0.0006,
+      "narr_russian_greatness": 0.0002,
+      "narr_soviet_nostalgia": 0.0001,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.2124
+     }
+    }
+   ],
+   "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#21#0-210"
+  },
+  {
+   "case": "reports_or_debunks:yes",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.1797,
+      "culture_entertainment": 0.0004,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0015,
+      "literature_art": 0.0002,
+      "cost_of_living": 0.0,
+      "science_technology": 0.019,
+      "geography": 0.0012,
+      "politics_government": 0.0237,
+      "war_ukraine": 0.0655,
+      "economy_business": 0.0078,
+      "history_soviet": 0.0648,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0002,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0088,
+      "narr_nato_blame": 0.0005,
+      "narr_annexation": 0.0217,
+      "narr_atrocity_denial": 0.0011,
+      "narr_language": 0.0001,
+      "narr_russian_greatness": 0.0007,
+      "narr_soviet_nostalgia": 0.0005,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.9402
+     }
+    }
+   ],
+   "from": "benchmark: c-reports_or_debunks-yes-1"
+  },
+  {
+   "case": "reports_or_debunks:near",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "economy_business"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9958,
+      "culture_entertainment": 0.0003,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0011,
+      "literature_art": 0.0001,
+      "cost_of_living": 0.0527,
+      "science_technology": 0.0004,
+      "geography": 0.0005,
+      "politics_government": 0.01,
+      "war_ukraine": 0.0014,
+      "economy_business": 0.5428,
+      "history_soviet": 0.0258,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0004,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0015,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0291,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0003,
+      "narr_russian_greatness": 0.0065,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.0003,
+      "reports_or_debunks": 0.2823
+     }
+    }
+   ],
+   "from": "benchmark: c-reports_or_debunks-near-1"
+  },
+  {
+   "case": "reports_or_debunks:near",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "geography"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9979,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0048,
+      "literature_art": 0.001,
+      "cost_of_living": 0.0,
+      "science_technology": 0.9238,
+      "geography": 0.7143,
+      "politics_government": 0.0021,
+      "war_ukraine": 0.0004,
+      "economy_business": 0.0023,
+      "history_soviet": 0.0979,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0016,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0009,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0073,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0552,
+      "narr_soviet_nostalgia": 0.0182,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.0001,
+      "reports_or_debunks": 0.1733
+     }
+    }
+   ],
+   "from": "benchmark: c-reports_or_debunks-near-2"
+  },
+  {
+   "case": "gate_marker",
+   "text": 0,
+   "expected": "remove",
+   "got": "keep",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine",
+    "narr_nazi",
+    "narr_war_justification",
+    "narr_annexation"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.0025,
+      "culture_entertainment": 0.0009,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0009,
+      "literature_art": 0.0039,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0001,
+      "geography": 0.0053,
+      "politics_government": 0.0153,
+      "war_ukraine": 0.4978,
+      "economy_business": 0.0007,
+      "history_soviet": 0.0659,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0048,
+      "narr_nazi": 0.0067,
+      "narr_war_justification": 0.0103,
+      "narr_nato_blame": 0.0017,
+      "narr_annexation": 0.0236,
+      "narr_atrocity_denial": 0.0036,
+      "narr_language": 0.0008,
+      "narr_russian_greatness": 0.0041,
+      "narr_soviet_nostalgia": 0.0009,
+      "hostility_ukrainians": 0.0033,
+      "hostility_russians": 0.0074,
+      "reports_or_debunks": 0.7949
+     }
+    }
+   ],
+   "from": "new (written for this case)"
+  },
+  {
+   "case": "gate_language_menu",
+   "text": 0,
+   "expected": "untouched or pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "new (written for this case)"
+  },
+  {
+   "case": "edge_scientist",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "science_technology"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.6705,
+      "culture_entertainment": 0.0003,
+      "celebrities": 0.0002,
+      "lifestyle_traditions": 0.0023,
+      "literature_art": 0.001,
+      "cost_of_living": 0.0,
+      "science_technology": 0.7755,
+      "geography": 0.0012,
+      "politics_government": 0.0006,
+      "war_ukraine": 0.0012,
+      "economy_business": 0.003,
+      "history_soviet": 0.0244,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0011,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.001,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0096,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.001,
+      "narr_russian_greatness": 0.0024,
+      "narr_soviet_nostalgia": 0.0028,
+      "hostility_ukrainians": 0.0003,
+      "hostility_russians": 0.0009,
+      "reports_or_debunks": 0.317
+     }
+    }
+   ],
+   "from": "new (written for this case)"
+  },
+  {
+   "case": "edge_price_in_tech",
+   "text": 0,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "science_technology",
+    "economy_business"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.2271,
+      "culture_entertainment": 0.0013,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0023,
+      "literature_art": 0.0019,
+      "cost_of_living": 0.0045,
+      "science_technology": 0.9831,
+      "geography": 0.0011,
+      "politics_government": 0.0068,
+      "war_ukraine": 0.0019,
+      "economy_business": 0.0461,
+      "history_soviet": 0.0307,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0007,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0011,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0013,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0003,
+      "narr_russian_greatness": 0.0108,
+      "narr_soviet_nostalgia": 0.0014,
+      "hostility_ukrainians": 0.0002,
+      "hostility_russians": 0.0028,
+      "reports_or_debunks": 0.5228
+     }
+    }
+   ],
+   "from": "new (written for this case)"
+  },
+  {
+   "case": "edge_conflict",
+   "text": 0,
+   "expected": "review",
+   "got": "review",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "culture_entertainment",
+    "celebrities",
+    "science_technology",
+    "economy_business"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "conflict",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9938,
+      "culture_entertainment": 0.9933,
+      "celebrities": 0.9924,
+      "lifestyle_traditions": 0.0045,
+      "literature_art": 0.0326,
+      "cost_of_living": 0.0,
+      "science_technology": 0.9936,
+      "geography": 0.0037,
+      "politics_government": 0.0016,
+      "war_ukraine": 0.0001,
+      "economy_business": 0.9611,
+      "history_soviet": 0.0238,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0015,
+      "narr_nazi": 0.0,
+      "narr_war_justification": 0.0011,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0067,
+      "narr_atrocity_denial": 0.0001,
+      "narr_language": 0.0017,
+      "narr_russian_greatness": 0.0564,
+      "narr_soviet_nostalgia": 0.0034,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0001,
+      "reports_or_debunks": 0.372
+     }
+    }
+   ],
+   "from": "benchmark: b-conflict-yes-1"
+  },
+  {
+   "case": "edge_conflict",
+   "text": 1,
+   "expected": "review",
+   "got": "review",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "cost_of_living",
+    "economy_business"
+   ],
+   "paragraphs": [
+    {
+     "action": "review",
+     "reason": "conflict",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9885,
+      "culture_entertainment": 0.0009,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.021,
+      "literature_art": 0.0011,
+      "cost_of_living": 0.8651,
+      "science_technology": 0.9704,
+      "geography": 0.0089,
+      "politics_government": 0.0079,
+      "war_ukraine": 0.0013,
+      "economy_business": 0.9692,
+      "history_soviet": 0.0468,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0017,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0027,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0073,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0007,
+      "narr_russian_greatness": 0.0076,
+      "narr_soviet_nostalgia": 0.0013,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0004,
+      "reports_or_debunks": 0.5941
+     }
+    }
+   ],
+   "from": "benchmark: b-conflict-yes-2"
+  },
+  {
+   "case": "edge_no_subject",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.6226,
+      "culture_entertainment": 0.0046,
+      "celebrities": 0.0003,
+      "lifestyle_traditions": 0.0097,
+      "literature_art": 0.0145,
+      "cost_of_living": 0.0001,
+      "science_technology": 0.069,
+      "geography": 0.0135,
+      "politics_government": 0.0078,
+      "war_ukraine": 0.0005,
+      "economy_business": 0.0109,
+      "history_soviet": 0.0251,
+      "sport": 0.0001,
+      "narr_ukraine_not_nation": 0.0005,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0024,
+      "narr_nato_blame": 0.0001,
+      "narr_annexation": 0.0157,
+      "narr_atrocity_denial": 0.0003,
+      "narr_language": 0.0002,
+      "narr_russian_greatness": 0.0149,
+      "narr_soviet_nostalgia": 0.0016,
+      "hostility_ukrainians": 0.0,
+      "hostility_russians": 0.0003,
+      "reports_or_debunks": 0.2813
+     }
+    }
+   ],
+   "from": "benchmark: b-no_subject-yes-1"
+  },
+  {
+   "case": "edge_no_subject",
+   "text": 1,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "no_subject",
+     "levels": [
+      0,
+      1
+     ],
+     "scores": {
+      "involves_russia": 0.9887,
+      "culture_entertainment": 0.0,
+      "celebrities": 0.0001,
+      "lifestyle_traditions": 0.0003,
+      "literature_art": 0.0002,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0329,
+      "geography": 0.001,
+      "politics_government": 0.0558,
+      "war_ukraine": 0.0086,
+      "economy_business": 0.0067,
+      "history_soviet": 0.051,
+      "sport": 0.0009,
+      "narr_ukraine_not_nation": 0.0018,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0129,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0743,
+      "narr_atrocity_denial": 0.0004,
+      "narr_language": 0.0003,
+      "narr_russian_greatness": 0.0015,
+      "narr_soviet_nostalgia": 0.0004,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0001,
+      "reports_or_debunks": 0.1109
+     }
+    }
+   ],
+   "from": "benchmark: b-no_subject-yes-4"
+  },
+  {
+   "case": "edge_war_factual",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "war_ukraine"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9123,
+      "culture_entertainment": 0.0002,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0006,
+      "literature_art": 0.0003,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0003,
+      "geography": 0.0053,
+      "politics_government": 0.0085,
+      "war_ukraine": 0.9738,
+      "economy_business": 0.0008,
+      "history_soviet": 0.0492,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0005,
+      "narr_nazi": 0.0023,
+      "narr_war_justification": 0.0029,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0011,
+      "narr_atrocity_denial": 0.0002,
+      "narr_language": 0.0012,
+      "narr_russian_greatness": 0.0006,
+      "narr_soviet_nostalgia": 0.0007,
+      "hostility_ukrainians": 0.0014,
+      "hostility_russians": 0.0022,
+      "reports_or_debunks": 0.5678
+     }
+    }
+   ],
+   "from": "new (written for this case)"
+  },
+  {
+   "case": "edge_debunk",
+   "text": 0,
+   "expected": "keep",
+   "got": "keep",
+   "ok": true,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "keep",
+     "reason": "keep_label",
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "scores": {
+      "involves_russia": 0.9951,
+      "culture_entertainment": 0.0001,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0017,
+      "literature_art": 0.0006,
+      "cost_of_living": 0.0,
+      "science_technology": 0.0133,
+      "geography": 0.0055,
+      "politics_government": 0.2568,
+      "war_ukraine": 0.986,
+      "economy_business": 0.0009,
+      "history_soviet": 0.1222,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0006,
+      "narr_nazi": 0.0005,
+      "narr_war_justification": 0.0028,
+      "narr_nato_blame": 0.0003,
+      "narr_annexation": 0.0013,
+      "narr_atrocity_denial": 0.0036,
+      "narr_language": 0.0008,
+      "narr_russian_greatness": 0.001,
+      "narr_soviet_nostalgia": 0.0006,
+      "hostility_ukrainians": 0.0036,
+      "hostility_russians": 0.0022,
+      "reports_or_debunks": 0.8481
+     }
+    }
+   ],
+   "from": "benchmark: c-narr_atrocity_denial-near-1"
+  },
+  {
+   "case": "edge_debunk",
+   "text": 1,
+   "expected": "keep",
+   "got": "pass",
+   "ok": false,
+   "labels_yes_expected": [
+    "involves_russia",
+    "politics_government",
+    "war_ukraine",
+    "reports_or_debunks"
+   ],
+   "paragraphs": [
+    {
+     "action": "pass",
+     "reason": "gate_negative",
+     "levels": [
+      0
+     ],
+     "scores": {
+      "involves_russia": 0.1797,
+      "culture_entertainment": 0.0004,
+      "celebrities": 0.0,
+      "lifestyle_traditions": 0.0015,
+      "literature_art": 0.0002,
+      "cost_of_living": 0.0,
+      "science_technology": 0.019,
+      "geography": 0.0012,
+      "politics_government": 0.0237,
+      "war_ukraine": 0.0655,
+      "economy_business": 0.0078,
+      "history_soviet": 0.0648,
+      "sport": 0.0,
+      "narr_ukraine_not_nation": 0.0002,
+      "narr_nazi": 0.0001,
+      "narr_war_justification": 0.0088,
+      "narr_nato_blame": 0.0005,
+      "narr_annexation": 0.0217,
+      "narr_atrocity_denial": 0.0011,
+      "narr_language": 0.0001,
+      "narr_russian_greatness": 0.0007,
+      "narr_soviet_nostalgia": 0.0005,
+      "hostility_ukrainians": 0.0001,
+      "hostility_russians": 0.0002,
+      "reports_or_debunks": 0.9402
+     }
+    }
+   ],
+   "from": "benchmark: c-reports_or_debunks-yes-1"
+  },
+  {
+   "case": "edge_place_names",
+   "text": 0,
+   "expected": "untouched or pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "new (written for this case)"
+  },
+  {
+   "case": "edge_russian_language",
+   "text": 0,
+   "expected": "untouched or pass",
+   "got": "untouched",
+   "ok": true,
+   "labels_yes_expected": [],
+   "paragraphs": [],
+   "from": "new (written for this case)"
+  }
+ ],
+ "note": "ok: expected == got, with 'pass' and 'untouched' counted as the same (both leave the text as it is)"
+}

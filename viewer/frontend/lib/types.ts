@@ -454,7 +454,7 @@ export type LabelDocRow = {
 export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number };
 export type LabelParagraph = {
   span: [number, number]; action: string; reason: string; labels: string[]; scores: Record<string, number>;
-  tokens: number; marker?: boolean; flags?: string[]; judged?: string[];
+  tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[];
 };
 export type LabelDocResp = {
   name: string; file: string; input: string | null; text: string | null; problem: string | null;
@@ -463,4 +463,18 @@ export type LabelDocResp = {
          tokens_removed?: number; rewrites?: number; error?: string };
   policy: { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string };
   settings: Record<string, unknown>;
+};
+
+// ---- policy Try page (labels/cases_v1.json, POST /api/labels/try) ----
+
+export type LabelCaseText = { text: string; from: string; labels_yes: string[]; expected_action: string | null; note: string };
+export type LabelCase = {
+  id: string; group: string; label: string | null; title: string; what: string;
+  hypothesis?: string; decision?: string; texts: LabelCaseText[];
+};
+export type LabelCasesResp = { version: number; created: string; about: string; policy: string; file: string; cases: LabelCase[] };
+export type LabelTryResp = {
+  rows: LabelDocResp["row"][]; clean: (string | null)[]; rewrites: { start: number; old: string; new: string }[][];
+  seconds: number; pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null };
+  policy: { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string };
 };

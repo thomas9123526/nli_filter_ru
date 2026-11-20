@@ -24,6 +24,7 @@ viewer/.viewer_edits/
 /test_corpus*
 out_test_corpus**
 out**
+!cmds/labeling/outputs.md
 pkgs/**
 # nli_label.py: downloaded corpus samples and score caches (hand labels in labels/*.jsonl ARE kept)
 corpus_olmo/

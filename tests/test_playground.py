@@ -103,3 +103,38 @@ def test_nli_filter_uses_hypotheses_file(tmp_path, monkeypatch):
     (tmp_path / "bad.json").write_text("{}", encoding="utf-8")
     assert nf.main([str(tmp_path / "in.jsonl"), "--hypotheses-file", str(tmp_path / "bad.json"),
                     "--output-dir", str(tmp_path / "out2")]) == 2
+
+
+def _post_path(url, path, body):
+    req = urllib.request.Request(url + path, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.status, json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read())
+
+
+def test_label_endpoint_policy_flow(service):
+    """POST /label: the policy's labels on texts (the viewer's policy Try page)."""
+    texts = ["The history of Russia is long and the Kremlin keeps its archives closed.", "Preheat the oven."]
+    code, r = _post_path(service, "/label", {"texts": texts})
+    assert code == 200, r
+    row = r["rows"][0]
+    assert row["gate"] and row["paragraphs"]
+    p = row["paragraphs"][0]
+    assert set(p["scores"]) == set(r["policy"]["labels"])          # all labels scored (all_labels default)
+    assert p["levels"][0] == 0 and p["action"] in ("remove", "review", "keep", "pass")
+    assert r["rows"][1]["action"] == "untouched"                     # no keyword
+    code, r = _post_path(service, "/label", {"texts": texts[1:], "force_gate": True})
+    assert code == 200 and r["rows"][0]["paragraphs"]                # labelled without a keyword
+    code, r = _post_path(service, "/label", {"texts": ["x"], "policy": "../nli_filter.py"})
+    assert code == 400                                               # only files in policy/
+    code, r = _post_path(service, "/label", {"texts": []})
+    assert code == 400
+
+
+def test_jobs_only_known_scripts():
+    jobs = nli_playground.Jobs()
+    with pytest.raises(ValueError):
+        jobs.start(["--help"], script="evil.py")

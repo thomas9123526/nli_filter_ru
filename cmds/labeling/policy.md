@@ -23,6 +23,15 @@ All hypotheses, thresholds and decisions live in this one file. To try a change,
 | `softens` | label keys, `*` allowed | A "yes" turns those labels' "remove" into "review" (used by `reports_or_debunks`) |
 | `note` | text | For people; ignored by the tool |
 
+## Versions
+
+| File | Labels |
+|---|---|
+| `policy\russia_policy.json` (v1) | 25: the guide's answer 2 |
+| `policy\russia_policy_v2.json` (v2) | 28: v1 + `fashion_style` (1, remove), `values_mindset` (1, review), `narr_traditional_values` (2, remove); level 2 also after `values_mindset`. See `cmds\labeling\cases.md` |
+
+`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json`.
+
 ## The labels as shipped (decisions = the guide's suggestions; A's compliance team decides)
 
 | Level | Label | Decision |

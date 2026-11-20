@@ -50,6 +50,7 @@
 | | `thresholds.md` | `nli_label.py eval` output, choosing thresholds, the CRC guarantee |
 | | `place_names.md` | `policy\place_names.csv` + exceptions, `nli_names.py`, open codebook questions |
 | | `outputs.md` | What `run` / `redecide` write; the composition report |
+| | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 66 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v2.json`; as a corpus: `test_corpus_cases\` (viewer dataset "cases"); policy v2 (values / style labels) |
 | | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
 | `design/` | `labeling_report_2026-11-20.md` | What was built on 2026-11-20 for the labelling project, results, open decisions, next steps |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |

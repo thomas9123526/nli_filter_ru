@@ -75,6 +75,7 @@ context; prices inside technical text; pre-1991 / Soviet history; Russian athlet
 | Seed | ~200 paragraphs, all labels | `sample out_label_seed --out labels\seed.jsonl` (done; check the drafts) |
 | Per label | 50 clear yes + 50 clear no **per label**, with near misses | `sample RUN --label celebrities --top 40 --near 30 --low 30 --random 0 --exclude labels\seed.jsonl --out labels\celebrities.jsonl` |
 | Random check | a random sample, for the CRC guarantee and the weekly audit | `sample RUN --random 300 --top 0 --near 0 --low 0 --exclude labels\*.jsonl --out labels\random_01.jsonl` |
+| Human review | every paragraph a run sent to **review**: a person decides remove / keep | `review out_label_dclm --out labels\review_dclm_01.jsonl` (see `outputs.md`) |
 
 Run `eval` with all files together: `python nli_label.py eval labels\seed.jsonl labels\celebrities.jsonl …`.
 For the per-label rounds, use a run made with `--all-labels` over many documents (on a GPU), so every label has

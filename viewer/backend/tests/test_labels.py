@@ -99,3 +99,16 @@ def test_start_guarded_and_validated(client):
     assert client.post("/api/labels/start", json={"command": "run in.jsonl"}, headers=h).status_code == 400
     r = client.post("/api/labels/start", json=body, headers=h)
     assert r.status_code in (502, 503)  # validated; the model service is not running in tests
+
+
+def test_cases_and_try(client, project):
+    assert client.get("/api/labels/cases").status_code == 404          # no cases file yet
+    (project / "labels").mkdir(exist_ok=True)
+    (project / "labels" / "cases_v1.json").write_text(json.dumps(
+        {"version": 1, "cases": [{"id": "x:yes", "group": "g", "title": "t", "what": "w", "texts": []}]}),
+        encoding="utf-8")
+    d = client.get("/api/labels/cases").json()
+    assert d["file"] == "labels/cases_v1.json" and d["cases"][0]["id"] == "x:yes"
+    assert client.post("/api/labels/try", json={"texts": []}).status_code == 400
+    assert client.post("/api/labels/try", json={"texts": ["a"] * 21}).status_code == 400
+    assert client.post("/api/labels/try", json={"texts": ["Russia."]}).status_code in (502, 503)  # no service

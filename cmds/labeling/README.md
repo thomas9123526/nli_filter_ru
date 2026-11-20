@@ -45,6 +45,7 @@ decision. It removes only the paragraphs the policy says to remove, and rewrites
 | [outputs.md](outputs.md) | What `run` writes; the composition report |
 | [benchmark.md](benchmark.md) | The synthetic regression set (170 items) and the real-data benchmark plan |
 | [../viewer/labels_pages.md](../viewer/labels_pages.md) | See runs and each paragraph's flow in the viewer; start runs from it |
+| [cases.md](cases.md) | **Try the policy case by case** in the viewer: 60 cases (every label yes / near miss + edge cases), 1–2 texts each |
 
 ## How a document is processed
 

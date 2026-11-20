@@ -19,11 +19,12 @@ const REASONS: Record<string, string> = {
   no_subject: "Russia-related (gate yes), but no subject label is yes: kept.",
 };
 
-function Level({ title, keys, p, pol, note }: { title: string; keys: string[]; p: LabelParagraph; pol: Record<string, LabelPolicyLabel>; note?: string }) {
+function Level({ title, keys, p, pol, note, used }: { title: string; keys: string[]; p: LabelParagraph; pol: Record<string, LabelPolicyLabel>; note?: string; used: boolean }) {
   const scored = keys.filter((k) => p.scores[k] !== undefined);
   return (
-    <div className="flow-step">
-      <div className="row"><strong>{title}</strong>{note ? <span className="faint" style={{ fontSize: 12 }}>{note}</span> : null}</div>
+    <div className={`flow-step${used ? "" : " unused"}`}>
+      <div className="row"><strong>{title}</strong>{note ? <span className="faint" style={{ fontSize: 12 }}>{note}</span> : null}
+        {!used && scored.length ? <span className="badge neutral">does not run for this paragraph: scores shown for information only</span> : null}</div>
       {scored.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>not run for this paragraph</div> : (
         <table className="flow-table"><tbody>{keys.map((k) => {
           const l = pol[k]; const s = p.scores[k];
@@ -41,17 +42,20 @@ function Level({ title, keys, p, pol, note }: { title: string; keys: string[]; p
   );
 }
 
-function Flow({ d, p }: { d: LabelDocResp; p: LabelParagraph }) {
-  const pol = d.policy.labels;
+export type FlowPolicy = { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]> };
+
+export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
+  const pol = policy.labels;
   const byLevel = (n: number) => Object.keys(pol).filter((k) => pol[k].level === n);
-  const runIf = (n: number) => (d.policy.run_if[String(n)] || []).map((k) => (k === "@marker" ? "a marker term" : k)).join(" or ");
+  const runIf = (n: number) => (policy.run_if[String(n)] || []).map((k) => (k === "@marker" ? "a marker term" : k)).join(" or ");
+  const used = (n: number) => (p.levels ? p.levels.includes(n) : true);
   return (
     <div className="flow">
-      <Level title="Level 0 · gate" keys={byLevel(0)} p={p} pol={pol} note={p.marker ? "marker term in the paragraph: the gate is skipped" : undefined} />
+      <Level title="Level 0 · gate" keys={byLevel(0)} p={p} pol={pol} used={used(0)} note={p.marker ? "marker term in the paragraph: the gate is skipped" : undefined} />
       <div className="flow-arrow">↓</div>
-      <Level title="Level 1 · subject" keys={byLevel(1)} p={p} pol={pol} note={runIf(1) ? `runs when ${runIf(1)} is yes` : undefined} />
+      <Level title="Level 1 · subject" keys={byLevel(1)} p={p} pol={pol} used={used(1)} note={runIf(1) ? `runs when ${runIf(1)} is yes` : undefined} />
       <div className="flow-arrow">↓</div>
-      <Level title="Level 2 · framing" keys={byLevel(2)} p={p} pol={pol} note={runIf(2) ? `runs when ${runIf(2)} is yes` : undefined} />
+      <Level title="Level 2 · framing" keys={byLevel(2)} p={p} pol={pol} used={used(2)} note={runIf(2) ? `runs when ${runIf(2)} is yes` : undefined} />
       <div className="flow-arrow">↓</div>
       <div className="flow-step">
         <div className="row"><strong>Decision</strong><span className={`badge big ${actionClass(p.action)}`}>{p.action}</span>
@@ -128,7 +132,7 @@ export function LabelDocView() {
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
                 <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)}>¶{i + 1} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
             </div>
-            {paras[sel] ? <Flow d={d} p={paras[sel]} /> : <div className="faint">Nothing to show.</div>}
+            {paras[sel] ? <Flow policy={d.policy} p={paras[sel]} /> : <div className="faint">Nothing to show.</div>}
           </div>
         </div>
       ) : null}

@@ -15,6 +15,13 @@
       "editable": true
     },
     {
+      "name": "cases",
+      "title": "Policy cases: one file per case (Level 0 / 1 / 2 + edge cases)",
+      "description": "labels/cases_v1.json as a corpus (tools/build_cases_corpus.py). Labels: out_label_cases on the Labels pages; try one by one on /labeltry.",
+      "corpus": "../test_corpus_cases",
+      "editable": true
+    },
+    {
       "name": "germany",
       "title": "Germany test",
       "corpus": "../test_corpus_de",

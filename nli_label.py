@@ -19,6 +19,7 @@ Commands
   sample  python nli_label.py sample out_label --out labels/seed.jsonl         (paragraphs to hand-label)
   eval    python nli_label.py eval labels/seed.jsonl                            (per-label accuracy, thresholds)
   report  python nli_label.py report out_label                                  (composition, token-weighted)
+  review  python nli_label.py review out_label --out labels/review_01.jsonl           (human-review queue)
   redecide python nli_label.py redecide out_label --policy new.json --output-dir out_label2
                                                    (changed thresholds / decisions from stored scores, no models)
 
@@ -331,9 +332,10 @@ class Labeller:
     def __init__(self, policy: Policy, matcher, rules, scorer, rewriter: Optional[NameRewriter] = None,
                  all_labels: bool = False, text_field: str = "text", id_field: Optional[str] = "id",
                  review_as: str = "keep", min_doc_chars: int = 50, marker_matcher=None,
-                 group_field: Optional[str] = None):
+                 group_field: Optional[str] = None, force_gate: bool = False):
         self.p, self.matcher, self.rules, self.scorer = policy, matcher, rules, scorer
         self.group_field = group_field
+        self.force_gate = force_gate  # label every paragraph, also without a keyword hit (Try page: gate cases)
         self.rewriter = rewriter
         self.all_labels = all_labels
         self.text_field, self.id_field = text_field, id_field
@@ -371,18 +373,18 @@ class Labeller:
                     self.rules.apply(text, hits)
                 open_hits = [h for h in hits if not h.rule]
                 marks = self.marker_matcher.find(text) if self.marker_matcher is not None else []
-                d["row"]["gate"] = bool(open_hits or marks)
+                d["row"]["gate"] = bool(open_hits or marks or self.force_gate)
                 if hits:
                     d["row"]["hits"] = [{"kw": self.matcher.keywords[h.kw] if h.kw is not None else text[h.start:h.end],
                                          "span": [h.start, h.end], **({"rule": h.rule} if h.rule else {})}
                                         for h in hits[:50]]
                 if marks:
                     d["row"]["markers"] = sorted({text[m.start:m.end] for m in marks})
-                if open_hits or marks:
+                if open_hits or marks or self.force_gate:
                     for s, e in split_paragraphs(text, p.min_chars, p.max_chars):
                         ph = [h for h in open_hits if s <= h.start < e]
                         pm = [m for m in marks if s <= m.start < e]
-                        if ph or pm:
+                        if ph or pm or self.force_gate:
                             d["paras"].append({"span": [s, e], "marker": bool(pm), "scores": {},
                                                "_text": text[s:e]})
             docs.append(d)
@@ -398,6 +400,18 @@ class Labeller:
                 self._score(todo)
         return [self._finish(d) for d in docs]
 
+    def levels_used(self, scores: Dict[str, float], marker: bool) -> List[int]:
+        """The levels the cascade runs for a paragraph (run_if). With --all-labels the other levels are scored
+        too, but only for information: the decision uses the same levels as a normal run."""
+        used = [0]
+        so_far = {k: v for k, v in scores.items() if self.p.labels[k].level == 0}
+        for lvl in (1, 2):
+            if not self.p.runs(lvl, so_far, marker):
+                break
+            used.append(lvl)
+            so_far.update({k: v for k, v in scores.items() if self.p.labels[k].level == lvl})
+        return used
+
     def _finish(self, d: Dict[str, Any]) -> Outcome:
         row, text, rec = d["row"], d["text"], d["rec"]
         if text is None:
@@ -409,9 +423,11 @@ class Labeller:
         tokens_removed = 0
         review = False
         for pa in d["paras"]:
-            r = resolve(self.p, pa["scores"], pa["marker"])
+            used = self.levels_used(pa["scores"], pa["marker"])
+            r = resolve(self.p, {k: v for k, v in pa["scores"].items() if self.p.labels[k].level in used},
+                        pa["marker"])
             out = {"span": pa["span"], "action": r["action"], "reason": r["reason"], "labels": r["labels"],
-                   "scores": pa["scores"], "tokens": est_tokens(pa["_text"])}
+                   "scores": pa["scores"], "levels": used, "tokens": est_tokens(pa["_text"])}
             if pa["marker"]:
                 out["marker"] = True
             if r["flags"]:
@@ -920,6 +936,96 @@ def label_meta(policy: Policy, **extra: Any) -> Dict[str, Any]:
             "created": time.strftime("%Y-%m-%d %H:%M:%S"), **extra}
 
 
+def paragraph_items(cands: List[Dict[str, Any]], policy: Policy, text_field: str = "text",
+                    context: int = 300) -> List[Dict[str, Any]]:
+    """Hand-label items (label tool format) for paragraphs of a run: cands = {key, file, line, span, id, scores,
+    action, marker, picked_for}. The text is read from the run's input files; emptied documents are skipped."""
+    by_file: Dict[str, Dict[int, List[Dict[str, Any]]]] = collections.defaultdict(lambda: collections.defaultdict(list))
+    for c in cands:
+        by_file[c["file"]][int(c["line"])].append(c)
+    matcher, rules, markers = build_matchers(policy)
+    items = []
+    for f, lines in by_file.items():
+        need = set(lines)
+        for rec in JsonlSource(f).records():
+            if rec.line not in need:
+                continue
+            text = rec.get(text_field) or ""
+            for c in lines[rec.line]:
+                s, e = c["span"]
+                ptext = text[s:e]
+                if not ptext.strip():  # the document was emptied (e.g. content screening) after the run
+                    continue
+                hs = matcher.find(ptext)
+                if rules is not None and hs:
+                    rules.apply(ptext, hs)
+                hl = [[h.start, h.end] for h in hs if not h.rule]
+                if markers is not None:
+                    hl += [[m.start, m.end] for m in markers.find(ptext)]
+                items.append({
+                    "key": c["key"], "source": {"file": f, "line": c["line"], "span": c["span"], "id": c.get("id")},
+                    "text": ptext, "before": text[max(0, s - context):s], "after": text[e:e + context],
+                    "hits": sorted(hl), "marker": bool(c.get("marker")), "picked_for": c["picked_for"],
+                    "model": {"scores": c["scores"], "action": c["action"], **({"reason": c["reason"]} if c.get("reason") else {}),
+                              **({"labels": c["labels"]} if c.get("labels") is not None else {})},
+                    "labels": {k: None for k in policy.labels}, "action": None,
+                    "status": "todo", "by": None, "note": ""})
+            need.discard(rec.line)
+            if not need:
+                break
+    return items
+
+
+def cmd_review(args) -> int:
+    """The human-review queue of a run: every paragraph whose action is 'review' (or --actions ...), as a
+    hand-label file that tools/label_tool.html opens. The reviewer decides with 'your action' (+ a note)."""
+    run = Path(args.run)
+    pairs = _run_files(run)
+    if not pairs:
+        print(f"error: {run} has no finished files", file=sys.stderr)
+        return 2
+    summ = json.loads((run / "summary.json").read_text(encoding="utf-8")) if (run / "summary.json").is_file() else {}
+    pol_path = args.policy or (summ.get("policy") or {}).get("path")
+    policy = Policy.load(pol_path)
+    want = set(args.actions)
+    cands = []
+    for inp, lp in pairs:
+        with open(lp, encoding="utf-8") as fh:
+            for raw in fh:
+                r = json.loads(raw)
+                for pa in r.get("paragraphs") or []:
+                    if pa["action"] not in want:
+                        continue
+                    cands.append({"key": f"{inp}#{r['line']}#{pa['span'][0]}-{pa['span'][1]}", "file": inp,
+                                  "line": r["line"], "id": r.get("id"), "span": pa["span"], "scores": pa["scores"],
+                                  "action": pa["action"], "reason": pa.get("reason"), "labels": pa.get("labels"),
+                                  "marker": pa.get("marker", False),
+                                  "picked_for": [f"{pa['action']}:{pa.get('reason')}"] +
+                                                [f"label:{k}" for k in pa.get("labels") or []]})
+    if not cands:
+        print(f"no paragraphs with action {', '.join(sorted(want))} in {run}")
+        return 0
+    items = paragraph_items(cands, policy, args.text_field, args.context)
+    out = Path(args.out)
+    if out.exists() and not args.overwrite:
+        print(f"error: {out} exists (use --overwrite)", file=sys.stderr)
+        return 2
+    rs = summ.get("settings") or {}
+    setup = setup_key(rs.get("fast_model"), rs.get("judge_model"), rs.get("uncertain_band"), rs.get("max_length")) \
+        if rs else None
+    write_labels_file(str(out), label_meta(policy, run=str(run), kind=f"review queue ({', '.join(sorted(want))})",
+                                           setup=setup), items)
+    why = collections.Counter(it["picked_for"][0] for it in items)
+    labs = collections.Counter(w[6:] for it in items for w in it["picked_for"][1:])
+    print(f"{len(items)} paragraphs -> {out}")
+    print("  by reason: " + ", ".join(f"{k} {v}" for k, v in why.most_common()))
+    print("  by label:  " + ", ".join(f"{k} {v}" for k, v in labs.most_common()))
+    if len(items) < len(cands):
+        print(f"  {len(cands) - len(items)} skipped: their documents are empty now")
+    print("open it in tools/label_tool.html: answer the labels, set 'your action' (remove / keep), note why")
+    return 0
+
+
 def cmd_sample(args) -> int:
     policy = Policy.load(args.policy)
     run = Path(args.run)
@@ -953,7 +1059,7 @@ def cmd_sample(args) -> int:
         if k in existing:
             return
         if k not in picked:
-            picked[k] = dict(c, picked_for=[])
+            picked[k] = dict(c, picked_for=[], key=k)
         if why not in picked[k]["picked_for"]:
             picked[k]["picked_for"].append(why)
 
@@ -979,39 +1085,7 @@ def cmd_sample(args) -> int:
             take(c, f"near:{k}")
         for c in rng.sample(low, min(args.low, len(low))):
             take(c, f"low:{k}")
-    # texts
-    by_file: Dict[str, Dict[int, List[Dict[str, Any]]]] = collections.defaultdict(lambda: collections.defaultdict(list))
-    for c in picked.values():
-        by_file[c["file"]][int(c["line"])].append(c)
-    matcher, rules, markers = build_matchers(policy)
-    items = []
-    for f, lines in by_file.items():
-        need = set(lines)
-        for rec in JsonlSource(f).records():
-            if rec.line not in need:
-                continue
-            text = rec.get(args.text_field) or ""
-            for c in lines[rec.line]:
-                s, e = c["span"]
-                ptext = text[s:e]
-                if not ptext.strip():  # the document was emptied (e.g. content screening) after the run
-                    continue
-                hs = matcher.find(ptext)
-                if rules is not None and hs:
-                    rules.apply(ptext, hs)
-                hl = [[h.start, h.end] for h in hs if not h.rule]
-                if markers is not None:
-                    hl += [[m.start, m.end] for m in markers.find(ptext)]
-                items.append({
-                    "key": key(c), "source": {"file": f, "line": c["line"], "span": c["span"], "id": c.get("id")},
-                    "text": ptext, "before": text[max(0, s - args.context):s], "after": text[e:e + args.context],
-                    "hits": sorted(hl), "marker": bool(c.get("marker")), "picked_for": c["picked_for"],
-                    "model": {"scores": c["scores"], "action": c["action"]},
-                    "labels": {k: None for k in policy.labels}, "action": None,
-                    "status": "todo", "by": None, "note": ""})
-            need.discard(rec.line)
-            if not need:
-                break
+    items = paragraph_items(list(picked.values()), policy, args.text_field, args.context)
     rng.shuffle(items)
     out = Path(args.out)
     if out.exists() and not args.overwrite:
@@ -1296,6 +1370,17 @@ def build_parser() -> argparse.ArgumentParser:
     rp = sub.add_parser("report", help="print a run's token-weighted composition again")
     rp.add_argument("run")
 
+    rv = sub.add_parser("review", help="the human-review queue of a run (paragraphs with action 'review') as a "
+                                       "hand-label file for tools/label_tool.html")
+    rv.add_argument("run", help="output folder of 'run' or 'redecide'")
+    rv.add_argument("--out", required=True, help="e.g. labels/review_dclm_01.jsonl")
+    rv.add_argument("--policy", help="default: the policy the run used")
+    rv.add_argument("--actions", nargs="+", default=["review"], choices=list(ACTIONS),
+                    help="which paragraph actions to queue (default review; e.g. review remove to check removals too)")
+    rv.add_argument("--context", type=int, default=300)
+    rv.add_argument("--text-field", default="text")
+    rv.add_argument("--overwrite", action="store_true")
+
     d = sub.add_parser("redecide", help="apply a changed policy (thresholds, decisions, run_if) to a finished run "
                                         "from its stored scores, no models")
     d.add_argument("run", help="output folder of 'run'")
@@ -1332,7 +1417,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         format="%(asctime)s %(levelname)s %(message)s")
     try:
         return {"run": cmd_run, "sample": cmd_sample, "eval": cmd_eval, "report": cmd_report,
-                "redecide": cmd_redecide}[args.cmd](args)
+                "redecide": cmd_redecide, "review": cmd_review}[args.cmd](args)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

@@ -419,3 +419,15 @@ tr.line-preview td { background: var(--panel-2); }
 .flow-table td { padding: 4px 6px; border-top: 1px solid var(--border); vertical-align: top; font-size: 13px; }
 .flow-table tr.yes td { background: var(--accent-soft); }
 tr.active td { background: var(--accent-soft); }
+/* policy Try page */
+.try-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .try-grid { grid-template-columns: 1fr; } }
+.case-list { max-height: 80vh; overflow: auto; }
+.case-group { padding: 8px 12px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.case-item { display: flex; justify-content: space-between; gap: 6px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--text); padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.case-item.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--border); margin-left: 3px; }
+.dot.ok { background: var(--keep); } .dot.bad { background: var(--filter); }
+.try-text { width: 100%; min-height: 130px; margin: 8px 0; padding: 8px; font-size: 13px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+.try-clean { white-space: pre-wrap; font-size: 12px; background: var(--panel-2); padding: 8px; border-radius: 6px; }
+.flow-step.unused { opacity: 0.6; border-style: dashed; }

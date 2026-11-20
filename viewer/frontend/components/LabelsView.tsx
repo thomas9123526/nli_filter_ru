@@ -61,6 +61,10 @@ export function LabelsView() {
         </div>
       </div>
 
+      <div className="row" style={{ marginBottom: 12 }}>
+        <Link className="btn small primary" href="/labeltry" data-testid="labeltry-link">Try the policy, case by case →</Link>
+        <span className="faint" style={{ fontSize: 12 }}>every level-0 / 1 / 2 label and edge case, one text at a time, with its flow</span>
+      </div>
       <div className="panel" data-testid="label-start">
         <div className="row"><strong>Start a run</strong>
           <span className="faint" style={{ fontSize: 12 }}>Runs through the model service: start it first with

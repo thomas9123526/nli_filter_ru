@@ -221,6 +221,23 @@ def test_labeller_all_labels_and_review_as_remove():
     assert out.row["paragraphs"][0]["action"] == "review" and out.row["action"] == "removed"
 
 
+def test_all_labels_decides_like_the_cascade():
+    text = "Russian hockey fans say Ukrainians are nazis, a long report from the arena follows."
+    normal = make_labeller().process([rec(1, text)])[0].row["paragraphs"][0]
+    every = make_labeller(all_labels=True).process([rec(1, text)])[0].row["paragraphs"][0]
+    assert "narr_nazi" not in normal["scores"] and every["scores"]["narr_nazi"] == 0.95  # scored, for information
+    assert normal["action"] == every["action"] == "review"        # sport; level 2 does not run (no war / marker)
+    assert normal["levels"] == every["levels"] == [0, 1]
+
+
+def test_force_gate_labels_text_without_keywords():
+    text = "Ballet tonight in Paris, with a famous pop star and a new film premiere afterwards."
+    assert make_labeller().process([rec(1, text)])[0].row["action"] == "untouched"
+    out = make_labeller(force_gate=True).process([rec(1, text)])[0]
+    p = out.row["paragraphs"][0]
+    assert p["action"] == "pass" and p["reason"] == "gate_negative" and p["levels"] == [0]
+
+
 # ---------------------------------------------------------------------------------------------------
 # names
 # ---------------------------------------------------------------------------------------------------
@@ -325,6 +342,18 @@ def test_run_sample_eval_end_to_end(tmp_path, monkeypatch):
     # rerun skips the finished file
     assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol_path)]) == 0
 
+    # review queue: doc c's paragraph (narrative softened by the debunk label) goes to human review
+    rq = tmp_path / "review.jsonl"
+    assert nli_label.main(["review", str(out), "--out", str(rq), "--policy", str(pol_path)]) == 0
+    rmeta, ritems = nli_label.read_labels_file(str(rq))
+    assert len(ritems) == 1 and "falsely claims" in ritems[0]["text"]
+    assert ritems[0]["picked_for"][0] == "review:review_label" and ritems[0]["model"]["action"] == "review"
+    assert rmeta["kind"].startswith("review queue")
+    assert nli_label.main(["review", str(out), "--out", str(rq), "--policy", str(pol_path)]) == 2  # exists
+    assert nli_label.main(["review", str(out), "--out", str(rq), "--policy", str(pol_path),
+                           "--actions", "review", "remove", "--overwrite"]) == 0
+    assert len(nli_label.read_labels_file(str(rq))[1]) == 2  # + doc a's removed paragraph
+
     # redecide: culture becomes 'keep' in a new policy -> doc a is no longer edited; no model is called
     calls = fake.fast_pairs
     data2 = json.loads(json.dumps(data))
@@ -366,3 +395,22 @@ def test_run_sample_eval_end_to_end(tmp_path, monkeypatch):
     calls = fake.fast_pairs
     assert nli_label.main(["eval", str(lab), "--policy", str(pol_path)]) == 0
     assert fake.fast_pairs == calls
+
+
+def test_policy_v2_and_cases_match():
+    p2 = Policy.load(str(ROOT / "policy" / "russia_policy_v2.json"))
+    p1 = Policy.load(str(ROOT / "policy" / "russia_policy.json"))
+    assert set(p2.labels) - set(p1.labels) == {"values_mindset", "fashion_style", "narr_traditional_values"}
+    assert "values_mindset" in p2.run_if[2]
+    for name, pol in (("cases_v1.json", p1), ("cases_v2.json", p2)):
+        path = ROOT / "labels" / name
+        if not path.is_file():
+            continue
+        data = json.loads(path.read_text(encoding="utf-8"))
+        ids = {c["id"] for c in data["cases"]}
+        for k in pol.labels:  # every label has a yes and a near-miss case
+            assert f"{k}:yes" in ids and f"{k}:near" in ids, (name, k)
+        for c in data["cases"]:
+            assert 1 <= len(c["texts"]) <= 2 and all(t["text"].strip() for t in c["texts"])
+            for t in c["texts"]:
+                assert set(t["labels_yes"]) <= set(pol.labels), (name, c["id"])
