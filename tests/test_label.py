@@ -249,6 +249,41 @@ def test_narrative_opens_gate():
     assert lab.process([rec(1, text)])[0].row["paragraphs"][0]["action"] == "remove"
 
 
+def test_narrative_keywords_bring_ukraine_only_text_to_the_narrative_check():
+    from nli_filter import KeywordMatcher
+
+    class StrictGate(FakeScorer):
+        CUES = dict(FakeScorer.CUES, GATE=["no-such-word"])
+
+    pol = small_policy(narrative_opens_gate=True, narrative_keywords=["Ukraine"])
+    propaganda = "Ukraine is run by nazis, a commentator claimed on air tonight, again and again."
+    news = "Ukraine exported more grain this year than last, the agriculture ministry said tonight."
+    plain = make_labeller(pol)  # no narrative matcher: neither text has a Russia keyword
+    assert [o.row["action"] for o in plain.process([rec(1, propaganda), rec(2, news)])] == ["untouched", "untouched"]
+    lab = make_labeller(pol, narrative_matcher=KeywordMatcher(pol.narrative_keywords))
+    lab.scorer = StrictGate()
+    a, b = lab.process([rec(1, propaganda), rec(2, news)])
+    pa, pb = a.row["paragraphs"][0], b.row["paragraphs"][0]
+    assert pa["action"] == "remove" and pa["narrative_keyword"] and pa["opened_by"] == ["narr_nazi"]
+    assert pb["action"] == "pass"            # Ukraine news is never removed for being about Ukraine
+    assert a.row["narrative_keywords"] == ["Ukraine"]
+
+    class GrainGate(FakeScorer):  # the gate says yes to the Ukraine news (as it may for "Kievan Rus" history)
+        CUES = dict(FakeScorer.CUES, GATE=["grain"], SPORT=["grain"])
+
+    for all_labels in (False, True):
+        lab = make_labeller(pol, narrative_matcher=KeywordMatcher(pol.narrative_keywords), all_labels=all_labels)
+        lab.scorer = GrainGate()
+        p = lab.process([rec(2, news)])[0].row["paragraphs"][0]
+        assert p["action"] == "pass" and p["narrative_keyword"], (all_labels, p)  # only the narrative check counts
+    with pytest.raises(ValueError, match="narrative_opens_gate"):
+        small_policy(narrative_keywords=["Ukraine"])
+    # expected action from hand labels follows narrative_opens_gate too
+    on = small_policy(narrative_opens_gate=True)
+    assert action_from_labels(on, {"involves": False, "narr_nazi": True}) == "remove"
+    assert action_from_labels(small_policy(), {"involves": False, "narr_nazi": True}) == "pass"
+
+
 def test_force_gate_labels_text_without_keywords():
     text = "Ballet tonight in Paris, with a famous pop star and a new film premiere afterwards."
     assert make_labeller().process([rec(1, text)])[0].row["action"] == "untouched"
@@ -414,6 +449,25 @@ def test_run_sample_eval_end_to_end(tmp_path, monkeypatch):
     calls = fake.fast_pairs
     assert nli_label.main(["eval", str(lab), "--policy", str(pol_path)]) == 0
     assert fake.fast_pairs == calls
+
+
+def test_inflight_gives_the_same_output_in_the_same_order(tmp_path, monkeypatch):
+    pol_path = tmp_path / "policy.json"
+    pol_path.write_text(json.dumps(small_policy().data), encoding="utf-8")
+    inp = tmp_path / "in.jsonl"
+    texts = [DOC, "Nothing here.", "Russian hockey team wins again in Moscow tonight, a long report follows.",
+             "The Russian invasion was reported by the fact-check desk; it falsely claims Ukrainians are nazis."] * 5
+    inp.write_text("".join(json.dumps({"id": f"x{i}", "text": t}) + "\n" for i, t in enumerate(texts)),
+                   encoding="utf-8")
+    monkeypatch.setattr(nli_label, "build_scorer", lambda args: (FakeScorer(), None, None))
+    outs = {}
+    for n in ("1", "3"):
+        out = tmp_path / f"out{n}"
+        assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol_path), "--write-clean",
+                               "--chunk-lines", "1", "--inflight", n]) == 0
+        outs[n] = [(out / f).read_text(encoding="utf-8") for f in ("in.labels.jsonl", "in.clean.jsonl")]
+        assert json.loads((out / "summary.json").read_text(encoding="utf-8"))["settings"]["inflight"] == int(n)
+    assert outs["1"] == outs["3"]
 
 
 def test_policy_v2_and_cases_match():

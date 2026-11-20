@@ -2,8 +2,9 @@
 // Policy Try page: step through the cases (labels/cases_v1.json) one by one, run the policy's labels on a case's
 // text with the model service, and compare the flow (gate → level 1 → level 2 → decision) with what is expected.
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
+import { href } from "@/lib/format";
 import type { LabelCase, LabelTryResp } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
@@ -40,15 +41,35 @@ export function LabelTryView() {
   const [err, setErr] = useState<Error | null>(null);
   const [sel, setSel] = useState(0);
   const [results, setResults] = useState<Record<string, boolean | null>>({});  // "case#text" -> matched expected
+  // opened from a run's document page (?run=&file=&line=&para=): that paragraph, the run's policy
+  const fromRun = sp.get("run"), fromFile = sp.get("file"), fromLine = Number(sp.get("line") || 0);
+  const fromPara = Number(sp.get("para") || 0);
+  const src = useApi(fromRun && fromFile && fromLine ? `trysrc:${fromRun}:${fromFile}:${fromLine}` : null,
+    (s) => api.labelDoc(fromRun as string, { file: fromFile, line: fromLine }, s));
+  const [extText, setExtText] = useState<string | null>(null);  // text from the run (until another case is picked)
+  const pendingTi = useRef<number | null>(null);
 
   useEffect(() => {  // open ?case=<id>
     const want = sp.get("case");
     if (want && list.length) { const i = list.findIndex((c) => c.id === want); if (i >= 0) setCi(i); }
   }, [list.length, sp]);
+  useEffect(() => {  // open ?run=…: the paragraph's text; its case (if the corpus is the case corpus); the run's policy
+    const d = src.data;
+    if (!d || !list.length) return;
+    const ps = d.row.paragraphs || [];
+    const p = ps[fromPara] || ps[0];
+    setExtText(d.text ? (p ? d.text.slice(p.span[0], p.span[1]) : d.text) : "");
+    const m = /^(.*)#(\d+)$/.exec(String(d.row.id || ""));
+    const i = m ? list.findIndex((c) => c.id === m[1]) : -1;
+    if (i >= 0) { pendingTi.current = Number(m![2]) - 1; setCi(i); setTi(Number(m![2]) - 1); }
+    const base = d.policy_path ? `policy/${d.policy_path.split(/[\\/]/).pop()}` : "";
+    if (base && (policies.data?.policies || []).includes(base)) setPolicy(base);
+  }, [src.data, list.length, policies.data, fromPara]);
   const c: LabelCase | undefined = list[ci];
   const t = c?.texts[ti];
-  useEffect(() => { setText(t?.text || ""); setRes(null); setSel(0); setErr(null); }, [ci, ti, t?.text]);
-  useEffect(() => { setTi(0); }, [ci]);
+  useEffect(() => { setText(extText ?? t?.text ?? ""); setRes(null); setSel(0); setErr(null); }, [ci, ti, t?.text, extText]);
+  useEffect(() => { setTi(pendingTi.current ?? 0); pendingTi.current = null; }, [ci]);
+  const pick = (i: number) => { setExtText(null); setCi(i); };
 
   const groups = useMemo(() => {
     const g: [string, { c: LabelCase; i: number }[]][] = [];
@@ -71,7 +92,7 @@ export function LabelTryView() {
     } catch (e) { setErr(e as Error); }
     setBusy(false);
   };
-  const go = (d: number) => setCi((i) => Math.max(0, Math.min(list.length - 1, i + d)));
+  const go = (d: number) => { setExtText(null); setCi((i) => Math.max(0, Math.min(list.length - 1, i + d))); };
 
   if (cases.error) return <ErrorBox error={cases.error} onRetry={cases.reload} />;
   if (!cases.data) return <Loading what="Loading cases" />;
@@ -99,7 +120,7 @@ export function LabelTryView() {
               {items.map(({ c: x, i }) => {
                 const marks = x.texts.map((_, k) => results[`${x.id}#${k}`]);
                 return (
-                  <button key={x.id} className={`case-item${i === ci ? " on" : ""}`} onClick={() => setCi(i)}>
+                  <button key={x.id} className={`case-item${i === ci ? " on" : ""}`} onClick={() => pick(i)}>
                     <span>{x.title}</span>
                     <span>{marks.map((m, k) => <span key={k} className={`dot ${m === true ? "ok" : m === false ? "bad" : ""}`} />)}</span>
                   </button>);
@@ -116,10 +137,17 @@ export function LabelTryView() {
                 <span className="faint">{ci + 1} / {list.length}</span>
                 <button className="btn small" onClick={() => go(1)} disabled={ci >= list.length - 1}>next case ›</button>
               </div>
+              {extText !== null ? (
+                <div className="alert" style={{ marginTop: 8 }} data-testid="from-run">
+                  Text from run <strong>{fromRun}</strong>, {fromFile} line {fromLine}, paragraph {fromPara + 1}
+                  {policy ? <> · the run&apos;s policy <code className="mono">{policy}</code></> : null}
+                  {t && extText === t.text ? " · it is this case's text: the expected result applies" : " · not a case text: no expected result"}
+                  {" "}<a href={href("/labeldoc", { run: fromRun, file: fromFile, line: fromLine })}>back to the run</a>
+                </div>) : null}
               <div style={{ marginTop: 6 }}>{c.what}</div>
               {c.hypothesis ? <div className="hyp" style={{ marginTop: 4 }}>Hypothesis: “{c.hypothesis}” <span className={`badge ${actionClass(c.decision || "")}`}>{c.decision}</span></div> : null}
               <div className="row" style={{ marginTop: 10 }}>
-                {c.texts.length > 1 ? <span className="seg">{c.texts.map((_, k) => <button key={k} className={k === ti ? "on" : ""} onClick={() => setTi(k)}>text {k + 1}</button>)}</span> : null}
+                {c.texts.length > 1 ? <span className="seg">{c.texts.map((_, k) => <button key={k} className={k === ti ? "on" : ""} onClick={() => { setExtText(null); setTi(k); }}>text {k + 1}</button>)}</span> : null}
                 <span className="faint" style={{ fontSize: 12 }}>{t?.from}</span>
               </div>
               <textarea className="mono try-text" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} data-testid="try-text" />

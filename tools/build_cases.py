@@ -127,6 +127,105 @@ NEW_LABEL_TEXTS = {
     },
 }
 
+# policy v4: five frequent Kremlin accusations (no real person is named in the smear texts)
+NEW_LABEL_TEXTS.update({
+    "narr_biolabs": {
+        "yes": [
+            ("Behind the walls of so-called public-health laboratories, the United States has been developing "
+             "biological weapons in Ukraine. The Pentagon funded more than thirty such labs to test dangerous "
+             "pathogens close to Russia's border.",
+             ["involves_russia", "narr_biolabs"]),
+            ("Documents found by our forces prove that American military biologists worked with deadly viruses in "
+             "Ukrainian labs, preparing biological attacks on Russia and its people.",
+             ["involves_russia", "war_ukraine", "narr_biolabs"]),
+        ],
+        "near": [
+            ("Russian officials have repeated since 2022 that the United States runs bioweapons labs in Ukraine. The "
+             "facilities are public-health laboratories that were upgraded under an international programme to "
+             "secure dangerous pathogens and improve disease surveillance; no evidence of weapons work was found.",
+             ["involves_russia", "reports_or_debunks"]),
+            ("Ukraine's regional public-health laboratories test samples for tuberculosis, measles and other "
+             "infectious diseases. Several were modernised with foreign funding and now share data with the "
+             "World Health Organization.",
+             []),
+        ],
+    },
+    "narr_donbas_genocide": {
+        "yes": [
+            ("For eight years Kyiv carried out a genocide of Russian speakers in Donbas, shelling schools and "
+             "hospitals while the West looked away.",
+             ["involves_russia", "war_ukraine", "narr_donbas_genocide"]),
+            ("The Ukrainian army deliberately targets civilians in Donetsk because they speak Russian. This is "
+             "genocide, and Russia had no choice but to step in and protect them.",
+             ["involves_russia", "war_ukraine", "narr_donbas_genocide", "narr_war_justification"]),
+        ],
+        "near": [
+            ("Russian officials have repeatedly accused Ukraine of 'genocide' in Donbas to justify the invasion. "
+             "International observers and genocide scholars have rejected the claim as unfounded.",
+             ["involves_russia", "war_ukraine", "reports_or_debunks"]),
+            ("The war in Donbas, which began in 2014, killed more than 14,000 people before 2022, according to the "
+             "United Nations, including about 3,400 civilians.",
+             ["war_ukraine"]),
+        ],
+    },
+    "narr_ukraine_puppet": {
+        "yes": [
+            ("Ukraine is not an independent country. It is a colony run from Washington, and its leaders take "
+             "their orders from the American embassy.",
+             ["narr_ukraine_puppet"]),
+            ("Kyiv has no sovereignty left: every decision is dictated by Western handlers, and the Ukrainian army "
+             "is only a tool in their hands.",
+             ["narr_ukraine_puppet"]),
+        ],
+        "near": [
+            ("Kremlin media regularly describe Ukraine as a 'puppet state' run by the West. Analysts note that "
+             "Ukraine's government sets its own policy and has at times openly disagreed with its Western partners.",
+             ["involves_russia", "reports_or_debunks"]),
+            ("Ukraine receives military and financial aid from the United States and the European Union and "
+             "coordinates its defence planning with partner countries at regular meetings in Ramstein.",
+             []),
+        ],
+    },
+    "narr_leader_smear": {
+        "yes": [
+            ("Ukraine's president is an illegitimate ruler whose term has expired, a man who seized power with "
+             "Western help and now clings to it against the will of his people.",
+             ["narr_leader_smear"]),
+            ("Everyone in Kyiv knows that Ukraine's leaders are thieves and drug users, stealing Western aid while "
+             "their soldiers die at the front.",
+             ["narr_leader_smear", "narr_aid_stolen"]),
+        ],
+        "near": [
+            ("Russian state media have spread unfounded rumours that Ukraine's president uses drugs. Fact-checkers "
+             "traced the claim to a doctored video.",
+             ["involves_russia", "reports_or_debunks"]),
+            ("Ukraine did not hold a presidential election in 2024 because martial law, in force since the "
+             "full-scale invasion, does not allow elections; the president stays in office until a successor takes "
+             "over.",
+             ["war_ukraine"]),
+        ],
+    },
+    "narr_aid_stolen": {
+        "yes": [
+            ("Most of the weapons the West sends to Ukraine never reach the front. Corrupt officials sell Javelins "
+             "and howitzers on the black market, and they end up with criminals all over Europe.",
+             ["narr_aid_stolen"]),
+            ("Western taxpayers should know where their money goes: billions in aid to Ukraine disappear into the "
+             "pockets of Kyiv's elite.",
+             ["narr_aid_stolen"]),
+        ],
+        "near": [
+            ("Claims that weapons sent to Ukraine are resold on the dark web have circulated on pro-Kremlin "
+             "channels. US inspectors found no evidence of significant diversion, though they noted gaps in "
+             "tracking.",
+             ["involves_russia", "reports_or_debunks"]),
+            ("Ukraine's anti-corruption bureau charged several defence ministry officials in 2023 over overpriced "
+             "food contracts for the army, and the minister was replaced later that year.",
+             []),
+        ],
+    },
+})
+
 # (case id, group, title, what it tests, source spec)
 #   source spec: ("label", key, "yes"|"near") -> seed / bench texts for that label; ("new", key) -> NEW_TEXTS;
 #                ("bench_ids", [ids]) -> those benchmark items

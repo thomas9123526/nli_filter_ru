@@ -107,7 +107,12 @@ class Policy:
         # Ukraine / NATO that never mention Russia still reach the policy (costs level-2 scores on gate-negative
         # paragraphs)
         self.narrative_opens_gate = bool(data.get("narrative_opens_gate", False))
+        # words that bring a paragraph to the narrative check even without a Russia keyword (Ukraine, Kyiv, NATO
+        # ...): such a paragraph is only removed if a narrative scores at or above its threshold
+        self.narrative_keywords: List[str] = list(data.get("narrative_keywords") or [])
         errors: List[str] = []
+        if self.narrative_keywords and not self.narrative_opens_gate:
+            errors.append("narrative_keywords needs \"narrative_opens_gate\": true")
         if self.conflict not in ("review", "remove", "keep"):
             errors.append(f"conflict must be review, remove or keep, not '{self.conflict}'")
         self.labels: Dict[str, Label] = {}
@@ -167,7 +172,7 @@ class Policy:
 
     def summary(self) -> Dict[str, Any]:
         return {"path": self.path, "country": self.country, "conflict": self.conflict,
-                "narrative_opens_gate": self.narrative_opens_gate,
+                "narrative_opens_gate": self.narrative_opens_gate, "narrative_keywords": len(self.narrative_keywords),
                 "paragraphs": {"min_chars": self.min_chars, "max_chars": self.max_chars},
                 "run_if": {str(k): v for k, v in self.run_if.items()}, "markers": len(self.markers),
                 "labels": {k: lab.as_dict() for k, lab in self.labels.items()}}
@@ -233,6 +238,8 @@ def resolve(policy: Policy, scores: Dict[str, Optional[float]], marker: bool = F
 
 def action_from_labels(policy: Policy, labels: Dict[str, Optional[bool]], marker: bool = False) -> Optional[str]:
     """The action hand labels imply (yes = 1.0, no / unknown = 0.0). None when the gate label is unknown."""
+    if policy.narrative_opens_gate and any(labels.get(lab.key) for lab in policy.level(2) if lab.decision == "remove"):
+        marker = True  # a narrative claim opens the gate (as in Labeller.is_open)
     if policy.gate is not None and labels.get(policy.gate.key) is None and not marker:
         return None
     return resolve(policy, {k: (1.0 if v else 0.0) for k, v in labels.items() if k in policy.labels},
@@ -337,7 +344,7 @@ class Labeller:
     def __init__(self, policy: Policy, matcher, rules, scorer, rewriter: Optional[NameRewriter] = None,
                  all_labels: bool = False, text_field: str = "text", id_field: Optional[str] = "id",
                  review_as: str = "keep", min_doc_chars: int = 50, marker_matcher=None,
-                 group_field: Optional[str] = None, force_gate: bool = False):
+                 group_field: Optional[str] = None, force_gate: bool = False, narrative_matcher=None):
         self.p, self.matcher, self.rules, self.scorer = policy, matcher, rules, scorer
         self.group_field = group_field
         self.force_gate = force_gate  # label every paragraph, also without a keyword hit (Try page: gate cases)
@@ -347,6 +354,7 @@ class Labeller:
         self.review_as = review_as
         self.min_doc_chars = min_doc_chars
         self.marker_matcher = marker_matcher
+        self.narrative_matcher = narrative_matcher  # policy "narrative_keywords" (Ukraine, Kyiv, NATO ...)
 
     # -- scoring rounds ----------------------------------------------------------------------------
     def _score(self, items: List[Tuple[Dict[str, Any], str, Label]]) -> None:
@@ -378,20 +386,26 @@ class Labeller:
                     self.rules.apply(text, hits)
                 open_hits = [h for h in hits if not h.rule]
                 marks = self.marker_matcher.find(text) if self.marker_matcher is not None else []
-                d["row"]["gate"] = bool(open_hits or marks or self.force_gate)
+                nks = self.narrative_matcher.find(text) if self.narrative_matcher is not None else []
+                d["row"]["gate"] = bool(open_hits or marks or nks or self.force_gate)
                 if hits:
                     d["row"]["hits"] = [{"kw": self.matcher.keywords[h.kw] if h.kw is not None else text[h.start:h.end],
                                          "span": [h.start, h.end], **({"rule": h.rule} if h.rule else {})}
                                         for h in hits[:50]]
                 if marks:
                     d["row"]["markers"] = sorted({text[m.start:m.end] for m in marks})
-                if open_hits or marks or self.force_gate:
+                if nks:
+                    d["row"]["narrative_keywords"] = sorted({text[m.start:m.end] for m in nks})[:20]
+                if open_hits or marks or nks or self.force_gate:
                     for s, e in split_paragraphs(text, p.min_chars, p.max_chars):
                         ph = [h for h in open_hits if s <= h.start < e]
                         pm = [m for m in marks if s <= m.start < e]
-                        if ph or pm or self.force_gate:
-                            d["paras"].append({"span": [s, e], "marker": bool(pm), "scores": {},
-                                               "_text": text[s:e]})
+                        pn = [m for m in nks if s <= m.start < e]
+                        if ph or pm or pn or self.force_gate:
+                            pa = {"span": [s, e], "marker": bool(pm), "scores": {}, "_text": text[s:e]}
+                            if pn and not ph and not pm:
+                                pa["narrative_keyword"] = True  # only here for the narrative check
+                            d["paras"].append(pa)
             docs.append(d)
         paras = [pa for d in docs for pa in d["paras"]]
         if self.all_labels:
@@ -400,11 +414,12 @@ class Labeller:
             if p.gate is not None:
                 self._score([(pa, pa["_text"], p.gate) for pa in paras])
                 if p.narrative_opens_gate:  # gate-negative paragraphs: do they make a narrative claim anyway?
-                    closed = [pa for pa in paras if not pa["marker"]
-                              and pa["scores"].get(p.gate.key, 0.0) < p.gate.threshold]
+                    closed = [pa for pa in paras if not pa["marker"] and (pa.get("narrative_keyword") or
+                              pa["scores"].get(p.gate.key, 0.0) < p.gate.threshold)]
                     self._score([(pa, pa["_text"], lab) for pa in closed for lab in self.opening_labels()])
             for lvl in (1, 2):
-                todo = [(pa, pa["_text"], lab) for pa in paras if p.runs(lvl, pa["scores"], self.is_open(pa))
+                todo = [(pa, pa["_text"], lab) for pa in paras
+                        if p.runs(lvl, self.decision_scores(pa), self.is_open(pa))
                         for lab in p.level(lvl) if lab.key not in pa["scores"]]
                 self._score(todo)
         return [self._finish(d) for d in docs]
@@ -422,6 +437,14 @@ class Labeller:
     def is_open(self, pa: Dict[str, Any]) -> bool:
         """Past the gate without the gate label: a marker term, or (narrative_opens_gate) a narrative claim."""
         return bool(pa["marker"]) or bool(self.opened_by(pa["scores"]))
+
+    def decision_scores(self, pa: Dict[str, Any]) -> Dict[str, float]:
+        """The scores the decision may use. A paragraph that is there only because of a narrative keyword (Ukraine,
+        Kyiv, NATO ...) is judged by the narrative check alone: its gate score never lets it in, so ordinary text
+        about Ukraine passes unless a narrative fires."""
+        if pa.get("narrative_keyword") and self.p.gate is not None:
+            return {k: v for k, v in pa["scores"].items() if k != self.p.gate.key}
+        return pa["scores"]
 
     def levels_used(self, scores: Dict[str, float], marker: bool) -> List[int]:
         """The levels the cascade runs for a paragraph (run_if). With --all-labels the other levels are scored
@@ -447,15 +470,19 @@ class Labeller:
         review = False
         for pa in d["paras"]:
             opened = self.is_open(pa)
-            used = self.levels_used(pa["scores"], opened)
-            r = resolve(self.p, {k: v for k, v in pa["scores"].items() if self.p.labels[k].level in used}, opened)
+            ds = self.decision_scores(pa)
+            used = self.levels_used(ds, opened)
+            r = resolve(self.p, {k: v for k, v in ds.items() if self.p.labels[k].level in used}, opened)
             out = {"span": pa["span"], "action": r["action"], "reason": r["reason"], "labels": r["labels"],
                    "scores": pa["scores"], "levels": used, "tokens": est_tokens(pa["_text"])}
             if pa["marker"]:
                 out["marker"] = True
+            if pa.get("narrative_keyword"):
+                out["narrative_keyword"] = True
             gate = self.p.gate
             ob = self.opened_by(pa["scores"])
-            if ob and not pa["marker"] and gate is not None and pa["scores"].get(gate.key, 0.0) < gate.threshold:
+            if ob and not pa["marker"] and gate is not None and (pa.get("narrative_keyword") or
+                                                                 pa["scores"].get(gate.key, 0.0) < gate.threshold):
                 out["opened_by"] = ob  # the gate said no; a narrative claim let the paragraph through
             if r["flags"]:
                 out["flags"] = r["flags"]
@@ -714,12 +741,19 @@ def build_matchers(policy: Policy):
     return matcher, rules, markers
 
 
+def build_narrative_matcher(policy: Policy):
+    """Matcher for the policy's narrative_keywords (None when there are none)."""
+    from nli_filter import KeywordMatcher
+    return KeywordMatcher(policy.narrative_keywords) if policy.narrative_keywords else None
+
+
 def build_scorer(args):
     from nli_filter import CascadeScorer
     from nli_models import NLIPool, quiet_transformers
     quiet_transformers()
     common = dict(devices=args.device, mode=args.mode, dtype=args.dtype, max_length=args.max_length,
-                  models_root=args.models_root, cpu_threads=args.cpu_threads)
+                  models_root=args.models_root, cpu_threads=args.cpu_threads,
+                  workers_per_device=getattr(args, "workers_per_device", 1) or 1)
     fast = NLIPool(args.fast_model, batch_size=args.batch_size, **common)
     judge = None
     if args.judge_model and args.judge_model.lower() != "none":
@@ -772,7 +806,7 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
     load_s = time.perf_counter() - t0
     labeller = Labeller(policy, matcher, None if args.no_rules else rules, scorer, rewriter, args.all_labels,
                         args.text_field, args.id_field or None, args.review_as, args.min_doc_chars, markers,
-                        args.group_field)
+                        args.group_field, narrative_matcher=build_narrative_matcher(policy))
     total = Stats()
     files_rows: List[Dict[str, Any]] = []
     failed = 0
@@ -798,6 +832,17 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
 
     names = _out_names(files)
     needed = [args.overwrite or not (out_dir / f"{n}.summary.json").is_file() for n in names]
+    # chunks labelled at once (like nli_filter.py): 1 on one device and for redecide, else 2 per model worker
+    if records_for is not None or scorer_override is not None:
+        inflight = 1
+    elif getattr(args, "inflight", None):
+        inflight = max(1, int(args.inflight))
+    elif fast is not None and getattr(fast, "mode", "single") != "single":
+        inflight = max(2, 2 * len(getattr(fast, "devices", []) or [1]) * int(getattr(args, "workers_per_device", 1) or 1))
+    else:
+        inflight = 1
+    from concurrent.futures import ThreadPoolExecutor
+    executor = ThreadPoolExecutor(inflight, thread_name_prefix="chunk") if inflight > 1 else None
     fetch = None
     if records_for is None and any(hasattr(f, "storage") for f in files):
         from nli_filter import Prefetcher  # download the next server file while this one is labelled; retries
@@ -835,15 +880,24 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                     clean_fh = clean_cm.__enter__() if clean_cm else None
                     try:
                         chunk: List[Record] = []
+                        pending: "collections.deque" = collections.deque()  # chunks in flight, in input order
 
-                        def flush() -> None:
-                            for o in labeller.process(chunk):
+                        def write(outs: List[Outcome]) -> None:
+                            for o in outs:
                                 st.add(o, o.group)
                                 lab_fh.write(json_dumps(o.row) + "\n")
                                 for c in o.rewrites:
                                     rw_fh.write(json_dumps(c) + "\n")
                                 if clean_fh is not None and o.clean is not None:
                                     clean_fh.write(json_dumps(o.clean) + "\n")
+
+                        def flush() -> None:
+                            if executor is None:
+                                write(labeller.process(chunk))
+                            else:  # several chunks at once: the model pool batches across them
+                                pending.append(executor.submit(labeller.process, list(chunk)))
+                                while len(pending) >= inflight:
+                                    write(pending.popleft().result())
                             chunk.clear()
 
                         reader = records_for(path) if records_for else \
@@ -859,7 +913,11 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                                                 60.0 * done / max(1e-6, time.perf_counter() - t_file))
                         if chunk:
                             flush()
+                        while pending:
+                            write(pending.popleft().result())
                     except BaseException as exc:
+                        for fut in pending:
+                            fut.cancel()
                         if clean_cm:
                             clean_cm.__exit__(type(exc), exc, exc.__traceback__)
                         raise
@@ -881,6 +939,8 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         ok = True
     finally:
         progress("done" if ok else "failed")
+        if executor is not None:
+            executor.shutdown(wait=True)
         if fetch is not None:
             fetch.close()
         for pool in (fast, judge):
@@ -899,7 +959,7 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                      "uncertain_band": list(args.uncertain_band), "all_labels": args.all_labels,
                      "review_as": args.review_as, "rewrite": not args.no_rewrite, "rules": not args.no_rules,
                      "text_field": args.text_field, "max_length": args.max_length, "group_field": args.group_field,
-                     "shard": shard},
+                     "shard": shard, "inflight": inflight},
         "timing": {"load_seconds": round(load_s, 1), "run_seconds": round(time.perf_counter() - t_run, 1),
                    "fast_pairs": scorer.fast_pairs, "judge_pairs": scorer.judge_pairs},
         "files": files_rows, "files_failed": failed, "stats": total.to_dict(), "output_dir": str(out_dir),
@@ -1466,6 +1526,9 @@ def _model_args(p: argparse.ArgumentParser, judge_default: str = "deberta") -> N
     g.add_argument("--max-length", type=int, default=512, help="tokens per (paragraph, hypothesis) pair")
     g.add_argument("--models-root", default=None)
     g.add_argument("--cpu-threads", type=int, default=None)
+    g.add_argument("--workers-per-device", type=int, default=1, help="model copies per device (as nli_filter.py)")
+    g.add_argument("--inflight", type=int, default=None,
+                   help="chunks labelled at once (default 1 on one device, else 2 x model workers)")
 
 
 def build_parser() -> argparse.ArgumentParser:

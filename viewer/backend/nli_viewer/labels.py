@@ -198,4 +198,5 @@ class LabelRuns:
         return {"name": name, "file": file, "input": src, "row": row, "text": text, "problem": problem,
                 "policy": {"labels": pol.get("labels") or {}, "run_if": pol.get("run_if") or {},
                            "conflict": pol.get("conflict")},
+                "policy_path": pol.get("path"),
                 "settings": s.get("settings") or {}}

@@ -21,21 +21,23 @@ Open `http://127.0.0.1:8000/labeltry/`, or the home page → **Labelling runs** 
 
 | Part | What it does |
 |---|---|
-| Case list (left) | 66 cases in 4 groups (cases_v2). A dot per text: green = the last try was as expected, red = not |
+| Case list (left) | 76 cases in 4 groups (cases_v4; the page shows the newest cases file). A dot per text: green = the last try was as expected, red = not |
 | Case | What it tests, the label's hypothesis and decision. **text 1 / text 2** when the case has two texts |
 | Text box | The text. You can edit it to try variations ("what if I remove this sentence?"); then the expected result no longer applies |
 | Expected | The action the policy should give, and the labels that should be yes. **draft labels** = a seed paragraph with Claude's unchecked labels |
 | Try | Scores the text with **all** labels (~1 s per label on a CPU, ~25 s per text with the judge). The decision still follows the cascade: levels that would not run are shown dashed, "for information only" |
 | label without a keyword | Labels the text even if no keyword / marker matches (otherwise it is untouched, no model runs). Use it for gate cases and the place-name case |
 | use the judge | DeBERTa re-scores uncertain scores (0.6–0.95), like a real run |
-| policy | Default: the policy the cases were made for (`policy\russia_policy_v2.json` for cases_v2). Pick another file from `policy\` to compare (e.g. v1 vs v2) |
+| policy | Default: the policy the cases were made for (`policy\russia_policy_v4.json` for cases_v4). Pick another file from `policy\` to compare (e.g. v3 vs v4) |
 | Result | The action, "as expected" or not, the flow per paragraph, and the cleaned text with place-name rewrites |
 | prev / next case | Step through the cases one by one |
 
-## The cases: `labels\cases_v2.json` (and `cases_v1.json`)
+## The cases: `labels\cases_v4.json` (and v1–v3)
 
-Made by `python tools\build_cases.py --policy policy\russia_policy_v2.json --out labels\cases_v2.json`
-(`cases_v1.json`: the same for `policy\russia_policy.json`). The Try page shows the newest version.
+Made by `python tools\build_cases.py --policy policy\russia_policy_v4.json --out labels\cases_v4.json`
+(`cases_v1/v2/v3.json`: the same for the older policies). The Try page shows the newest version. v4 adds a yes and a
+near-miss case for each of its five new accusation labels (biolabs, Donbas genocide, puppet state, leader smears,
+stolen aid): 76 cases, 145 texts (39 written for the cases; the smear texts name no real person).
 
 | Group | Cases | Texts from |
 |---|---|---|

@@ -51,7 +51,7 @@
 | | `thresholds.md` | `nli_label.py eval` output, choosing thresholds, the CRC guarantee |
 | | `place_names.md` | `policy\place_names.csv` + exceptions, `nli_names.py`, open codebook questions |
 | | `outputs.md` | What `run` / `redecide` write; the composition report |
-| | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 66 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v2.json`; as a corpus: `test_corpus_cases\` (viewer dataset "cases"); policy v2 (values / style labels) |
+| | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 76 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v4.json`; as a corpus: `test_corpus_cases\` (viewer dataset "cases"); policies v2 (values / style), v3 (cascade fixes), v4 (Kremlin accusations, narrative keywords) |
 | | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
 | `design/` | `policy_cases_report_2026-11-20.md` | **Report**: why the approach fits A's needs, results per case with examples, why cases fail, simulated fixes (66 % → 81 %), cases / models to add, turning removed content into keepable content |
 | | `policy_cases_results_2026-11-20.md` | Appendix: every case text, expected vs actual action, gate score, labels (policy v2) |

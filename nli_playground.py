@@ -290,7 +290,8 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
         scorer = nf.CascadeScorer(pg.fast, pg.judge if use_judge else None, (float(lo), float(hi)))
         lab = nli_label.Labeller(policy, matcher, rules, scorer, NameRewriter.from_files(),
                                  all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
-                                 force_gate=bool(req.get("force_gate", False)))
+                                 force_gate=bool(req.get("force_gate", False)),
+                                 narrative_matcher=nli_label.build_narrative_matcher(policy))
         outs = lab.process(records)
     return {"rows": [o.row for o in outs], "clean": [(o.clean or {}).get("text") for o in outs],
             "rewrites": [o.rewrites for o in outs], "seconds": round(time.perf_counter() - t0, 3),

@@ -32,7 +32,17 @@ All hypotheses, thresholds and decisions live in this one file. To try a change,
 
 | `policy\russia_policy_v3.json` (v3) | 28 labels as v2, with the cascade fixes of `cmds\design\policy_cases_report_2026-11-20.md`: gate threshold 0.12 (wording as v2: adding "or the war between Russia and Ukraine" was tried and lowered the gate scores of plainly Russia-related texts, so it was dropped); level 2 for every paragraph past the gate (`run_if 2` = gate or marker); `"narrative_opens_gate": true` (a narrative claim lets a gate-negative paragraph through); `keywords\russia_v3.txt` (+ Soviet, Russian Empire, Tsarist, Kremlin-backed, pro-Kremlin, Putin); the debunk guard says "reports or refutes" |
 
-`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json` (or `_v3`).
+| `policy\russia_policy_v4.json` (v4) | 33 labels: v3 + five frequent Kremlin accusations at level 2 (remove): `narr_biolabs` (US bioweapons labs in Ukraine), `narr_donbas_genocide`, `narr_ukraine_puppet` (a puppet state of the West), `narr_leader_smear` (Ukraine's leaders as drug addicts, criminals or illegitimate), `narr_aid_stolen` (weapons or aid sold on the black market); plus `"narrative_keywords"` (below) |
+
+`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json` (or `_v3`, `_v4`).
+
+**`"narrative_keywords"`** (v4: Ukraine, Ukrainian, Kyiv, Kiev, Donbas, Donetsk, Luhansk, Crimea, Zelensky, Bucha,
+NATO …, also in Ukrainian and Russian). Most Kremlin accusations are about Ukraine, Kyiv or NATO and never mention
+Russia, so the Russia keywords never bring them to a model. A paragraph with one of these words but no Russia keyword
+gets the gate question and, if the gate says no, the narrative check (`narrative_opens_gate`). It is **removed only if
+a narrative scores at or above its threshold**; ordinary text about Ukraine passes untouched (`"narrative_keyword":
+true` on the paragraph in `labels.jsonl`). Needs `"narrative_opens_gate": true`. Cost: the gate + 16 narrative labels
+on every such paragraph.
 
 **`"narrative_opens_gate": true`**: every paragraph the gate rejects is also scored with the level-2 `remove` labels.
 If one is at or above its threshold, the paragraph is treated like one with a marker term: levels 1 and 2 run, and

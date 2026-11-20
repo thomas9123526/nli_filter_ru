@@ -88,6 +88,7 @@ def test_doc_flow(client):
     assert d["text"] == TEXT and d["problem"] is None
     assert d["row"]["paragraphs"][0]["action"] == "remove"
     assert d["policy"]["labels"]["culture"]["decision"] == "remove"
+    assert d["policy_path"] == "policy/russia_policy.json"  # for the Try page's "Try this paragraph"
     assert client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 9}).status_code == 404
 
 

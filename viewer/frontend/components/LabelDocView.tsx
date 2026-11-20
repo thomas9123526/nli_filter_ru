@@ -129,6 +129,8 @@ export function LabelDocView() {
           </div>
           <div className="panel">
             <div className="row" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Flow</h2>
+              {paras[sel] ? <a className="btn small" data-testid="try-this" href={href("/labeltry", { run, file, line, para: sel })}
+                title="Open the Try page with this paragraph and the run's policy">Try this paragraph →</a> : null}
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
                 <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)}>¶{i + 1} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
             </div>

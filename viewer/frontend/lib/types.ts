@@ -462,6 +462,7 @@ export type LabelDocResp = {
          markers?: string[]; paragraphs?: LabelParagraph[]; labels?: string[]; flags?: string[]; tokens: number;
          tokens_removed?: number; rewrites?: number; error?: string };
   policy: { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string };
+  policy_path?: string | null;
   settings: Record<string, unknown>;
 };
 
