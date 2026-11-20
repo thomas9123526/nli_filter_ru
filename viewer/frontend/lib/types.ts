@@ -454,7 +454,7 @@ export type LabelDocRow = {
 export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number };
 export type LabelParagraph = {
   span: [number, number]; action: string; reason: string; labels: string[]; scores: Record<string, number>;
-  tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[];
+  tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[]; opened_by?: string[];
 };
 export type LabelDocResp = {
   name: string; file: string; input: string | null; text: string | null; problem: string | null;

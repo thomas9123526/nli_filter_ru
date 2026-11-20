@@ -51,7 +51,7 @@ export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
   const used = (n: number) => (p.levels ? p.levels.includes(n) : true);
   return (
     <div className="flow">
-      <Level title="Level 0 · gate" keys={byLevel(0)} p={p} pol={pol} used={used(0)} note={p.marker ? "marker term in the paragraph: the gate is skipped" : undefined} />
+      <Level title="Level 0 · gate" keys={byLevel(0)} p={p} pol={pol} used={used(0)} note={p.marker ? "marker term in the paragraph: the gate is skipped" : p.opened_by?.length ? `the gate said no, but a narrative claim (${p.opened_by.join(", ")}) opened it` : undefined} />
       <div className="flow-arrow">↓</div>
       <Level title="Level 1 · subject" keys={byLevel(1)} p={p} pol={pol} used={used(1)} note={runIf(1) ? `runs when ${runIf(1)} is yes` : undefined} />
       <div className="flow-arrow">↓</div>

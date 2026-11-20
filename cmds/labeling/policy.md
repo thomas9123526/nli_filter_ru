@@ -30,7 +30,15 @@ All hypotheses, thresholds and decisions live in this one file. To try a change,
 | `policy\russia_policy.json` (v1) | 25: the guide's answer 2 |
 | `policy\russia_policy_v2.json` (v2) | 28: v1 + `fashion_style` (1, remove), `values_mindset` (1, review), `narr_traditional_values` (2, remove); level 2 also after `values_mindset`. See `cmds\labeling\cases.md` |
 
-`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json`.
+| `policy\russia_policy_v3.json` (v3) | 28 labels as v2, with the cascade fixes of `cmds\design\policy_cases_report_2026-11-20.md`: gate threshold 0.12 (wording as v2: adding "or the war between Russia and Ukraine" was tried and lowered the gate scores of plainly Russia-related texts, so it was dropped); level 2 for every paragraph past the gate (`run_if 2` = gate or marker); `"narrative_opens_gate": true` (a narrative claim lets a gate-negative paragraph through); `keywords\russia_v3.txt` (+ Soviet, Russian Empire, Tsarist, Kremlin-backed, pro-Kremlin, Putin); the debunk guard says "reports or refutes" |
+
+`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json` (or `_v3`).
+
+**`"narrative_opens_gate": true`**: every paragraph the gate rejects is also scored with the level-2 `remove` labels.
+If one is at or above its threshold, the paragraph is treated like one with a marker term: levels 1 and 2 run, and
+the flow says "the gate said no, but a narrative claim opened it" (`opened_by` in `labels.jsonl`). This catches
+narratives about Ukraine, NATO or Ukrainians that never mention Russia. It costs about 11 more model passes per
+gate-negative paragraph.
 
 ## The labels as shipped (decisions = the guide's suggestions; A's compliance team decides)
 

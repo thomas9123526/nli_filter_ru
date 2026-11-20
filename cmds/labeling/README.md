@@ -37,6 +37,7 @@ decision. It removes only the paragraphs the policy says to remove, and rewrites
 
 | File | Read it for |
 |---|---|
+| [overview_diagram.md](overview_diagram.md) | **The whole project in one diagram**: settings → run → outputs, human loop, viewer |
 | [quick_start.md](quick_start.md) | The commands, step by step, from nothing to a labelled run |
 | [policy.md](policy.md) | Editing the policy: labels, thresholds, decisions, how a paragraph's action is decided |
 | [hand_labeling.md](hand_labeling.md) | Hand-labelling with the label tool; labelling rules; rounds |

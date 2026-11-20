@@ -1,0 +1,1931 @@
+{
+ "version": 1,
+ "created": "2026-11-20 17:58:43",
+ "about": "Cases for the viewer's policy Try page (tools/build_cases.py). Seed texts carry Claude's unchecked draft labels; benchmark and new texts carry labels written with the text.",
+ "policy": "policy/russia_policy_v3.json",
+ "cases": [
+  {
+   "id": "involves_russia:yes",
+   "group": "Level 0 · gate",
+   "label": "involves_russia",
+   "title": "involves_russia · yes",
+   "what": "Texts where 'involves_russia' is clearly yes: expected action follows its decision (gate).",
+   "hypothesis": "This text mentions Russia, the Soviet Union, the Russian Empire or Russian people.",
+   "decision": "gate",
+   "texts": [
+    {
+     "text": "NASA estimated the meteorite was roughly 50 feet (15 meters) in diameter when it entered Earth’s atmosphere, travelling faster than the speed of sound, and exploded into a fireball brighter than the sun. Amateur video show by Russian television depicted a white streak of light like the cloud from a jetliner quickly expanding to a large white ball that eventually sent shock waves throughout the city of Chelyabinsk. None of the existing celestial tracking systems, either Russian or American, detected the meteor until it entered the atmosphere,” Director of the Astronomy Institute of the Russian Academy of Sciences Boris Shustov told the newswire.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#75#824-1476",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "[draft] Chelyabinsk meteor event with Russian scientist quoted; unclear whether science_technology applies (not Russian-developed tech)."
+    },
+    {
+     "text": "Forecasters expect a sharp drop in temperatures across eastern Poland from Thursday as a mass of cold, dry air moves in from western Russia. Night frosts of minus eight degrees are possible in Białystok and Lublin, and drivers are advised to fit winter tyres before the weekend. The cold spell should ease by Monday when milder Atlantic air returns from the west.",
+     "from": "benchmark: a-involves_russia-yes-1",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Russia is named as a real place (source of an air mass); nothing else about Russia is discussed."
+    }
+   ]
+  },
+  {
+   "id": "involves_russia:near",
+   "group": "Level 0 · gate",
+   "label": "involves_russia",
+   "title": "involves_russia · near miss",
+   "what": "Near misses: they look related to 'involves_russia' (same words or topic) but 'involves_russia' is no.",
+   "hypothesis": "This text mentions Russia, the Soviet Union, the Russian Empire or Russian people.",
+   "decision": "gate",
+   "texts": [
+    {
+     "text": "Send inquiries to James Dulley, St. Petersburg Times, 6906 Royalgreen Drive, Cincinnati, OH 45244 or go to www.dulley.com.\n\nBay and bow windows, though efficient, aren't cheap 01/09/09 [Last modified: Wednesday, November 3, 2010 9:41am]\nPhoto reprints | Article reprints\n\n© 2014 Tampa Bay Times\n\n\nJoin the discussion: Click to view comments, add yours",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#57#3770-4121",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": ""
+    },
+    {
+     "text": "For a quick Russian dressing, whisk together half a cup of mayonnaise, two tablespoons of ketchup, a teaspoon of horseradish, a splash of Worcestershire sauce and a pinch of paprika. Stir in finely chopped pickles if you like some crunch. It keeps for five days in the fridge and is the classic sauce for a Reuben sandwich.",
+     "from": "benchmark: a-involves_russia-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "'Russian dressing' is an American condiment name; Russia itself is not referred to."
+    }
+   ]
+  },
+  {
+   "id": "culture_entertainment:yes",
+   "group": "Level 1 · subject",
+   "label": "culture_entertainment",
+   "title": "culture_entertainment · yes",
+   "what": "Texts where 'culture_entertainment' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text describes Russian music, films, TV shows or entertainment.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The Russian animated series 'Masha and the Bear' has become one of the most-watched cartoons in the world. Each short episode follows a mischievous little girl who causes chaos in the forest home of a patient retired circus bear. The show was produced by a Moscow studio, has been dubbed into dozens of languages and some of its episodes have gathered billions of views online.",
+     "from": "benchmark: a-culture_entertainment-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "culture_entertainment"
+     ],
+     "expected_action": "remove",
+     "note": "Describes a Russian TV/animated show."
+    },
+    {
+     "text": "Russian TV viewers have made the crime drama 'Quiet District' the most-streamed series of the autumn. Set in a small police station on the edge of a Volga town, the eight-episode show mixes slow detective work with dark humour. Critics in Moscow praised the soundtrack and the grey, rainy cinematography, and a second season has already been announced by the streaming platform.",
+     "from": "benchmark: a-culture_entertainment-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "culture_entertainment"
+     ],
+     "expected_action": "remove",
+     "note": "Describes a (fictional) Russian TV series and its reception."
+    }
+   ]
+  },
+  {
+   "id": "culture_entertainment:near",
+   "group": "Level 1 · subject",
+   "label": "culture_entertainment",
+   "title": "culture_entertainment · near miss",
+   "what": "Near misses: they look related to 'culture_entertainment' (same words or topic) but 'culture_entertainment' is no.",
+   "hypothesis": "This text describes Russian music, films, TV shows or entertainment.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The Hollywood thriller 'Red Ledger' follows two deep-cover Russian agents posing as a suburban couple in Virginia. Directed by an American filmmaker and shot in Atlanta, the film stars a British and an Australian actor with carefully rehearsed accents. Critics praised the tense dinner-party scenes but noted that the plot borrows heavily from older Cold War spy dramas.",
+     "from": "benchmark: a-culture_entertainment-near-1",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "An American film about Russian spies: involves Russia, but it is not Russian entertainment."
+    },
+    {
+     "text": "The Odesa International Film Festival opened on Saturday with a Ukrainian comedy about a family running a seaside guesthouse. This year's programme includes twelve Ukrainian feature films, a section of short documentaries and open-air screenings at the Potemkin Stairs. Tickets for the closing night sold out in two hours, organisers said.",
+     "from": "benchmark: a-culture_entertainment-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Ukrainian films and festival, not Russian entertainment."
+    }
+   ]
+  },
+  {
+   "id": "celebrities:yes",
+   "group": "Level 1 · subject",
+   "label": "celebrities",
+   "title": "celebrities · yes",
+   "what": "Texts where 'celebrities' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text is about Russian celebrities, singers, actors or bloggers.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russian pop singer Darya Velikanova surprised fans on Saturday by posting wedding photos from a private ceremony near Sochi. The 31-year-old star, known for her summer dance hits, wore a short white dress and married her long-time manager in front of about forty guests. Within hours the post had collected over two million likes, and Russian gossip sites rushed to identify the guests.",
+     "from": "benchmark: a-celebrities-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "celebrities"
+     ],
+     "expected_action": "remove",
+     "note": "Gossip about an (invented) Russian pop singer."
+    },
+    {
+     "text": "Moscow beauty blogger Alina Ruzhova, who has more than eight million followers, announced she is taking a break from social media after a heated feud with another Russian influencer over a cosmetics collaboration. In a tearful video she said she needed time for her family. Fans flooded her comments with support, while critics accused her of staging the drama to boost her new product line.",
+     "from": "benchmark: a-celebrities-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "celebrities"
+     ],
+     "expected_action": "remove",
+     "note": "About an (invented) Russian blogger/influencer."
+    }
+   ]
+  },
+  {
+   "id": "celebrities:near",
+   "group": "Level 1 · subject",
+   "label": "celebrities",
+   "title": "celebrities · near miss",
+   "what": "Near misses: they look related to 'celebrities' (same words or topic) but 'celebrities' is no.",
+   "hypothesis": "This text is about Russian celebrities, singers, actors or bloggers.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Ukrainian singer Oksana Lyvynenko announced a charity tour across Western Europe, with all proceeds going to rebuild schools in the Kharkiv region. Known for her folk-pop ballads sung in Ukrainian, she will perform in Berlin, Vienna, Kraków and Lisbon. She told reporters that the new album was recorded in a small studio in Lviv during the winter.",
+     "from": "benchmark: a-celebrities-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "An (invented) Ukrainian singer; not a Russian celebrity and Russia is not mentioned."
+    },
+    {
+     "text": "Belarusian lifestyle blogger Yana Kaval, who lives in Warsaw, has become one of the most followed creators among young Belarusians abroad. Her videos about cooking on a budget, learning Polish and decorating a tiny rented flat regularly get hundreds of thousands of views. She says she wants to show that starting over in a new country can be done with humour.",
+     "from": "benchmark: a-celebrities-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "An (invented) Belarusian blogger; not Russian."
+    }
+   ]
+  },
+  {
+   "id": "lifestyle_traditions:yes",
+   "group": "Level 1 · subject",
+   "label": "lifestyle_traditions",
+   "title": "lifestyle_traditions · yes",
+   "what": "Texts where 'lifestyle_traditions' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text describes Russian traditions, holidays, food or way of life.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Monastic clergy wear different headcoverings than married clergy. Married clergy wear either a colored kalimaukion or skufia; monastic clergy wear a black kalimaukion and veil (together known as the klobuk). For monastics, the skufia is reserved for house dress, and the klobuk is worn in church. Russian archbishops have a jewelled cross attached to the front of their klobuks; Russian Metropolitans wear a white klobuk with jewelled cross. Several Orthodox Patriarchs wear a rounded headcovering called a koukoulion.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#29#6043-6561",
+     "labels_yes": [
+      "involves_russia",
+      "lifestyle_traditions"
+     ],
+     "expected_action": "remove",
+     "note": "[draft] Russian Orthodox clergy dress is only part of a general Orthodox vestments paragraph; religious dress as 'tradition' is a stretch."
+    },
+    {
+     "text": "Maslenitsa, the Russian week-long festival that marks the end of winter, is all about blini. Families fry stacks of thin pancakes and eat them with sour cream, honey, jam or red caviar. In towns across Russia there are sledging contests, folk games and, on the last day, a straw figure of Lady Winter is burned in a bonfire. The final Sunday is called Forgiveness Sunday.",
+     "from": "benchmark: a-lifestyle_traditions-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "lifestyle_traditions"
+     ],
+     "expected_action": "remove",
+     "note": "Describes a Russian holiday tradition and food."
+    }
+   ]
+  },
+  {
+   "id": "lifestyle_traditions:near",
+   "group": "Level 1 · subject",
+   "label": "lifestyle_traditions",
+   "title": "lifestyle_traditions · near miss",
+   "what": "Near misses: they look related to 'lifestyle_traditions' (same words or topic) but 'lifestyle_traditions' is no.",
+   "hypothesis": "This text describes Russian traditions, holidays, food or way of life.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "In 2022 UNESCO added the culture of Ukrainian borscht cooking to its list of intangible heritage in need of urgent safeguarding. Every region of Ukraine has its own version: with beans in Poltava, with smoked pears in the west, with fish in the south. Recipes are passed between generations, and the dish is served with garlic pampushky and a spoon of sour cream.",
+     "from": "benchmark: a-lifestyle_traditions-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Ukrainian food tradition, not Russian."
+    },
+    {
+     "text": "On Holy Saturday, Polish families carry decorated baskets to church to have their Easter food blessed. The święconka basket usually holds painted eggs, bread, salt, a piece of sausage, horseradish and a small lamb made of sugar or butter. The blessed food is eaten at Easter Sunday breakfast, which begins with sharing an egg and exchanging wishes.",
+     "from": "benchmark: a-lifestyle_traditions-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Polish tradition; Russia is not involved."
+    }
+   ]
+  },
+  {
+   "id": "fashion_style:yes",
+   "group": "Level 1 · subject",
+   "label": "fashion_style",
+   "title": "fashion_style · yes",
+   "what": "Texts where 'fashion_style' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text describes Russian fashion, clothing or style.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Moscow Fashion Week closed with a collection that reworked the kokoshnik, the traditional Russian headdress, into structured caps worn with oversized wool coats. Russian designers showed long padded skirts, fur trims and heavy embroidery in muted greens and greys.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "fashion_style"
+     ],
+     "expected_action": "remove",
+     "note": ""
+    },
+    {
+     "text": "Street style in St. Petersburg this winter means layered dark coats, high boots and a fur ushanka. Young Russians mix vintage Soviet-era sweaters with new sportswear, a look that local fashion bloggers call 'post-Soviet chic'.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "fashion_style"
+     ],
+     "expected_action": "remove",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "fashion_style:near",
+   "group": "Level 1 · subject",
+   "label": "fashion_style",
+   "title": "fashion_style · near miss",
+   "what": "Near misses: they look related to 'fashion_style' (same words or topic) but 'fashion_style' is no.",
+   "hypothesis": "This text describes Russian fashion, clothing or style.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The vyshyvanka, the embroidered shirt of Ukraine, is worn on Vyshyvanka Day every May. Patterns differ by region: red and black geometric motifs in Poltava, floral ornaments in Bukovyna.",
+     "from": "new (written for this case)",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": ""
+    },
+    {
+     "text": "Russian textile exports fell by 14 percent last year as sanctions cut access to European buyers. Mills in Ivanovo, the centre of the industry, reported shortages of imported dyes and machine parts.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "economy_business"
+     ],
+     "expected_action": "keep",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "values_mindset:yes",
+   "group": "Level 1 · subject",
+   "label": "values_mindset",
+   "title": "values_mindset · yes",
+   "what": "Texts where 'values_mindset' is clearly yes: expected action follows its decision (review).",
+   "hypothesis": "This text describes values, beliefs or ways of thinking common among people in Russia.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "Surveys of Russian attitudes describe a strong preference for order and a powerful state over individual freedoms. Many respondents say that trust belongs to family and personal networks rather than to public institutions, and that a person should endure hardship patiently instead of protesting. Sociologists link these views to the experience of the 1990s.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "values_mindset"
+     ],
+     "expected_action": "review",
+     "note": ""
+    },
+    {
+     "text": "In Russian everyday thinking, the word 'avos' stands for a habit of relying on luck instead of planning. Writers on Russian character pair it with a deep suspicion of formal rules and a belief that informal arrangements between people matter more than written contracts.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "values_mindset"
+     ],
+     "expected_action": "review",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "values_mindset:near",
+   "group": "Level 1 · subject",
+   "label": "values_mindset",
+   "title": "values_mindset · near miss",
+   "what": "Near misses: they look related to 'values_mindset' (same words or topic) but 'values_mindset' is no.",
+   "hypothesis": "This text describes values, beliefs or ways of thinking common among people in Russia.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "A Levada Center poll published in March 2023 found that 72 percent of respondents in Russia said they supported the actions of the Russian armed forces in Ukraine, while 20 percent said they did not. The pollster noted that answers to such questions in wartime must be read with caution.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "politics_government"
+     ],
+     "expected_action": "keep",
+     "note": ""
+    },
+    {
+     "text": "Studies of Polish society show strong attachment to the Catholic Church, high trust in family ties and lively civic engagement in local communities. Younger Poles are more secular than their parents but still mark religious holidays.",
+     "from": "new (written for this case)",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "literature_art:yes",
+   "group": "Level 1 · subject",
+   "label": "literature_art",
+   "title": "literature_art · yes",
+   "what": "Texts where 'literature_art' is clearly yes: expected action follows its decision (review).",
+   "hypothesis": "This text discusses Russian literature or art.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "\"How do the Lithuanians get involved, though?\"\n\n\"No frickin' story about Russia is complete without Baba Yaga.\"\n\n\"I'll handle Baba Yaga.\"\n\n\"Judicious use of powders and unguents.\"\n\n\"We can't kill him — he has to meet up with Roger Bacon in 1246.\"",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#2#7267-7513",
+     "labels_yes": [
+      "involves_russia",
+      "literature_art"
+     ],
+     "expected_action": "review",
+     "note": "[draft] Fiction-writer banter about Baba Yaga in a story set in Rus; folklore mention is brief."
+    },
+    {
+     "text": "Dostoevsky's 'Crime and Punishment' follows Rodion Raskolnikov, a poor former student in St. Petersburg who murders a pawnbroker to test his theory that extraordinary people may step over moral law. Most of the novel takes place after the crime, in his feverish mind, as guilt, illness and the patient investigator Porfiry slowly break him down. It remains one of the central works of Russian literature.",
+     "from": "benchmark: a-literature_art-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "literature_art"
+     ],
+     "expected_action": "review",
+     "note": "Discusses a classic Russian novel."
+    }
+   ]
+  },
+  {
+   "id": "literature_art:near",
+   "group": "Level 1 · subject",
+   "label": "literature_art",
+   "title": "literature_art · near miss",
+   "what": "Near misses: they look related to 'literature_art' (same words or topic) but 'literature_art' is no.",
+   "hypothesis": "This text discusses Russian literature or art.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "Olga Tokarczuk's 'Flights' is a fragmented Polish novel made of short stories, essays and travel notes about bodies, movement and restlessness. One thread follows the heart of Chopin being smuggled back to Warsaw in a jar; another follows a woman who disappears on a Croatian island. The book won the International Booker Prize in its English translation.",
+     "from": "benchmark: a-literature_art-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "A Polish novel; not Russian literature."
+    },
+    {
+     "text": "Lesya Ukrainka's verse drama 'The Forest Song' tells the story of Mavka, a forest spirit who falls in love with a young village musician, Lukash. Drawing on folklore from Volhynia, the play contrasts the free, magical world of the forest with the narrow practical life of the village. It is one of the most loved works of Ukrainian literature and is studied in every school.",
+     "from": "benchmark: a-literature_art-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Ukrainian literature, not Russian."
+    }
+   ]
+  },
+  {
+   "id": "cost_of_living:yes",
+   "group": "Level 1 · subject",
+   "label": "cost_of_living",
+   "title": "cost_of_living · yes",
+   "what": "Texts where 'cost_of_living' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text is about prices, salaries or living costs in Russia.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Renting a one-bedroom flat in Moscow now costs on average around 70,000 roubles a month, while outside the centre prices start near 45,000. In St. Petersburg the same flat is roughly a third cheaper. Landlords usually ask for a deposit equal to one month's rent plus an agency fee, and utilities add another 5,000 to 7,000 roubles in winter.",
+     "from": "benchmark: a-cost_of_living-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "cost_of_living"
+     ],
+     "expected_action": "remove",
+     "note": "About rent and housing costs in Russia."
+    },
+    {
+     "text": "Salaries in Russia vary enormously by region. A nurse in Moscow may earn about 90,000 roubles a month, while a nurse in a small town in the Kurgan or Ivanovo region often takes home less than 40,000. Many families in the provinces rely on two jobs or on vegetables from the garden to make ends meet, and young people move to the capital mainly for the wages.",
+     "from": "benchmark: a-cost_of_living-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "cost_of_living"
+     ],
+     "expected_action": "remove",
+     "note": "About salaries and making ends meet in Russia."
+    }
+   ]
+  },
+  {
+   "id": "cost_of_living:near",
+   "group": "Level 1 · subject",
+   "label": "cost_of_living",
+   "title": "cost_of_living · near miss",
+   "what": "Near misses: they look related to 'cost_of_living' (same words or topic) but 'cost_of_living' is no.",
+   "hypothesis": "This text is about prices, salaries or living costs in Russia.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Prices in Almaty keep climbing. A one-bedroom apartment in the Medeu district now rents for about 350,000 tenge a month, and a cappuccino in a city-centre café costs 1,500 tenge. Locals say salaries have not kept pace, and many young families are moving to the outskirts or to smaller Kazakh cities such as Shymkent, where rents are half as much.",
+     "from": "benchmark: a-cost_of_living-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Living costs in Kazakhstan, not Russia."
+    },
+    {
+     "text": "From 1 June, households in Kyiv will pay a new tariff for electricity, the government announced. The price per kilowatt-hour rises by about 60 percent, although families that use little power will receive subsidies. Energy companies say the money is needed to repair power stations and grid equipment damaged over the winter.",
+     "from": "benchmark: a-cost_of_living-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Utility costs in Ukraine; Russia is not mentioned."
+    }
+   ]
+  },
+  {
+   "id": "science_technology:yes",
+   "group": "Level 1 · subject",
+   "label": "science_technology",
+   "title": "science_technology · yes",
+   "what": "Texts where 'science_technology' is clearly yes: expected action follows its decision (keep).",
+   "hypothesis": "This text explains science, technology, software or hardware developed in Russia.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "lactobacillus bacteria\n\nLactobacillus Bulgaricus\n(shown here in brown)\nCredit: Utah State University\n\nThe well-known Russian scientist Ilya Metchnikoff - one of the founders of modern immunology - linked the longevity of the Bulgarian people to the consumption of yoghurt. Metchnikoff, at that time a professor at the Pasteur Institute in Paris, produced the notion that the aging process results from the activity of putrefactive (proteolytic) microbes producing toxic substances in the bowels. Proteolytic bacteria such as clostridia, which are part of the normal gut flora, produce toxic substances including phenols, indols and ammonia from the digestion of proteins. According to Metchnikoff these compounds were responsible for what he called \"intestinal auto-intoxication\", which caused the physical changes associated with old age. It was at that time known that milk fermented with lactic-acid bacteria inhibits the growth of proteolytic bacteria because of the low pH produced by the fermentation of lactose. Metchnikoff had also observed that certain rural populations in Europe, for example in Bulgaria and the Russian Steppes who lived largely on milk fermented by lactic-acid bacteria were exceptionally long lived. Based on these facts, Metchnikoff proposed that consumption of fermented milk would \"seed\" the intestine with harmless lactic-acid bacteria and decrease the intestinal pH and that this would suppress the growth of proteolytic bacteria.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#44#351-1816",
+     "labels_yes": [
+      "involves_russia",
+      "science_technology"
+     ],
+     "expected_action": "keep",
+     "note": "[draft] Russian scientist Metchnikoff, but his work was done at the Pasteur Institute in Paris."
+    },
+    {
+     "text": "CatBoost is an open-source gradient boosting library developed by engineers at Yandex in Moscow and released in 2017. Its main innovation is ordered boosting, which reduces target leakage when encoding categorical features. The library handles categorical columns natively, trains on CPU or GPU, and ships with Python, R and command-line interfaces.",
+     "from": "benchmark: b-science_technology-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "science_technology"
+     ],
+     "expected_action": "keep",
+     "note": "Describes software developed in Russia; no company/market focus."
+    }
+   ]
+  },
+  {
+   "id": "science_technology:near",
+   "group": "Level 1 · subject",
+   "label": "science_technology",
+   "title": "science_technology · near miss",
+   "what": "Near misses: they look related to 'science_technology' (same words or topic) but 'science_technology' is no.",
+   "hypothesis": "This text explains science, technology, software or hardware developed in Russia.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "At an international machine learning conference in Moscow, several speakers cited the transformer architecture, first described in 2017 by a Google research team in California. One session compared attention variants on long documents, while another asked whether the original design is still the best default. Slides from the event were posted online after the conference.",
+     "from": "benchmark: b-science_technology-near-1",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Russia is only the conference venue; the technology discussed was developed in the US."
+    },
+    {
+     "text": "Grammarly was founded in 2009 by three engineers who had studied in Kyiv, and much of its early development took place in Ukraine. The writing assistant combines rule-based grammar checks with machine learning models that suggest clearer wording. The company now has offices in Kyiv, San Francisco and Vancouver and serves millions of users.",
+     "from": "benchmark: b-science_technology-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Technology developed in Ukraine/US; Russia is not mentioned."
+    }
+   ]
+  },
+  {
+   "id": "geography:yes",
+   "group": "Level 1 · subject",
+   "label": "geography",
+   "title": "geography · yes",
+   "what": "Texts where 'geography' is clearly yes: expected action follows its decision (keep).",
+   "hypothesis": "This text describes the geography, borders, rivers or distances of Russia.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Examples of HEO orbits offering visibility over Earth's polar regions, which most geosynchronous satellites lack, are:\n\nMuch of Russia is at high latitude, so geostationary orbit does not provide full coverage of the region. These Soviet HEO orbits include polar coverage.[citation needed]",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#38#1263-1552",
+     "labels_yes": [
+      "involves_russia",
+      "science_technology",
+      "geography",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "[draft] Russia's high latitude and Soviet HEO (Molniya-type) orbits; geography may be too generous."
+    },
+    {
+     "text": "The Volga is the longest river in Europe, flowing about 3,530 kilometres through western Russia. It rises in the Valdai Hills northwest of Moscow and empties into the Caspian Sea near Astrakhan, forming a wide delta. Its drainage basin covers roughly 1.36 million square kilometres, and a chain of reservoirs regulates much of its course.",
+     "from": "benchmark: b-geography-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "geography"
+     ],
+     "expected_action": "keep",
+     "note": "Describes a Russian river's length, course and basin."
+    }
+   ]
+  },
+  {
+   "id": "geography:near",
+   "group": "Level 1 · subject",
+   "label": "geography",
+   "title": "geography · near miss",
+   "what": "Near misses: they look related to 'geography' (same words or topic) but 'geography' is no.",
+   "hypothesis": "This text describes the geography, borders, rivers or distances of Russia.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Stayed three nights at a hotel near Tverskaya Street in Moscow. The room was small but spotless, the bed was comfortable and the staff at reception spoke good English. Breakfast had a decent choice of eggs, pastries and fruit. Wi-Fi dropped a couple of times in the evening. Would stay again, but ask for a room facing the courtyard because the street side is noisy.",
+     "from": "benchmark: b-geography-near-1",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Hotel review set in Moscow; says nothing about geography, borders or distances."
+    },
+    {
+     "text": "Moscow, Idaho, sits on the Palouse, a region of rolling wheat-covered hills in the northern part of the state. The city lies about 8 miles east of Pullman, Washington, across the state line, and roughly 90 miles south of Coeur d'Alene. Paradise Creek runs through town, and Moscow Mountain rises to the northeast.",
+     "from": "benchmark: b-geography-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Geography of Moscow, Idaho, not Russia; incidental keyword."
+    }
+   ]
+  },
+  {
+   "id": "politics_government:yes",
+   "group": "Level 1 · subject",
+   "label": "politics_government",
+   "title": "politics_government · yes",
+   "what": "Texts where 'politics_government' is clearly yes: expected action follows its decision (keep).",
+   "hypothesis": "This text is about the Russian government, its officials or policies.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "William Colton Millay, 24, was stationed in Alaska as a military police officer (MP) with the 164th Military Police Company when he attempted to contact Russian officials with an offer to spy on the United States.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#47#2132-2345",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government"
+     ],
+     "expected_action": "keep",
+     "note": "[draft] Russia appears only as the intended recipient of a US soldier's spying offer; gate is borderline."
+    },
+    {
+     "text": "The State Duma has passed in its third reading a bill that widens the definition of a \"foreign agent\" in Russia. Under the new rules, a person can be added to the registry if they are judged to be \"under foreign influence\", even without receiving money from abroad. Those listed will be barred from teaching in state schools and from running for public office.",
+     "from": "benchmark: b-politics_government-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government"
+     ],
+     "expected_action": "keep",
+     "note": "Reports on a Russian law passed by the Duma."
+    }
+   ]
+  },
+  {
+   "id": "politics_government:near",
+   "group": "Level 1 · subject",
+   "label": "politics_government",
+   "title": "politics_government · near miss",
+   "what": "Near misses: they look related to 'politics_government' (same words or topic) but 'politics_government' is no.",
+   "hypothesis": "This text is about the Russian government, its officials or policies.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Belarusian President Alexander Lukashenko has signed a decree reorganising the country's regional administrations in Minsk, Gomel and Brest. The changes merge several district committees and transfer some powers to regional governors. The government in Minsk says the reform will cut administrative costs by about 15 percent.",
+     "from": "benchmark: b-politics_government-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Belarusian government, not Russian; no reference to Russia."
+    },
+    {
+     "text": "The Russian Chess Club of Toronto held its annual meeting on Saturday and elected a new five-member board. Members voted to move the weekly blitz evenings to Thursdays and to raise the junior membership fee slightly. The outgoing chair thanked volunteers who helped organise last spring's open tournament for players of all ages.",
+     "from": "benchmark: b-politics_government-near-2",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "A diaspora club's internal election; not about the Russian government."
+    }
+   ]
+  },
+  {
+   "id": "war_ukraine:yes",
+   "group": "Level 1 · subject",
+   "label": "war_ukraine",
+   "title": "war_ukraine · yes",
+   "what": "Texts where 'war_ukraine' is clearly yes: expected action follows its decision (keep).",
+   "hypothesis": "This text reports on the Russian war against Ukraine.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Boyd Tonkin\n\nThe Isis threat must be confronted with clarity and determination\n\nEd Miliband\n\nThe phoney war is over\n\nRussian troops and armour pour into Ukraine\nPotatoes could be off the menu as crop pests threaten UK",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#62#10493-10710",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "[draft] Only a navigation headline 'Russian troops and armour pour into Ukraine' among unrelated links."
+    },
+    {
+     "text": "Russian forces launched dozens of missiles and attack drones at Ukraine overnight, targeting power plants and substations in the Kharkiv, Dnipropetrovsk and Lviv regions. Ukraine's air force said most of the drones were shot down. Emergency power cuts were introduced in several cities, and officials reported that two people were killed in Kharkiv.",
+     "from": "benchmark: b-war_ukraine-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "Reports a Russian strike on Ukraine."
+    }
+   ]
+  },
+  {
+   "id": "war_ukraine:near",
+   "group": "Level 1 · subject",
+   "label": "war_ukraine",
+   "title": "war_ukraine · near miss",
+   "what": "Near misses: they look related to 'war_ukraine' (same words or topic) but 'war_ukraine' is no.",
+   "hypothesis": "This text reports on the Russian war against Ukraine.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "In the autumn of 2016, Syrian government forces, backed by Russian aircraft, tightened the siege of eastern Aleppo. Rebel-held neighbourhoods were cut off from supplies, and hospitals in the area were repeatedly hit. By December the remaining fighters and tens of thousands of civilians were evacuated in green buses to Idlib province.",
+     "from": "benchmark: b-war_ukraine-near-1",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Russia is involved, but the war is in Syria, not against Ukraine."
+    },
+    {
+     "text": "The Battle of Kyiv in the summer of 1941 ended in one of the largest encirclements in military history. German army groups closed a pocket east of the city, and the Red Army lost more than 600,000 soldiers killed or captured. Kyiv itself fell on 19 September and remained under German occupation until November 1943.",
+     "from": "benchmark: b-war_ukraine-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "WWII battle in Ukraine (Soviet history), not the Russian war against Ukraine."
+    }
+   ]
+  },
+  {
+   "id": "economy_business:yes",
+   "group": "Level 1 · subject",
+   "label": "economy_business",
+   "title": "economy_business · yes",
+   "what": "Texts where 'economy_business' is clearly yes: expected action follows its decision (keep).",
+   "hypothesis": "This text is about Russian companies, markets or sanctions.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "After making millions during the wild days of 1990s privatisation in Russia, he began to dabble in the volatile, and sometimes violent, politics of his native country. Along the way he made friends and enemies, probably in equal measure, of KGB officers, Chechen warlords, political fixers and shadowy tycoons.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#11#610-920",
+     "labels_yes": [
+      "involves_russia",
+      "economy_business"
+     ],
+     "expected_action": "keep",
+     "note": "[draft] Georgian tycoon's career; Russia's 1990s privatisation is context, gate is borderline."
+    },
+    {
+     "text": "Gazprom reported a net loss for the full year, its first in more than two decades. Revenue fell sharply after pipeline gas exports to Europe collapsed, and the company's attempts to redirect volumes to China have so far offset only a small part of the drop. Analysts expect the state-controlled firm to cut its investment programme next year.",
+     "from": "benchmark: b-economy_business-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "economy_business"
+     ],
+     "expected_action": "keep",
+     "note": "About a Russian company's results."
+    }
+   ]
+  },
+  {
+   "id": "economy_business:near",
+   "group": "Level 1 · subject",
+   "label": "economy_business",
+   "title": "economy_business · near miss",
+   "what": "Near misses: they look related to 'economy_business' (same words or topic) but 'economy_business' is no.",
+   "hypothesis": "This text is about Russian companies, markets or sanctions.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Ukrainian logistics company Nova Poshta has opened branches in Poland, Lithuania and Moldova to serve Ukrainians living abroad. The firm says parcel volumes on international routes grew by a third last year, and it plans to launch its own cargo flights between Kyiv and European hubs once airspace reopens.",
+     "from": "benchmark: b-economy_business-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Ukrainian company; Russia not mentioned."
+    },
+    {
+     "text": "Sales of bottled salad dressings rose 6 percent last year at a mid-sized US food company in Ohio. Ranch remained the best seller, but Thousand Island and Russian dressing gained shelf space in supermarkets after the firm cut prices. Management expects to add a new production line in the spring.",
+     "from": "benchmark: b-economy_business-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Russian dressing is an incidental keyword; a US company."
+    }
+   ]
+  },
+  {
+   "id": "history_soviet:yes",
+   "group": "Level 1 · subject",
+   "label": "history_soviet",
+   "title": "history_soviet · yes",
+   "what": "Texts where 'history_soviet' is clearly yes: expected action follows its decision (review).",
+   "hypothesis": "This text is about Soviet history or the shared history before 1991.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "Initially the USSR had decided to supply only three engines and their related hardware. \"Later it was finalised that seven engines without related hardware were to be supplied,\" Narayanan said.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#26#3139-3332",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "[draft] USSR supplying rocket engines to India; Soviet role is the subject but the context is ISRO."
+    },
+    {
+     "text": "In October 1917 the Bolsheviks led by Vladimir Lenin seized power in Petrograd, overthrowing the Provisional Government that had ruled since the fall of the tsar in February. A bloody civil war followed between the Red Army and the Whites, which lasted until the early 1920s. In 1922 the Bolsheviks founded the Union of Soviet Socialist Republics.",
+     "from": "benchmark: a-history_soviet-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "Describes the founding events of Soviet history."
+    }
+   ]
+  },
+  {
+   "id": "history_soviet:near",
+   "group": "Level 1 · subject",
+   "label": "history_soviet",
+   "title": "history_soviet · near miss",
+   "what": "Near misses: they look related to 'history_soviet' (same words or topic) but 'history_soviet' is no.",
+   "hypothesis": "This text is about Soviet history or the shared history before 1991.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "In October 1993 a constitutional crisis in Moscow ended in violence when President Boris Yeltsin ordered tanks to shell the parliament building, the White House, after deputies tried to remove him from office. Dozens of people were killed. Two months later Russians approved a new constitution that gave the president far greater powers than the legislature.",
+     "from": "benchmark: a-history_soviet-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government"
+     ],
+     "expected_action": "keep",
+     "note": "Post-1991 Russian politics, not Soviet history."
+    },
+    {
+     "text": "Vladimir Putin was first elected president of Russia in March 2000 after serving as acting president following Boris Yeltsin's surprise resignation on New Year's Eve. His first term brought a centralisation of power: regional governors lost their seats in the upper house, and independent television channels came under state control.",
+     "from": "benchmark: a-history_soviet-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government"
+     ],
+     "expected_action": "keep",
+     "note": "Post-Soviet Russian politics; not about Soviet history."
+    }
+   ]
+  },
+  {
+   "id": "sport:yes",
+   "group": "Level 1 · subject",
+   "label": "sport",
+   "title": "sport · yes",
+   "what": "Texts where 'sport' is clearly yes: expected action follows its decision (review).",
+   "hypothesis": "This text is about Russian athletes or sports teams.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "Slovakia remembers an ice hockey genius\nAfter the crash that wiped out Russia's Lokomotiv Yaroslavl ice hockey team, thousands remember a former Slovak captain.\nLast Modified: 15 Sep 2011 16:06\nDemitra in action during the IIHF World Championship match between Slovakia and Germany [GALLO/GETTY]",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#65#0-295",
+     "labels_yes": [
+      "involves_russia",
+      "sport"
+     ],
+     "expected_action": "review",
+     "note": "[draft] Russian team's crash is the trigger, but the focus is a Slovak player."
+    },
+    {
+     "text": "CSKA Moscow beat SKA St. Petersburg 3-2 in overtime on Tuesday to level the KHL conference final at two games each. The winning goal came after four minutes of extra time from a rebound in front of the net. The Moscow side had trailed 2-0 after the first period but turned the game around with two power-play goals.",
+     "from": "benchmark: a-sport-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "sport"
+     ],
+     "expected_action": "review",
+     "note": "About Russian hockey teams."
+    }
+   ]
+  },
+  {
+   "id": "sport:near",
+   "group": "Level 1 · subject",
+   "label": "sport",
+   "title": "sport · near miss",
+   "what": "Near misses: they look related to 'sport' (same words or topic) but 'sport' is no.",
+   "hypothesis": "This text is about Russian athletes or sports teams.",
+   "decision": "review",
+   "texts": [
+    {
+     "text": "Ukrainian boxer Oleksandr Usyk defended his heavyweight titles with a unanimous decision victory in London. Using his footwork and speed, the southpaw outboxed his taller opponent over twelve rounds. After the fight Usyk dedicated the win to his family and to Ukraine, and said he wants to fight at least two more times before retiring.",
+     "from": "benchmark: a-sport-near-1",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "A Ukrainian athlete; Russia is not involved."
+    },
+    {
+     "text": "The Kazakh professional cycling team Astana finished the Tour de France with two stage wins and a top-ten place in the general classification. The team, sponsored by Kazakhstan's sovereign wealth fund, has relied on a mix of experienced European riders and young Kazakh talents. Its manager said the mountain stages were the highlight of the race.",
+     "from": "benchmark: a-sport-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "A Kazakh sports team; not Russian."
+    }
+   ]
+  },
+  {
+   "id": "narr_ukraine_not_nation:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_ukraine_not_nation",
+   "title": "narr_ukraine_not_nation · yes",
+   "what": "Texts where 'narr_ukraine_not_nation' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that Ukraine is not a real nation or that Ukrainians and Russians are one people.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russians and Ukrainians are one people, a single nation divided only by borders that the Bolsheviks drew on a map. There has never been a separate Ukrainian nation; Kyiv was the cradle of our common civilisation since Kievan Rus, and the same faith, language and history bind us together. The so-called Ukrainian identity was invented by Austrian and Polish intriguers to split one people, and sooner or later this artificial division will be overcome.",
+     "from": "benchmark: c-narr_ukraine_not_nation-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet",
+      "narr_ukraine_not_nation"
+     ],
+     "expected_action": "remove",
+     "note": "States in its own voice that Ukrainians and Russians are one people and Ukraine was never a nation."
+    },
+    {
+     "text": "Honestly, there is no such thing as a Ukrainian nation. It's the same people as the Russians: same faith, same history, same family names. A 'country' that only appeared on the map in 1991 is not a nation, it's an administrative accident. Ask anyone's grandmother in Kharkiv or Odesa and she'll tell you she is Russian like everyone else. The whole 'separate nation' story is a political project of the last thirty years, nothing more.",
+     "from": "benchmark: c-narr_ukraine_not_nation-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "narr_ukraine_not_nation"
+     ],
+     "expected_action": "remove",
+     "note": "Forum post asserting Ukrainians are not a separate nation from Russians."
+    }
+   ]
+  },
+  {
+   "id": "narr_ukraine_not_nation:near",
+   "group": "Level 2 · framing",
+   "label": "narr_ukraine_not_nation",
+   "title": "narr_ukraine_not_nation · near miss",
+   "what": "Near misses: they look related to 'narr_ukraine_not_nation' (same words or topic) but 'narr_ukraine_not_nation' is no.",
+   "hypothesis": "This text claims that Ukraine is not a real nation or that Ukrainians and Russians are one people.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Claim: 'Ukrainians and Russians are one people, and Ukraine was never a real nation.' Verdict: False. The claim, repeated in a 2021 essay published on the Kremlin's website, ignores centuries of distinct Ukrainian language, literature and political institutions, from the Cossack Hetmanate to the Ukrainian People's Republic of 1917. Historians note that the 'one people' framing has long been used to deny Ukrainian sovereignty.",
+     "from": "benchmark: c-narr_ukraine_not_nation-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "history_soviet",
+      "reports_or_debunks"
+     ],
+     "expected_action": "review",
+     "note": "Fact-check quoting and refuting the 'one people' claim; the text does not adopt it."
+    },
+    {
+     "text": "The Ukrainian national movement took shape in the nineteenth century, when writers such as Taras Shevchenko and historians like Mykhailo Hrushevsky documented the Ukrainian language, folklore and past. After the collapse of the Russian Empire, the Ukrainian People's Republic declared independence in January 1918. Ukraine later became a Soviet republic and regained full independence in 1991, confirmed by a referendum in which more than 90 percent voted in favour.",
+     "from": "benchmark: c-narr_ukraine_not_nation-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "Neutral encyclopedic history of Ukrainian nationhood; no claim that Ukraine is not a nation."
+    }
+   ]
+  },
+  {
+   "id": "narr_nazi:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_nazi",
+   "title": "narr_nazi · yes",
+   "what": "Texts where 'narr_nazi' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that the Ukrainian government or Ukrainian people are Nazis.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The regime in Kyiv is a Nazi regime. Its battalions march under symbols borrowed from the SS, its streets are named after Hitler's collaborators, and its leaders openly worship fascist ideology. Ukraine today is the only country in Europe where Nazism has become state policy, and the West pretends not to see it. Russian people remember who defeated Nazism eighty years ago, and they recognise it again in Kyiv.",
+     "from": "benchmark: c-narr_nazi-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "narr_nazi"
+     ],
+     "expected_action": "remove",
+     "note": "Asserts as fact that the Ukrainian government is Nazi."
+    },
+    {
+     "text": "Ukrainian soldiers are neo-Nazis, plain and simple. They are the grandsons of Bandera's men and they fight against Russia with the same hatred their grandfathers had. Every unit has its runes and portraits of collaborators on the walls. Whenever Russian troops enter a town abandoned by the Ukrainian army, they find Nazi literature in every barracks. This is who the West is arming.",
+     "from": "benchmark: c-narr_nazi-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_nazi"
+     ],
+     "expected_action": "remove",
+     "note": "Labels Ukrainian soldiers as neo-Nazis in the war context, in its own voice."
+    }
+   ]
+  },
+  {
+   "id": "narr_nazi:near",
+   "group": "Level 2 · framing",
+   "label": "narr_nazi",
+   "title": "narr_nazi · near miss",
+   "what": "Near misses: they look related to 'narr_nazi' (same words or topic) but 'narr_nazi' is no.",
+   "hypothesis": "This text claims that the Ukrainian government or Ukrainian people are Nazis.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russian President Vladimir Putin again claimed on Tuesday that Ukraine's government is run by 'neo-Nazis', repeating a justification he has used since the full-scale invasion began in February 2022. Ukrainian officials rejected the remark, pointing out that President Volodymyr Zelensky is Jewish and was elected with 73 percent of the vote. Far-right parties won about 2 percent in Ukraine's 2019 parliamentary election.",
+     "from": "benchmark: c-narr_nazi-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "News report quoting and contextualising the Nazi claim without adopting it."
+    },
+    {
+     "text": "The Azov unit was formed in 2014 as a volunteer battalion and was later incorporated into Ukraine's National Guard. Its early ranks included members of far-right groups, which drew criticism from human rights organisations at the time. The unit has since been reorganised, and it became widely known for defending the Azovstal steel plant in Mariupol during the Russian siege of the city in spring 2022.",
+     "from": "benchmark: c-narr_nazi-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "Neutral factual paragraph on a topic often used in the Nazi narrative; makes no such claim."
+    }
+   ]
+  },
+  {
+   "id": "narr_war_justification:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_war_justification",
+   "title": "narr_war_justification · yes",
+   "what": "Texts where 'narr_war_justification' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that Russia's invasion of Ukraine is a defensive or liberating special operation.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The special military operation was never an act of aggression. Russia was forced to step in to protect the people of Donbas, who had been shelled for eight years while the world looked away. Our soldiers are liberating towns, not conquering them, and residents greet them as defenders. Every country has the right to defend its own people, and that is exactly what Russia is doing.",
+     "from": "benchmark: c-narr_war_justification-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_war_justification"
+     ],
+     "expected_action": "remove",
+     "note": "Frames the invasion as a defensive, liberating special operation."
+    },
+    {
+     "text": "Moscow, 14 March. The Russian Armed Forces continue the special military operation to demilitarise Ukraine and protect the civilian population of Donbas. Thanks to the courageous actions of our servicemen, three more settlements have been liberated from nationalist formations, and their residents are already receiving humanitarian aid. The operation is proceeding strictly according to plan, and all its objectives will be achieved.",
+     "from": "benchmark: c-narr_war_justification-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_war_justification"
+     ],
+     "expected_action": "remove",
+     "note": "State-media style bulletin adopting the 'liberation / special operation' framing as its own."
+    }
+   ]
+  },
+  {
+   "id": "narr_war_justification:near",
+   "group": "Level 2 · framing",
+   "label": "narr_war_justification",
+   "title": "narr_war_justification · near miss",
+   "what": "Near misses: they look related to 'narr_war_justification' (same words or topic) but 'narr_war_justification' is no.",
+   "hypothesis": "This text claims that Russia's invasion of Ukraine is a defensive or liberating special operation.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Moscow describes its invasion as a 'special military operation' to protect Donbas residents and 'demilitarise' Ukraine. The UN General Assembly rejected that framing in March 2022, when 141 states voted to condemn the invasion as an act of aggression. The International Court of Justice also ordered Russia to suspend its military operations, noting it had no evidence for the genocide allegations Moscow used to justify them.",
+     "from": "benchmark: c-narr_war_justification-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Reports the justification and the international rejection of it; does not adopt it."
+    },
+    {
+     "text": "On 24 February 2022 Russian forces launched a full-scale invasion of Ukraine from the north, east and south, including from Belarusian territory. Columns advanced towards Kyiv but withdrew from the region at the end of March. Fighting then concentrated in the east and south, where Ukraine recaptured large areas around Kharkiv and Kherson in the autumn before front lines largely stabilised in 2023.",
+     "from": "benchmark: c-narr_war_justification-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "Neutral factual account of the invasion with no justification."
+    }
+   ]
+  },
+  {
+   "id": "narr_nato_blame:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_nato_blame",
+   "title": "narr_nato_blame · yes",
+   "what": "Texts where 'narr_nato_blame' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that NATO or the West caused the war in Ukraine.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "This war is NATO's war. For thirty years the alliance crept eastward, breaking every promise made to Moscow, until it stood at Russia's doorstep. Washington armed Ukraine and pushed it into confrontation, knowing exactly how Russia would respond. The blame for every death on this front lies in Brussels and Washington, not in Moscow. The West wanted this war and it got it.",
+     "from": "benchmark: c-narr_nato_blame-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_nato_blame"
+     ],
+     "expected_action": "remove",
+     "note": "Blames NATO and the West for causing the war."
+    },
+    {
+     "text": "The West started this conflict in 2014 when it organised a coup in Kyiv and installed a puppet government. Since then American and British advisers have trained, armed and directed the Ukrainian army. Ukraine is only a battering ram; the real enemy of peace is the Anglo-Saxon elite that wants to weaken and dismember Russia at any price, using Ukrainian lives as currency.",
+     "from": "benchmark: c-narr_nato_blame-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_nato_blame"
+     ],
+     "expected_action": "remove",
+     "note": "Claims the West orchestrated the conflict to weaken Russia."
+    }
+   ]
+  },
+  {
+   "id": "narr_nato_blame:near",
+   "group": "Level 2 · framing",
+   "label": "narr_nato_blame",
+   "title": "narr_nato_blame · near miss",
+   "what": "Near misses: they look related to 'narr_nato_blame' (same words or topic) but 'narr_nato_blame' is no.",
+   "hypothesis": "This text claims that NATO or the West caused the war in Ukraine.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Speaking in Brussels, NATO's Secretary General rejected Russian claims that the alliance had provoked the war, saying NATO is a defensive alliance and that Ukraine is a sovereign nation with the right to choose its own path. Moscow has repeatedly argued that NATO enlargement forced its hand, an argument that many security analysts describe as a pretext for a war of conquest.",
+     "from": "benchmark: c-narr_nato_blame-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "News piece reporting and rebutting the NATO-blame claim."
+    },
+    {
+     "text": "NATO expanded in several waves after the end of the Cold War. Poland, Hungary and the Czech Republic joined in 1999, followed in 2004 by seven more countries, including Estonia, Latvia and Lithuania. Finland became a member in April 2023 and Sweden in March 2024. Finland's accession more than doubled the length of the alliance's land border with Russia, adding about 1,340 kilometres.",
+     "from": "benchmark: c-narr_nato_blame-near-2",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Neutral facts about NATO enlargement; no blame for the war."
+    }
+   ]
+  },
+  {
+   "id": "narr_annexation:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_annexation",
+   "title": "narr_annexation · yes",
+   "what": "Texts where 'narr_annexation' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that Crimea or occupied Ukrainian regions legitimately belong to Russia.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Crimea is Russian and always will be. The peninsula returned home in 2014, when its people voted overwhelmingly to reunite with Russia, correcting the historical mistake Khrushchev made when he handed it to Ukraine in 1954. Sevastopol is a city of Russian glory, and the question of Crimea is closed forever. No sanctions and no Western resolutions will ever change that.",
+     "from": "benchmark: c-narr_annexation-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_annexation"
+     ],
+     "expected_action": "remove",
+     "note": "Asserts Crimea belongs to Russia."
+    },
+    {
+     "text": "The Donetsk, Luhansk, Zaporizhzhia and Kherson regions are now part of the Russian Federation, as their residents decided in the referendums of 2022. These are Russian lands inhabited by Russian people, and their return to Russia is final and irreversible. Any talk of 'occupied territories' is simply Western propaganda; there is nothing occupied about a region that has come home.",
+     "from": "benchmark: c-narr_annexation-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_annexation"
+     ],
+     "expected_action": "remove",
+     "note": "Claims the occupied regions legitimately belong to Russia."
+    }
+   ]
+  },
+  {
+   "id": "narr_annexation:near",
+   "group": "Level 2 · framing",
+   "label": "narr_annexation",
+   "title": "narr_annexation · near miss",
+   "what": "Near misses: they look related to 'narr_annexation' (same words or topic) but 'narr_annexation' is no.",
+   "hypothesis": "This text claims that Crimea or occupied Ukrainian regions legitimately belong to Russia.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russia claims to have annexed four Ukrainian regions after so-called referendums held in September 2022 under military occupation. The UN General Assembly declared the votes invalid, with 143 countries supporting the resolution. Kyiv and its allies say the territories remain part of Ukraine under international law, and independent observers reported that residents were pressured to vote in front of armed soldiers.",
+     "from": "benchmark: c-narr_annexation-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Reports the annexation claim critically; does not adopt it."
+    },
+    {
+     "text": "Crimea is a peninsula on the northern coast of the Black Sea, connected to the mainland by the narrow Perekop Isthmus. Its southern coast is sheltered by the Crimean Mountains, whose highest peak, Roman-Kosh, rises to 1,545 metres. The climate ranges from dry steppe in the north to a mild, almost subtropical belt along the shore between Alushta and Yalta.",
+     "from": "benchmark: c-narr_annexation-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Neutral geography of Crimea; says nothing about whom it belongs to and does not mention Russia."
+    }
+   ]
+  },
+  {
+   "id": "narr_atrocity_denial:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_atrocity_denial",
+   "title": "narr_atrocity_denial · yes",
+   "what": "Texts where 'narr_atrocity_denial' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that documented Russian war crimes were staged or fake.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The so-called Bucha massacre was a staged provocation. Russian troops left the town days before the bodies appeared, and the footage was carefully arranged for Western cameras. It is the same script every time: fake bodies, fake witnesses, and a ready-made story in all the Western media within hours. Anyone who looks at the timeline honestly can see it was a performance.",
+     "from": "benchmark: c-narr_atrocity_denial-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_atrocity_denial"
+     ],
+     "expected_action": "remove",
+     "note": "Claims the Bucha killings were staged."
+    },
+    {
+     "text": "The strike on the maternity hospital in Mariupol never happened the way Western media reported it. The building had long been taken over by Ukrainian fighters, and the 'pregnant women' in the photos were hired actors. Russian forces do not target civilians; these stories are invented in Kyiv to turn the world against Russia and to beg for more weapons.",
+     "from": "benchmark: c-narr_atrocity_denial-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_atrocity_denial"
+     ],
+     "expected_action": "remove",
+     "note": "Denies a documented attack and calls victims actors."
+    }
+   ]
+  },
+  {
+   "id": "narr_atrocity_denial:near",
+   "group": "Level 2 · framing",
+   "label": "narr_atrocity_denial",
+   "title": "narr_atrocity_denial · near miss",
+   "what": "Near misses: they look related to 'narr_atrocity_denial' (same words or topic) but 'narr_atrocity_denial' is no.",
+   "hypothesis": "This text claims that documented Russian war crimes were staged or fake.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russian officials have claimed that images of dead civilians in Bucha were 'staged' after Russian forces withdrew. Satellite images published by Maxar Technologies, however, show bodies lying in the streets in mid-March 2022, while the town was still under Russian control. UN investigators and journalists later documented unlawful killings there, contradicting the Kremlin's version of events.",
+     "from": "benchmark: c-narr_atrocity_denial-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Fact-check quoting the denial and refuting it."
+    },
+    {
+     "text": "In March 2023 the International Criminal Court issued arrest warrants for Vladimir Putin and Russia's children's rights commissioner, Maria Lvova-Belova, over the unlawful deportation of Ukrainian children from occupied territories. Ukraine has identified around 20,000 children it says were taken to Russia. Russia does not recognise the court's jurisdiction, and the warrants restrict where its president can travel.",
+     "from": "benchmark: c-narr_atrocity_denial-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "Neutral report on war-crime proceedings; no denial."
+    }
+   ]
+  },
+  {
+   "id": "narr_language:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_language",
+   "title": "narr_language · yes",
+   "what": "Texts where 'narr_language' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that Ukrainian is a dialect of Russian or not a real language.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Ukrainian is not a real language. It is a regional dialect of Russian mixed with Polish words, given a written standard only in the nineteenth century by a handful of intellectuals. Anyone from Moscow can understand it without any study. Forcing this dialect on schools, courts and offices is an artificial political project designed to push people away from Russia.",
+     "from": "benchmark: c-narr_language-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "narr_language"
+     ],
+     "expected_action": "remove",
+     "note": "States Ukrainian is a dialect of Russian, not a language."
+    },
+    {
+     "text": "Let's be honest, the 'Ukrainian language' is just Little Russian peasant speech that intellectuals dressed up with Polish grammar and invented words. Real literature, science and business in Kyiv were always conducted in Russian. Calling a village dialect a separate language was a political decision, not a linguistic one, and everyone who grew up there knows it.",
+     "from": "benchmark: c-narr_language-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "narr_language"
+     ],
+     "expected_action": "remove",
+     "note": "Forum post dismissing Ukrainian as a dressed-up dialect."
+    }
+   ]
+  },
+  {
+   "id": "narr_language:near",
+   "group": "Level 2 · framing",
+   "label": "narr_language",
+   "title": "narr_language · near miss",
+   "what": "Near misses: they look related to 'narr_language' (same words or topic) but 'narr_language' is no.",
+   "hypothesis": "This text claims that Ukrainian is a dialect of Russian or not a real language.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Is Ukrainian just a dialect of Russian? No. Linguists classify Ukrainian as a separate East Slavic language with its own grammar, phonetics and vocabulary; in shared vocabulary it is closer to Belarusian and Polish than to Russian. The 'dialect' claim goes back to the Russian Empire, whose 1863 Valuev Circular declared that a separate Little Russian language 'never existed and cannot exist'.",
+     "from": "benchmark: c-narr_language-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet",
+      "reports_or_debunks"
+     ],
+     "expected_action": "review",
+     "note": "Fact-check quoting and debunking the dialect claim."
+    },
+    {
+     "text": "Ukrainian is the state language of Ukraine and is spoken by roughly 30 to 40 million people. It is written in a Cyrillic alphabet of 33 letters, including Ґ, Є, І and Ї. Together with Russian and Belarusian, it belongs to the East Slavic branch of the Slavic languages. Its literary standard is based mainly on the dialects of the central Dnipro region.",
+     "from": "benchmark: c-narr_language-near-2",
+     "labels_yes": [],
+     "expected_action": "pass",
+     "note": "Neutral linguistic facts; Russian is mentioned only as a language in a list, so the gate is false."
+    }
+   ]
+  },
+  {
+   "id": "narr_russian_greatness:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_russian_greatness",
+   "title": "narr_russian_greatness · yes",
+   "what": "Texts where 'narr_russian_greatness' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text glorifies Russian imperial power or the Russian world.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russia is not just a country, it is a civilisation. From the Baltic to the Pacific, Russian power has united dozens of peoples under one great state, and every attempt by the West to break it has ended in defeat. The Russian world lives wherever the Russian language and the Orthodox faith are alive, and its destiny is to remain a great power that others must respect.",
+     "from": "benchmark: c-narr_russian_greatness-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "narr_russian_greatness"
+     ],
+     "expected_action": "remove",
+     "note": "Glorifies Russian power and the 'Russian world'."
+    },
+    {
+     "text": "Peter the Great and Catherine the Great built an empire that made all of Europe tremble. Russia's glory has always rested on its strength: the strength to master endless lands, to crush Napoleon and to stand alone against the whole world. Today the Russian world is rising again, and those who doubted it will soon remember what a great empire means.",
+     "from": "benchmark: c-narr_russian_greatness-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet",
+      "narr_russian_greatness"
+     ],
+     "expected_action": "remove",
+     "note": "Celebrates Russian imperial might and its revival."
+    }
+   ]
+  },
+  {
+   "id": "narr_russian_greatness:near",
+   "group": "Level 2 · framing",
+   "label": "narr_russian_greatness",
+   "title": "narr_russian_greatness · near miss",
+   "what": "Near misses: they look related to 'narr_russian_greatness' (same words or topic) but 'narr_russian_greatness' is no.",
+   "hypothesis": "This text glorifies Russian imperial power or the Russian world.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "The concept of the 'Russian world' (russkiy mir) has become a central element of Kremlin ideology. Critics argue that it presents Russian-speaking communities abroad as part of a single civilisation led by Moscow, which provides a pretext for interference in neighbouring states. In 2022 hundreds of Orthodox theologians signed a declaration rejecting the 'Russian world' teaching as incompatible with their faith.",
+     "from": "benchmark: c-narr_russian_greatness-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Critical analysis of the 'Russian world' doctrine, not an endorsement."
+    },
+    {
+     "text": "The Russian Empire reached its greatest territorial extent in the 1860s, covering about 22.8 million square kilometres across Eastern Europe, Central Asia and Siberia, as well as Alaska, which was sold to the United States in 1867. The empire was ruled by the Romanov dynasty until the February Revolution of 1917 forced Nicholas II to abdicate.",
+     "from": "benchmark: c-narr_russian_greatness-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "geography",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "Neutral historical facts about imperial size without glorification."
+    }
+   ]
+  },
+  {
+   "id": "narr_soviet_nostalgia:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_soviet_nostalgia",
+   "title": "narr_soviet_nostalgia · yes",
+   "what": "Texts where 'narr_soviet_nostalgia' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text praises the USSR or calls for restoring it.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Over time, when at the peak of its power, U.S. imperialism, along with its imperialist allies, succeeded in dividing the world communist movement and containing the Russian Revolution, leading to the overthrow of the Soviet Union and to other major working-class defeats.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#17#11249-11520",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet",
+      "narr_soviet_nostalgia"
+     ],
+     "expected_action": "remove",
+     "note": "[draft] Frames the overthrow of the USSR as a working-class defeat; nostalgia is implied rather than explicit."
+    },
+    {
+     "text": "Life in the USSR was better, and everyone who lived then knows it. Housing was free, education and medicine were free, and nobody was afraid of tomorrow. The peoples of fifteen republics lived as one big family. The collapse of the Soviet Union was the greatest tragedy of the century, and one day our great country will be restored.",
+     "from": "benchmark: c-narr_soviet_nostalgia-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet",
+      "narr_soviet_nostalgia"
+     ],
+     "expected_action": "remove",
+     "note": "Praises the USSR and hopes for its restoration."
+    }
+   ]
+  },
+  {
+   "id": "narr_soviet_nostalgia:near",
+   "group": "Level 2 · framing",
+   "label": "narr_soviet_nostalgia",
+   "title": "narr_soviet_nostalgia · near miss",
+   "what": "Near misses: they look related to 'narr_soviet_nostalgia' (same words or topic) but 'narr_soviet_nostalgia' is no.",
+   "hypothesis": "This text praises the USSR or calls for restoring it.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "According to a recent Levada Center poll, around two thirds of Russians say they regret the collapse of the Soviet Union, most often citing the loss of a common economic system and of the feeling of belonging to a great power. Sociologists caution that such nostalgia usually reflects dissatisfaction with present-day conditions rather than a genuine wish to restore the Soviet system.",
+     "from": "benchmark: c-narr_soviet_nostalgia-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet",
+      "reports_or_debunks"
+     ],
+     "expected_action": "review",
+     "note": "Reports survey opinions and analyses them; the text itself does not praise the USSR."
+    },
+    {
+     "text": "The Soviet Union was formally dissolved on 26 December 1991, a day after Mikhail Gorbachev resigned as its president. Its fifteen republics became independent states, and Russia took over the Soviet seat on the UN Security Council. The Commonwealth of Independent States, founded earlier that month, was intended to manage the transition between the former republics.",
+     "from": "benchmark: c-narr_soviet_nostalgia-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "history_soviet"
+     ],
+     "expected_action": "review",
+     "note": "Neutral account of the Soviet collapse."
+    }
+   ]
+  },
+  {
+   "id": "narr_traditional_values:yes",
+   "group": "Level 2 · framing",
+   "label": "narr_traditional_values",
+   "title": "narr_traditional_values · yes",
+   "what": "Texts where 'narr_traditional_values' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text claims that Russia defends traditional values against a decadent West.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Russia today stands as the last defender of traditional family values, faith and the natural order, while the decadent West has abandoned them. Western elites want to export their moral decline to Russia, and the country must protect its children from these foreign ideas.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "values_mindset",
+      "politics_government",
+      "narr_traditional_values"
+     ],
+     "expected_action": "remove",
+     "note": ""
+    },
+    {
+     "text": "Unlike Europe, which has lost its spiritual roots, Russia keeps the traditional values of family, church and homeland. This is why the West attacks Russia: it cannot forgive a nation that refuses to give up its soul.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "values_mindset",
+      "narr_traditional_values"
+     ],
+     "expected_action": "remove",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "narr_traditional_values:near",
+   "group": "Level 2 · framing",
+   "label": "narr_traditional_values",
+   "title": "narr_traditional_values · near miss",
+   "what": "Near misses: they look related to 'narr_traditional_values' (same words or topic) but 'narr_traditional_values' is no.",
+   "hypothesis": "This text claims that Russia defends traditional values against a decadent West.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Analysts at the EU's East StratCom Task Force describe the claim that Russia defends 'traditional values' against a 'decadent West' as one of the Kremlin's most repeated messages. They note that it is used to present the war against Ukraine as a clash of civilisations.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": ""
+    },
+    {
+     "text": "In 2022 the Russian president signed a decree on 'preserving and strengthening traditional Russian spiritual and moral values'. It lists values such as patriotism, service to the homeland and strong families, and tasks ministries with promoting them in schools and the media.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government"
+     ],
+     "expected_action": "keep",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "hostility_ukrainians:yes",
+   "group": "Level 2 · framing",
+   "label": "hostility_ukrainians",
+   "title": "hostility_ukrainians · yes",
+   "what": "Texts where 'hostility_ukrainians' is clearly yes: expected action follows its decision (remove).",
+   "hypothesis": "This text contains insults or dehumanising language about Ukrainians.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "Ukrainians are like a herd of sheep. They follow whoever feeds them, yesterday Russia, today the Americans, tomorrow someone else. A people with no spine and no brain, good only for begging and grabbing what belongs to others. Russia fed them for decades and this is the thanks it gets. Nothing a Ukrainian says can ever be trusted.",
+     "from": "benchmark: c-hostility_ukrainians-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "hostility_ukrainians"
+     ],
+     "expected_action": "remove",
+     "note": "Dehumanising generalisation about Ukrainians as a people."
+    },
+    {
+     "text": "They are not like us. Ukrainians are a sick, degenerate people, rotten from the inside, a parasite that lives on Western handouts the same way it once lived on cheap Russian gas. You cannot reason with such creatures, and you should not waste your pity on them. Whatever happens to them, they brought it on themselves.",
+     "from": "benchmark: c-hostility_ukrainians-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "hostility_ukrainians"
+     ],
+     "expected_action": "remove",
+     "note": "Calls Ukrainians parasites and creatures."
+    }
+   ]
+  },
+  {
+   "id": "hostility_ukrainians:near",
+   "group": "Level 2 · framing",
+   "label": "hostility_ukrainians",
+   "title": "hostility_ukrainians · near miss",
+   "what": "Near misses: they look related to 'hostility_ukrainians' (same words or topic) but 'hostility_ukrainians' is no.",
+   "hypothesis": "This text contains insults or dehumanising language about Ukrainians.",
+   "decision": "remove",
+   "texts": [
+    {
+     "text": "A study by a media monitoring group found that Russian state television regularly described Ukrainians as 'vermin' and 'a sick nation' during prime-time talk shows in 2022. The researchers counted hundreds of such remarks and warned that dehumanising language about an entire people often precedes and accompanies mass violence against civilians.",
+     "from": "benchmark: c-hostility_ukrainians-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Reports and condemns dehumanising speech; does not use it in its own voice."
+    },
+    {
+     "text": "According to the 2001 census, the only one held since independence, Ukraine had a population of about 48.5 million. Ethnic Ukrainians made up roughly 78 percent, and Russians, the largest minority, about 17 percent, living mostly in the east, the south and Crimea. Smaller communities included Belarusians, Moldovans, Crimean Tatars, Bulgarians, Hungarians and Poles.",
+     "from": "benchmark: c-hostility_ukrainians-near-2",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Neutral demographic facts about Ukrainians; no hostility."
+    }
+   ]
+  },
+  {
+   "id": "hostility_russians:yes",
+   "group": "Level 2 · framing",
+   "label": "hostility_russians",
+   "title": "hostility_russians · yes",
+   "what": "Texts where 'hostility_russians' is clearly yes: expected action follows its decision (flag).",
+   "hypothesis": "This text contains insults or dehumanising language about Russians.",
+   "decision": "flag",
+   "texts": [
+    {
+     "text": "Russians are not a nation but a horde. For centuries they have lived like locusts, devouring everything around them and leaving only ruins behind. There is something broken in them as a people: they love their chains and hate anyone who is free. The world will only be safe when this barbarian mass is shut away behind a wall.",
+     "from": "benchmark: c-hostility_russians-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "hostility_russians"
+     ],
+     "expected_action": "keep",
+     "note": "Dehumanises Russians as a people (horde, locusts, barbarian mass)."
+    },
+    {
+     "text": "Talking to Russians is pointless. They are a slave people, bred for obedience, a grey crowd without conscience or memory. Like animals they recognise only force and the hand that feeds them. Every Russian, from the soldier to the pensioner, carries the same disease, and it is passed on from generation to generation.",
+     "from": "benchmark: c-hostility_russians-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "hostility_russians"
+     ],
+     "expected_action": "keep",
+     "note": "Calls Russians as a people slaves, animals and diseased."
+    }
+   ]
+  },
+  {
+   "id": "hostility_russians:near",
+   "group": "Level 2 · framing",
+   "label": "hostility_russians",
+   "title": "hostility_russians · near miss",
+   "what": "Near misses: they look related to 'hostility_russians' (same words or topic) but 'hostility_russians' is no.",
+   "hypothesis": "This text contains insults or dehumanising language about Russians.",
+   "decision": "flag",
+   "texts": [
+    {
+     "text": "The Russian government bears full responsibility for the invasion and for the crimes committed by its forces. Its officials have lied to their own citizens, jailed thousands of protesters and silenced independent media. Accountability must reach those who planned and ordered the war, not ordinary people who never had a real say in the decision.",
+     "from": "benchmark: c-hostility_russians-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "Harsh criticism of the Russian government, explicitly not of Russians as a people."
+    },
+    {
+     "text": "Human rights groups in Germany reported a rise in harassment of Russian-speaking residents after February 2022, including insults in shops and vandalism at Russian grocery stores. Local officials condemned the incidents and stressed that people living in Germany should not be held responsible for the decisions of the Kremlin.",
+     "from": "benchmark: c-hostility_russians-near-2",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "News about anti-Russian harassment that condemns it; the text is not hostile."
+    }
+   ]
+  },
+  {
+   "id": "reports_or_debunks:yes",
+   "group": "Level 2 · framing",
+   "label": "reports_or_debunks",
+   "title": "reports_or_debunks · yes",
+   "what": "Texts where 'reports_or_debunks' is clearly yes: expected action follows its decision (keep).",
+   "hypothesis": "This text reports or refutes claims made by others rather than making the claims itself.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Nuke blast a bigger concern than Russia - Obama\n\n2014-03-26 08:44\n\nPresident Barack Obama says he's more concerned about the prospect of a nuclear weapon exploding in New York City than Russia's recent actions.",
+     "from": "seed (draft labels): corpus_olmo\\seed_docs.jsonl#21#0-210",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "[draft] 'Russia's recent actions' (March 2014) implies Crimea but Ukraine is not named."
+    },
+    {
+     "text": "FACT CHECK: Did Ukraine run secret US-funded bioweapons labs? No. The claim, promoted by Russia's defence ministry in March 2022, refers to public-health laboratories that the United States helped upgrade under a programme to secure dangerous pathogens left over from the Soviet era. The World Health Organization and independent experts found no evidence of weapons research.",
+     "from": "benchmark: c-reports_or_debunks-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Fact-check attributing a claim to the Russian defence ministry and refuting it."
+    }
+   ]
+  },
+  {
+   "id": "reports_or_debunks:near",
+   "group": "Level 2 · framing",
+   "label": "reports_or_debunks",
+   "title": "reports_or_debunks · near miss",
+   "what": "Near misses: they look related to 'reports_or_debunks' (same words or topic) but 'reports_or_debunks' is no.",
+   "hypothesis": "This text reports or refutes claims made by others rather than making the claims itself.",
+   "decision": "keep",
+   "texts": [
+    {
+     "text": "Russia's central bank raised its key interest rate to 21 percent in October 2024, the highest level in more than two decades, in an effort to slow inflation that was running at around 9 percent. Higher borrowing costs made mortgages and business loans considerably more expensive, and several large companies postponed investment projects as a result.",
+     "from": "benchmark: c-reports_or_debunks-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "economy_business"
+     ],
+     "expected_action": "keep",
+     "note": "States economic facts in its own voice; no claim by others is reported."
+    },
+    {
+     "text": "Russia's Lake Baikal, in southern Siberia, is the deepest lake in the world, reaching 1,642 metres, and holds about a fifth of the planet's unfrozen fresh surface water. It is fed by more than 300 rivers and streams but drained by only one, the Angara. Its waters are home to the Baikal seal, one of the few freshwater seal species.",
+     "from": "benchmark: c-reports_or_debunks-near-2",
+     "labels_yes": [
+      "involves_russia",
+      "geography"
+     ],
+     "expected_action": "keep",
+     "note": "Encyclopedic description in its own voice."
+    }
+   ]
+  },
+  {
+   "id": "gate_marker",
+   "group": "Level 0 · gate",
+   "label": null,
+   "title": "Marker term, no keyword",
+   "what": "Only marker terms ('Kiev regime', 'Novorossiya', 'denazification'): the gate is skipped and level 1 and 2 run.",
+   "texts": [
+    {
+     "text": "The so-called Kiev regime keeps shelling peaceful towns of Novorossiya, and only denazification can bring peace to these lands, the commentator told viewers.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine",
+      "narr_nazi",
+      "narr_war_justification",
+      "narr_annexation"
+     ],
+     "expected_action": "remove",
+     "note": "Only marker terms ('Kiev regime', 'Novorossiya', 'denazification'): the gate is skipped and level 1 and 2 run."
+    }
+   ]
+  },
+  {
+   "id": "gate_language_menu",
+   "group": "Level 0 · gate",
+   "label": null,
+   "title": "Language menu",
+   "what": "'Russian' in a list of languages: the cheap rules mark it incidental before any model (document untouched).",
+   "texts": [
+    {
+     "text": "Subtitles: English, German, French, Spanish, Russian, Japanese. Audio: English 5.1. Region free. The disc also includes a making-of documentary and deleted scenes.",
+     "from": "new (written for this case)",
+     "labels_yes": [],
+     "expected_action": "untouched or pass",
+     "note": "'Russian' in a list of languages: the cheap rules mark it incidental before any model (document untouched)."
+    }
+   ]
+  },
+  {
+   "id": "edge_scientist",
+   "group": "Edge cases",
+   "label": null,
+   "title": "Russian scientist in a technical text",
+   "what": "A theorem named after a Russian mathematician: science_technology (keep), not celebrities.",
+   "texts": [
+    {
+     "text": "The Lyapunov exponent, named after the Russian mathematician Aleksandr Lyapunov, measures how quickly two nearby trajectories of a dynamical system separate. A positive exponent indicates chaos. In practice it is estimated from time series by tracking the divergence of neighbouring points and averaging the logarithm of their growth rate over many steps.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "science_technology"
+     ],
+     "expected_action": "keep",
+     "note": "A theorem named after a Russian mathematician: science_technology (keep), not celebrities."
+    }
+   ]
+  },
+  {
+   "id": "edge_price_in_tech",
+   "group": "Edge cases",
+   "label": null,
+   "title": "Price inside a technical text",
+   "what": "The price of a Russian-made processor in a hardware review: science / economy (keep), not cost_of_living.",
+   "texts": [
+    {
+     "text": "The Elbrus-8SV processor, designed by the Moscow Center of SPARC Technologies, has eight cores at 1.5 GHz and uses a VLIW architecture that relies on the compiler to schedule instructions. Reviewers measured about half the single-thread performance of a comparable x86 chip; the board with the processor was listed at around 150,000 rubles.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "science_technology",
+      "economy_business"
+     ],
+     "expected_action": "keep",
+     "note": "The price of a Russian-made processor in a hardware review: science / economy (keep), not cost_of_living."
+    }
+   ]
+  },
+  {
+   "id": "edge_conflict",
+   "group": "Edge cases",
+   "label": null,
+   "title": "Remove and keep subject together",
+   "what": "A remove-type subject (culture, salaries, ...) and a keep-type subject (technology, economy, ...) in one paragraph: the conflict rule sends it to review.",
+   "texts": [
+    {
+     "text": "Russian pop singer Alina Vereskova, known for her chart-topping dance hits, has co-founded a technology startup in Moscow. The company is developing a neural network that turns hummed melodies into full backing tracks, and its first app entered beta testing this month. The singer says she will promote it during her autumn tour.",
+     "from": "benchmark: b-conflict-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "culture_entertainment",
+      "celebrities",
+      "science_technology",
+      "economy_business"
+     ],
+     "expected_action": "review",
+     "note": "Celebrity + music (remove) and Russian-developed software + startup company (keep)."
+    },
+    {
+     "text": "Engineers at Baikal Electronics, the Moscow-based designer of Russian processors, earn between 250,000 and 400,000 rubles a month, according to job listings. That is well above the average salary in Moscow, but recruiters say it still lags behind what chip designers can earn abroad, and the company struggles to keep staff.",
+     "from": "benchmark: b-conflict-yes-2",
+     "labels_yes": [
+      "involves_russia",
+      "cost_of_living",
+      "economy_business"
+     ],
+     "expected_action": "review",
+     "note": "Salaries in Russia (remove) at a Russian company (keep)."
+    }
+   ]
+  },
+  {
+   "id": "edge_no_subject",
+   "group": "Edge cases",
+   "label": null,
+   "title": "About Russia, no subject",
+   "what": "Russia-related but none of the 12 subjects: kept (reason no_subject).",
+   "texts": [
+    {
+     "text": "Moscow Zoo has welcomed a new resident: a two-year-old red panda named Bao arrived from a zoo in the Czech Republic. Keepers say he spent the first week exploring his enclosure and has already learned to come down from the tree at feeding time. Visitors can see him in the Asian forest pavilion from Tuesday to Sunday.",
+     "from": "benchmark: b-no_subject-yes-1",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "About Russia (Moscow Zoo) but none of the 12 subjects."
+    },
+    {
+     "text": "Filling in the Russian e-visa form: upload a passport-style photo on a light background, enter your passport number exactly as printed, and list the cities you plan to visit. After you submit, save the PDF confirmation and print it, because border officers may ask to see it. The status page usually updates within four days.",
+     "from": "benchmark: b-no_subject-yes-4",
+     "labels_yes": [
+      "involves_russia"
+     ],
+     "expected_action": "keep",
+     "note": "Practical paperwork steps for a Russian visa; not about government policy or officials."
+    }
+   ]
+  },
+  {
+   "id": "edge_war_factual",
+   "group": "Edge cases",
+   "label": null,
+   "title": "Factual war reporting",
+   "what": "Documented facts about the war (Bucha): war_ukraine (keep), no narrative: the model must keep this knowledge.",
+   "texts": [
+    {
+     "text": "Russian forces withdrew from Bucha at the end of March 2022. Ukrainian prosecutors, the UN monitoring mission and journalists documented the killing of civilians in the town during the occupation, and international investigators collected forensic evidence for war-crimes cases.",
+     "from": "new (written for this case)",
+     "labels_yes": [
+      "involves_russia",
+      "war_ukraine"
+     ],
+     "expected_action": "keep",
+     "note": "Documented facts about the war (Bucha): war_ukraine (keep), no narrative: the model must keep this knowledge."
+    }
+   ]
+  },
+  {
+   "id": "edge_debunk",
+   "group": "Edge cases",
+   "label": null,
+   "title": "News that debunks a narrative",
+   "what": "A fact-check quoting a Kremlin claim to refute it. Expected: keep (the narrative label is no). If the model wrongly says the narrative is yes, reports_or_debunks turns 'remove' into 'review' instead.",
+   "texts": [
+    {
+     "text": "Russian officials have claimed that images of dead civilians in Bucha were 'staged' after Russian forces withdrew. Satellite images published by Maxar Technologies, however, show bodies lying in the streets in mid-March 2022, while the town was still under Russian control. UN investigators and journalists later documented unlawful killings there, contradicting the Kremlin's version of events.",
+     "from": "benchmark: c-narr_atrocity_denial-near-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Fact-check quoting the denial and refuting it."
+    },
+    {
+     "text": "FACT CHECK: Did Ukraine run secret US-funded bioweapons labs? No. The claim, promoted by Russia's defence ministry in March 2022, refers to public-health laboratories that the United States helped upgrade under a programme to secure dangerous pathogens left over from the Soviet era. The World Health Organization and independent experts found no evidence of weapons research.",
+     "from": "benchmark: c-reports_or_debunks-yes-1",
+     "labels_yes": [
+      "involves_russia",
+      "politics_government",
+      "war_ukraine",
+      "reports_or_debunks"
+     ],
+     "expected_action": "keep",
+     "note": "Fact-check attributing a claim to the Russian defence ministry and refuting it."
+    }
+   ]
+  },
+  {
+   "id": "edge_place_names",
+   "group": "Edge cases",
+   "label": null,
+   "title": "Place names: rewrite and exceptions",
+   "what": "Kiev / Kharkov / Zaporozhye are rewritten in the cleaned text; Kievan Rus, Chicken Kiev and the URL are not. Use 'label without a keyword' to see the cleaned text.",
+   "texts": [
+    {
+     "text": "Night trains from Kiev to Kharkov take about seven hours, and the line continues south to Zaporozhye. Historians trace the city's origins to Kievan Rus. The station cafe still serves Chicken Kiev, and the timetable is online at https://kiev-trains.example/kiev. Lviv lies 540 km west of Kiev.",
+     "from": "new (written for this case)",
+     "labels_yes": [],
+     "expected_action": "untouched or pass",
+     "note": "Kiev / Kharkov / Zaporozhye are rewritten in the cleaned text; Kievan Rus, Chicken Kiev and the URL are not. Use 'label without a keyword' to see the cleaned text."
+    }
+   ]
+  },
+  {
+   "id": "edge_russian_language",
+   "group": "Edge cases",
+   "label": null,
+   "title": "Russian-language text about Ukraine",
+   "what": "A Russian-language news item about the Kyiv metro: not Russia-related by itself. The English models are weak on Cyrillic text: compare with bge-m3.",
+   "texts": [
+    {
+     "text": "Киевский метрополитен открыл новую станцию на Сырецко-Печерской линии. Поезда будут ходить каждые четыре минуты в часы пик. Городской совет Киева сообщил, что строительство финансировалось из городского бюджета Украины.",
+     "from": "new (written for this case)",
+     "labels_yes": [],
+     "expected_action": "untouched or pass",
+     "note": "A Russian-language news item about the Kyiv metro: not Russia-related by itself. The English models are weak on Cyrillic text: compare with bge-m3."
+    }
+   ]
+  }
+ ]
+}

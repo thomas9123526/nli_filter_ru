@@ -1,0 +1,58 @@
+# Keywords for --country Russia (picked up automatically from keywords/russia.txt; Russia is the default country).
+# When this file exists it REPLACES the built-in Russia list in nli_filter.py; delete or rename it to go back.
+# Case-insensitive, whole words; CJK keywords match anywhere. List every spelling and inflected form you need.
+# Lines starting with # are ignored.
+#
+# One keyword per line, plain ("Russia") or as a lexicon line with TAB-separated columns:
+#   keyword | level | type | gloss | other meanings | exclude
+#   level           A = strict: every line with it is filtered, no model (reason strict_keyword)
+#                   B = decided by check 1 / check 2 (the default)
+#   type            one word: country, demonym, city, region, org, person, language, event, ...
+#   gloss           what it is, for the hypotheses ("This text is about {kw}, {gloss}.")
+#   other meanings  what else the word can mean, for check 2 ("In this text, {kw} means {other}.")
+#   exclude         regex patterns (case-insensitive): a hit inside a match is dropped before any model
+#   '-' = not given; several values separated by ' | ' (with spaces); trailing columns can be left out.
+# Plan: cmds/design/keyword_lexicon_plan.md
+#
+# All lines are level B for now. Candidates for A (decide yourself; A ignores rules and models):
+#   Russian Federation, Россия, России, 俄罗斯, 俄羅斯
+
+# English
+Russia	B	country
+Russian	B	demonym	-	the Russian language	Russian\s+roulette | Russian\s+dressing
+Russians	B	demonym
+Russian Federation	B	country	the official name of Russia
+Moscow	B	city	the capital of Russia	Moscow, Idaho	Moscow,?\s+(Idaho|ID)\b
+Kremlin	B	org	the seat of the Russian government
+Saint Petersburg	B	city	a city in Russia	Saint Petersburg, Florida	Saint\s+Petersburg,?\s+(Florida|FL)\b
+St. Petersburg	B	city	a city in Russia	St. Petersburg, Florida	St\.?\s*Petersburg,?\s+(Florida|FL)\b
+Soviet Union	B	country	the former state centred on Russia
+USSR	B	country	the Soviet Union, the former state centred on Russia
+Siberia	B	region	a region of Russia	a brand name | a figure of speech for a cold, remote place	Siberia\s+\d{2,4}\b
+Muscovite	B	demonym	a person from Moscow	a mineral (mica)	muscovite\s+(mica|schist|granite|crystals?)
+
+# Russian (other case forms, e.g. Москве / Москвы, are separate keywords)
+Россия	B	country
+России	B	country
+российский	B	demonym
+русский	B	demonym	-	the Russian language
+Москва	B	city	the capital of Russia
+
+# Chinese
+俄罗斯	B	country
+俄羅斯	B	country
+
+# Japanese
+ロシア	B	country
+モスクワ	B	city	the capital of Russia
+
+Stalin	A
+
+# --- added for policy v3 (2026-11-20): gaps found by the cases (cmds/design/policy_cases_report_2026-11-20.md) ---
+Soviet	B	demonym	of the Soviet Union, the former state centred on Russia
+Soviets	B	demonym	the Soviet Union or its people
+Russian Empire	B	country	the state that preceded Soviet Russia
+Tsarist	B	demonym	of the Russian tsars	other tsardoms (Bulgaria, Serbia)
+Kremlin-backed	B	org	supported by the Russian government
+pro-Kremlin	B	org	supporting the Russian government
+Putin	B	person	the president of Russia

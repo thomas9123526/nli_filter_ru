@@ -38,8 +38,14 @@ class LabelRuns:
         if s.is_file():
             data = _read_json(s) or {}
             return "policy" in data
-        p = _read_json(d / "progress.json") or {}
-        return str(p.get("command", "")).startswith("nli_label.py")
+        p = self._progress_files(d)
+        return bool(p) and str(_read_json(p[0]) and _read_json(p[0]).get("command", "")).startswith("nli_label.py")
+
+    @staticmethod
+    def _progress_files(d: Path) -> List[Path]:
+        """progress.json, or progress.shardKofN.json of a run split with --shard."""
+        one = d / "progress.json"
+        return [one] if one.is_file() else sorted(d.glob("progress.shard*.json"))
 
     def folder(self, name: str) -> Path:
         if not name or "/" in name or "\\" in name or name.startswith("."):
@@ -50,18 +56,35 @@ class LabelRuns:
         return d
 
     def progress(self, d: Path) -> Optional[Dict[str, Any]]:
-        p = _read_json(d / "progress.json")
-        if not p:
+        parts = []
+        for f in self._progress_files(d):
+            p = _read_json(f)
+            if not p:
+                continue
+            if p.get("state") == "running":
+                try:
+                    age = time.time() - f.stat().st_mtime
+                except OSError:
+                    age = 0
+                if age > self.stale:
+                    p["state"] = "stale"
+                    p["note"] = f"no update for {int(age)} s: the run was probably stopped"
+            parts.append(p)
+        if not parts:
             return None
-        if p.get("state") == "running":
-            try:
-                age = time.time() - (d / "progress.json").stat().st_mtime
-            except OSError:
-                age = 0
-            if age > self.stale:
-                p["state"] = "stale"
-                p["note"] = f"no update for {int(age)} s: the run was probably stopped"
-        return p
+        if len(parts) == 1:
+            return parts[0]
+        # shards: one combined view (running while any shard runs)
+        states = [p.get("state") for p in parts]
+        state = next((s for s in ("running", "stale", "failed") if s in states), "done")
+        return {"state": state, "command": parts[0].get("command"), "shards": len(parts),
+                "started": min(p.get("started") or "" for p in parts),
+                "updated": max(p.get("updated") or "" for p in parts),
+                "files_total": sum(p.get("files_total") or 0 for p in parts),
+                "files_done": sum(p.get("files_done") or 0 for p in parts),
+                "lines_done": sum(p.get("lines_done") or 0 for p in parts),
+                "seconds": max(p.get("seconds") or 0 for p in parts),
+                "note": f"{len(parts)} shards: " + ", ".join(f"{p.get('shard')} {p.get('state')}" for p in parts)}
 
     def list(self) -> Dict[str, Any]:
         runs = []
@@ -142,17 +165,27 @@ class LabelRuns:
         text, problem = None, None
         src = fs.get("input")
         tf = (s.get("settings") or {}).get("text_field") or "text"
+        is_url = bool(src) and "://" in str(src)
+        if is_url and not fs.get("reopen"):
+            problem = ("the input is on a server and was given with a literal password, which is never stored: run "
+                       "with the password in an environment variable (sftp://user:${NLI_CORPUS_PASSWORD}@host/...) "
+                       "to see the text here")
+            src = None
         if src:
-            path = Path(src) if Path(src).is_absolute() else self.project / src
             try:
-                from nli_models import JsonlSource  # project module; no torch at import
-                for rec in JsonlSource(str(path)).records():
+                from nli_models import JsonlSource, expand_inputs  # project module; no torch at import
+                if is_url:  # the ${VAR} form: the viewer's environment must have the variable
+                    source = expand_inputs([fs["reopen"]])[0]
+                else:
+                    source = str(Path(src) if Path(src).is_absolute() else self.project / src)
+                for rec in JsonlSource(source).records():
                     if rec.line == line:
                         t = rec.get(tf)
                         text = t if isinstance(t, str) else None
                         break
             except Exception as exc:  # noqa: BLE001 - shown on the page
-                problem = f"cannot read {src}: {exc}"
+                from nli_storage import mask_uri
+                problem = mask_uri(f"cannot read {src}: {exc}")
         if text == "" and row.get("paragraphs"):
             problem = "the source document is empty now (removed after the run, e.g. by content screening)"
             text = None

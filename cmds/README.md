@@ -44,6 +44,7 @@
 | `design/` | `overnight_2026-11-18.md` | Overnight report: Keywords / Review pages, golden set, `--audit-strict`, `nli_compare.py`, `nli_replay.py`; how to try them, test results |
 | | `keyword_lexicon_plan.md` | Plan: keyword lexicon (level A strict / B models, type, gloss, other meanings, exclude), templated hypotheses, review tools; build order |
 | `labeling/` | `README.md` | **Start here for A's policy labelling**: `nli_label.py` (paragraph labels per policy, place-name rewrite, token composition), files, how a document is processed |
+| | `overview_diagram.md` | The whole project in one diagram (settings → run → outputs, human loop, viewer) |
 | | `quick_start.md` | The commands step by step: sample → score → hand-label → eval → label a corpus |
 | | `policy.md` | `policy\russia_policy.json`: labels, thresholds, decisions, `run_if`, how a paragraph's action is decided |
 | | `hand_labeling.md` | `tools\label_tool.html`, labelling rules (codebook start), Claude's drafts, rounds |

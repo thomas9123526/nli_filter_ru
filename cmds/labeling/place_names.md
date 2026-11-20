@@ -43,16 +43,32 @@ add rows the same way).
 
 ## Exceptions: `policy\place_name_exceptions.txt`
 
-Regex patterns, case-insensitive (prefix `case:` for case-sensitive). As shipped:
+**What it is for.** The mapping table says "Kiev → Kyiv" and so on. Applied blindly, it would also change text where
+the word is not the Ukrainian city, or where the old form is correct. The exceptions file lists the places in text
+where a name must **not** be rewritten, even though it matches the table. Each line is a regex pattern,
+case-insensitive by default (prefix `case:` for case-sensitive). A name inside a match is left as it is.
 
-| Pattern | Why |
-|---|---|
-| `chicken kiev` | a dish |
-| `Odessa, Texas` (and other US / Canadian Odessas) | other places |
-| a capitalised first name + `Nikolaev` / `Khmelnitsky` | person names (Andrian Nikolaev). "In Nikolaev" is still rewritten |
-| `Battle of Kiev`, `Kiev Offensive` | historical events: the guide lists "historical events where the old name was official" as a codebook question; kept for now |
-| `Chernobyl disaster / accident / catastrophe` | the event is known by this name; the town itself becomes Chornobyl |
+As shipped:
+
+| Pattern (simplified) | Protects | Why not rewrite |
+|---|---|---|
+| `chicken kiev` | "Chicken Kiev" | a dish, not the city |
+| `odessa, texas` (and other US / Canadian Odessas) | "Odessa, Texas" | a different place |
+| `odessa college / high school …` | institutions there | not the Ukrainian city |
+| a capitalised first name + `Nikolaev` / `Khmelnitsky` | "Andrian Nikolaev", "Bohdan Khmelnitsky" | people, not places. "In Nikolaev" (a place) is still rewritten |
+| `battle of kiev`, `kiev offensive` | historical events | names fixed in history: the guide lists "historical events where the old name was official" as a codebook question; kept for now |
+| `chernobyl disaster / accident / catastrophe` | "the Chernobyl disaster" | the event is known by this name; the town itself still becomes Chornobyl |
+
+**Built into the rewriter, no line needed:** URLs, e-mail addresses and code (`` `inline` ``, ``` blocks ```) are
+never changed, so links and programs do not break. **Kievan Rus** is safe because it is a different word: only whole
+words are matched.
+
+**See it work:** on the Try page, the case "Place names: rewrite and exceptions": Kiev, Kharkov and Zaporozhye are
+rewritten; Chicken Kiev, Kievan Rus and the URL stay.
+
+**Change it:** add a line for a new exception, or delete one to allow the rewrite (deleting `battle\s+of\s+kiev`
+makes it "Battle of Kyiv"). It takes effect at the next run or Try, with no restart.
 
 **Codebook decisions still open** (the guide's edge cases): historical events (keep or rewrite?), titles of books and
-films, direct quotes, "Dynamo Kiev"-style organisation names (rewritten now; the club itself uses Dynamo Kyiv),
+films, direct quotes (now "Kiev regime" in a quoted propaganda phrase becomes "Kyiv regime"), "Dynamo Kiev"-style organisation names (rewritten now; the club itself uses Dynamo Kyiv),
 Russian-imposed names in occupied areas beyond the 2016 renamings. Each decision becomes a row or an exception line.

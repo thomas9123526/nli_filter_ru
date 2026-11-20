@@ -68,6 +68,31 @@ python nli_label.py report out_label_dclm
 
 Outputs and the report: [outputs.md](outputs.md). A rerun skips files that are done (`--overwrite` redoes them).
 
+## Corpus on a server (ftp / ftps / sftp / s3 / minio)
+
+The same addresses as `nli_filter.py` (`cmds\setup\remote_corpus.md`): a folder, one file or a pattern.
+
+```powershell
+$env:NLI_CORPUS_PASSWORD = "..."     # the password goes in an environment variable, not in the command
+python nli_label.py run 'sftp://download:${NLI_CORPUS_PASSWORD}@192.168.170.200/home/download/hkc_test/test_corpus' --policy policy\russia_policy_v3.json --output-dir out_label_sftp_v3 --write-clean
+python nli_label.py run "s3://bucket/corpus/**/*.jsonl.zst?endpoint=http://minio:9000" --output-dir out_label_s3
+```
+
+- **Passwords are never written or printed**: the command, `summary.json`, `progress.json`, the per-file
+  summaries, logs and errors show `user:***@host`.
+- **Use `${NLI_CORPUS_PASSWORD}`** rather than the password itself, **in single quotes** in PowerShell (`'sftp://…'`):
+  in double quotes PowerShell replaces `${…}` itself (with its own, empty variable) before `nli_label.py` sees it.
+  The run then stores the `${…}` form as `reopen`, so `sample`, `review`, `redecide` and the viewer's document page can
+  open the file again later, as long as the variable is set where they run. With a literal password nothing can
+  reopen the file: they say so.
+- Each file is downloaded to `--download-dir` (default `<output-dir>\.download`) while the previous one is labelled,
+  and deleted when done. A failed download is retried (`--retries`, default 3), then skipped: the run goes on, and
+  the next run with the same `--output-dir` fetches only what is missing.
+- **`--shard K/N`** splits the files over machines or GPUs: `--shard 0/4` … `--shard 3/4`, same `--output-dir`
+  (shared disk) or one each. Every shard writes `summary.shardKofN.json` and `progress.shardKofN.json`, plus
+  `summary.json` merged from all finished files (the last shard's is complete). The viewer combines the shards'
+  progress.
+
 ## Common options of `run`
 
 | Option | Default | Meaning |

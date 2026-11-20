@@ -103,6 +103,10 @@ class Policy:
         self.min_chars = int(para.get("min_chars", 200))
         self.max_chars = int(para.get("max_chars", 2000))
         self.conflict = data.get("conflict", "review")
+        # a level-2 'remove' label at or above its threshold opens the gate like a marker term: narratives about
+        # Ukraine / NATO that never mention Russia still reach the policy (costs level-2 scores on gate-negative
+        # paragraphs)
+        self.narrative_opens_gate = bool(data.get("narrative_opens_gate", False))
         errors: List[str] = []
         if self.conflict not in ("review", "remove", "keep"):
             errors.append(f"conflict must be review, remove or keep, not '{self.conflict}'")
@@ -163,6 +167,7 @@ class Policy:
 
     def summary(self) -> Dict[str, Any]:
         return {"path": self.path, "country": self.country, "conflict": self.conflict,
+                "narrative_opens_gate": self.narrative_opens_gate,
                 "paragraphs": {"min_chars": self.min_chars, "max_chars": self.max_chars},
                 "run_if": {str(k): v for k, v in self.run_if.items()}, "markers": len(self.markers),
                 "labels": {k: lab.as_dict() for k, lab in self.labels.items()}}
@@ -394,11 +399,29 @@ class Labeller:
         else:
             if p.gate is not None:
                 self._score([(pa, pa["_text"], p.gate) for pa in paras])
+                if p.narrative_opens_gate:  # gate-negative paragraphs: do they make a narrative claim anyway?
+                    closed = [pa for pa in paras if not pa["marker"]
+                              and pa["scores"].get(p.gate.key, 0.0) < p.gate.threshold]
+                    self._score([(pa, pa["_text"], lab) for pa in closed for lab in self.opening_labels()])
             for lvl in (1, 2):
-                todo = [(pa, pa["_text"], lab) for pa in paras if p.runs(lvl, pa["scores"], pa["marker"])
-                        for lab in p.level(lvl)]
+                todo = [(pa, pa["_text"], lab) for pa in paras if p.runs(lvl, pa["scores"], self.is_open(pa))
+                        for lab in p.level(lvl) if lab.key not in pa["scores"]]
                 self._score(todo)
         return [self._finish(d) for d in docs]
+
+    def opening_labels(self) -> List[Label]:
+        """Level-2 'remove' labels: with narrative_opens_gate, one of them at or above its threshold opens the gate."""
+        return [lab for lab in self.p.level(2) if lab.decision == "remove"]
+
+    def opened_by(self, scores: Dict[str, float]) -> List[str]:
+        if not self.p.narrative_opens_gate:
+            return []
+        return sorted(lab.key for lab in self.opening_labels()
+                      if scores.get(lab.key) is not None and scores[lab.key] >= lab.threshold)
+
+    def is_open(self, pa: Dict[str, Any]) -> bool:
+        """Past the gate without the gate label: a marker term, or (narrative_opens_gate) a narrative claim."""
+        return bool(pa["marker"]) or bool(self.opened_by(pa["scores"]))
 
     def levels_used(self, scores: Dict[str, float], marker: bool) -> List[int]:
         """The levels the cascade runs for a paragraph (run_if). With --all-labels the other levels are scored
@@ -423,13 +446,17 @@ class Labeller:
         tokens_removed = 0
         review = False
         for pa in d["paras"]:
-            used = self.levels_used(pa["scores"], pa["marker"])
-            r = resolve(self.p, {k: v for k, v in pa["scores"].items() if self.p.labels[k].level in used},
-                        pa["marker"])
+            opened = self.is_open(pa)
+            used = self.levels_used(pa["scores"], opened)
+            r = resolve(self.p, {k: v for k, v in pa["scores"].items() if self.p.labels[k].level in used}, opened)
             out = {"span": pa["span"], "action": r["action"], "reason": r["reason"], "labels": r["labels"],
                    "scores": pa["scores"], "levels": used, "tokens": est_tokens(pa["_text"])}
             if pa["marker"]:
                 out["marker"] = True
+            gate = self.p.gate
+            ob = self.opened_by(pa["scores"])
+            if ob and not pa["marker"] and gate is not None and pa["scores"].get(gate.key, 0.0) < gate.threshold:
+                out["opened_by"] = ob  # the gate said no; a narrative claim let the paragraph through
             if r["flags"]:
                 out["flags"] = r["flags"]
             if pa.get("judged"):
@@ -607,6 +634,57 @@ def format_report(summary: Dict[str, Any]) -> str:
 # --------------------------------------------------------------------------------------------------
 
 
+def _is_url(s: str) -> bool:
+    return bool(re.match(r"^(ftps?|sftp|s3|minios?)://", str(s), re.IGNORECASE))
+
+
+def _mask(text: Any) -> str:
+    """Hide passwords of server addresses (user:secret@host -> user:***@host) in anything written or printed."""
+    from nli_storage import mask_uri
+    return mask_uri(str(text))
+
+
+def reopen_uri(typed: str, rf: Any) -> Optional[str]:
+    """A server file's address that is safe to store AND can be opened again later: only when the typed address
+    takes the password from an environment variable (${NLI_CORPUS_PASSWORD} ...). A literal password is never
+    stored, so such inputs cannot be reopened by sample / review / redecide / the viewer."""
+    if not hasattr(rf, "storage") or "$" not in typed:
+        return None
+    from urllib.parse import urlparse
+    t = typed.split("?", 1)
+    tu, ru = urlparse(t[0]), urlparse(str(rf))
+    return f"{tu.scheme}://{tu.netloc}{ru.path}" + (f"?{t[1]}" if len(t) > 1 else "")
+
+
+def expand_typed(inputs: Sequence[str]) -> List[Tuple[Any, Optional[str]]]:
+    """[(file, reopen address or None)] for the inputs as typed: local paths, folders, globs, server addresses."""
+    out: List[Tuple[Any, Optional[str]]] = []
+    for item in inputs:
+        for f in expand_inputs([item]):
+            out.append((f, reopen_uri(item, f) if _is_url(item) else None))
+    seen, uniq = set(), []
+    for f, ro in out:
+        if str(f) not in seen:
+            seen.add(str(f))
+            uniq.append((f, ro))
+    return uniq
+
+
+def open_input(row: Dict[str, Any]) -> Any:
+    """The input file of a run's per-file summary, for reading it again: a local path, or a server file
+    (from 'reopen', the ${VAR} form of the address). Raises ValueError for a server file stored without one."""
+    src = row.get("reopen") or row.get("input")
+    if not src:
+        raise ValueError("the run does not record its input file")
+    if _is_url(src):
+        if not row.get("reopen"):
+            raise ValueError(f"{src} is on a server and was given with a literal password, which is never stored: "
+                             "run with the password in an environment variable (sftp://user:${NLI_CORPUS_PASSWORD}"
+                             "@host/...) to be able to open it again")
+        return expand_inputs([src])[0]
+    return src
+
+
 def _out_names(files: Sequence[str]) -> List[str]:
     """Output base name per input file (stem; a counter is added when two files share a stem)."""
     seen: Dict[str, int] = collections.Counter()
@@ -653,11 +731,33 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
     """run; redecide reuses it with a scorer that returns stored scores (scorer_override) and a record reader
     that loads each line's stored scores first (records_for)."""
     policy = Policy.load(args.policy)
-    files = list(args.inputs) if scorer_override is not None else expand_inputs(args.inputs)
-    if not files:
-        print("error: no input files", file=sys.stderr)
+    try:
+        if scorer_override is not None:  # redecide: the files are given already (with their reopen addresses)
+            typed = [(f, getattr(args, "reopen", {}).get(str(f))) for f in args.inputs]
+        else:
+            typed = expand_typed(args.inputs)
+    except FileNotFoundError as exc:
+        print(f"error: input not found: {_mask(exc)}", file=sys.stderr)
         return 2
-    if any(f.lower().endswith((".zst", ".zstd")) for f in files) and not zstd_available():
+    except Exception as exc:  # noqa: BLE001 - server errors: no password in the message
+        print(f"error: cannot read the input: {_mask(exc)}", file=sys.stderr)
+        return 2
+    shard = getattr(args, "shard", None)
+    sk = sn = None
+    if shard:
+        try:
+            sk, sn = (int(x) for x in str(shard).split("/"))
+            assert 0 <= sk < sn
+        except (ValueError, AssertionError):
+            print("error: --shard K/N needs 0 <= K < N (e.g. 0/4)", file=sys.stderr)
+            return 2
+        typed = typed[sk::sn]
+    files = [f for f, _ in typed]
+    reopen = {str(f): ro for f, ro in typed}
+    if not files:
+        print("error: no input files" + (f" for shard {shard}" if shard else ""), file=sys.stderr)
+        return 2
+    if any(str(f).lower().endswith((".zst", ".zstd")) for f in files) and not zstd_available():
         print("error: .zst input needs the 'zstandard' package", file=sys.stderr)
         return 2
     if args.compress == "zst" and not zstd_available():
@@ -674,17 +774,21 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                         args.text_field, args.id_field or None, args.review_as, args.min_doc_chars, markers,
                         args.group_field)
     total = Stats()
-    files_rows = []
+    files_rows: List[Dict[str, Any]] = []
+    failed = 0
     ext = ".jsonl.zst" if args.compress == "zst" else ".jsonl"
     t_run = time.perf_counter()
     started = time.strftime("%Y-%m-%d %H:%M:%S")
-    prog_path = out_dir / "progress.json"
+    tag = f".shard{sk}of{sn}" if shard else ""
+    prog_path = out_dir / f"progress{tag}.json"
+    command = _mask("nli_label.py " + " ".join(sys.argv[1:]))
 
     def progress(state: str, **kw: Any) -> None:
         """progress.json: what the viewer's Labels page shows while a run goes (state, files, lines)."""
-        d = {"state": state, "command": "nli_label.py " + " ".join(sys.argv[1:]), "started": started,
+        d = {"state": state, "command": command, "started": started, "shard": shard,
              "updated": time.strftime("%Y-%m-%d %H:%M:%S"), "files_total": len(files), "files_done": len(files_rows),
-             "lines_done": total.lines, "seconds": round(time.perf_counter() - t_run, 1), **kw}
+             "files_failed": failed, "lines_done": total.lines, "seconds": round(time.perf_counter() - t_run, 1),
+             **{k: (_mask(v) if isinstance(v, str) else v) for k, v in kw.items()}}
         try:
             tmp = prog_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -692,84 +796,122 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         except OSError:
             pass
 
+    names = _out_names(files)
+    needed = [args.overwrite or not (out_dir / f"{n}.summary.json").is_file() for n in names]
+    fetch = None
+    if records_for is None and any(hasattr(f, "storage") for f in files):
+        from nli_filter import Prefetcher  # download the next server file while this one is labelled; retries
+        fetch = Prefetcher(files, needed, Path(args.download_dir) if getattr(args, "download_dir", None)
+                           else out_dir / ".download", getattr(args, "retries", 3))
     progress("running")
     ok = False
     try:
-        for path, name in zip(files, _out_names(files)):
+        for i, (path, name) in enumerate(zip(files, names)):
+            shown = _mask(path)
             summ_path = out_dir / f"{name}.summary.json"
-            if summ_path.is_file() and not args.overwrite:
+            if not needed[i]:
                 old = json.loads(summ_path.read_text(encoding="utf-8"))
                 total.merge(Stats(old.get("stats")))
-                files_rows.append({"input": path, "name": name, "status": "skipped (done)"})
-                log.warning("skip %s (done; --overwrite to redo)", path)
+                files_rows.append({"input": shown, "name": name, "status": "skipped (done)"})
+                log.warning("skip %s (done; --overwrite to redo)", shown)
                 continue
+            local = None
+            if fetch is not None:
+                try:
+                    local = fetch.get(i)
+                except Exception as exc:  # noqa: BLE001 - download failed after the retries: go on with the rest
+                    failed += 1
+                    files_rows.append({"input": shown, "name": name, "status": f"failed: {_mask(exc)}"})
+                    log.error("skip %s: %s", shown, _mask(exc))
+                    progress("running")
+                    continue
             st = Stats()
             t_file = time.perf_counter()
             done = 0
-            with AtomicOutput(out_dir / f"{name}.labels.jsonl") as lab_fh, \
-                    AtomicOutput(out_dir / f"{name}.rewrites.jsonl") as rw_fh:
-                clean_cm = AtomicOutput(out_dir / f"{name}.clean{ext}") if args.write_clean else None
-                clean_fh = clean_cm.__enter__() if clean_cm else None
-                try:
-                    chunk: List[Record] = []
+            try:
+                with AtomicOutput(out_dir / f"{name}.labels.jsonl") as lab_fh, \
+                        AtomicOutput(out_dir / f"{name}.rewrites.jsonl") as rw_fh:
+                    clean_cm = AtomicOutput(out_dir / f"{name}.clean{ext}") if args.write_clean else None
+                    clean_fh = clean_cm.__enter__() if clean_cm else None
+                    try:
+                        chunk: List[Record] = []
 
-                    def flush() -> None:
-                        for o in labeller.process(chunk):
-                            st.add(o, o.group)
-                            lab_fh.write(json_dumps(o.row) + "\n")
-                            for c in o.rewrites:
-                                rw_fh.write(json_dumps(c) + "\n")
-                            if clean_fh is not None and o.clean is not None:
-                                clean_fh.write(json_dumps(o.clean) + "\n")
-                        chunk.clear()
+                        def flush() -> None:
+                            for o in labeller.process(chunk):
+                                st.add(o, o.group)
+                                lab_fh.write(json_dumps(o.row) + "\n")
+                                for c in o.rewrites:
+                                    rw_fh.write(json_dumps(c) + "\n")
+                                if clean_fh is not None and o.clean is not None:
+                                    clean_fh.write(json_dumps(o.clean) + "\n")
+                            chunk.clear()
 
-                    reader = records_for(path) if records_for else JsonlSource(path).records(limit=args.limit)
-                    for rec in reader:
-                        chunk.append(rec)
-                        if len(chunk) >= args.chunk_lines:
+                        reader = records_for(path) if records_for else \
+                            JsonlSource(path, local=local).records(limit=args.limit)
+                        for rec in reader:
+                            chunk.append(rec)
+                            if len(chunk) >= args.chunk_lines:
+                                flush()
+                                done += args.chunk_lines
+                                progress("running", current_file=shown, current_lines=done)
+                                if done % (args.chunk_lines * 8) == 0:
+                                    log.warning("%s: %d lines, %.1f lines/min", name, done,
+                                                60.0 * done / max(1e-6, time.perf_counter() - t_file))
+                        if chunk:
                             flush()
-                            done += args.chunk_lines
-                            progress("running", current_file=path, current_lines=done)
-                            if done % (args.chunk_lines * 8) == 0:
-                                log.warning("%s: %d lines, %.1f lines/min", name, done,
-                                            60.0 * done / max(1e-6, time.perf_counter() - t_file))
-                    if chunk:
-                        flush()
-                except BaseException as exc:
+                    except BaseException as exc:
+                        if clean_cm:
+                            clean_cm.__exit__(type(exc), exc, exc.__traceback__)
+                        raise
                     if clean_cm:
-                        clean_cm.__exit__(type(exc), exc, exc.__traceback__)
-                    raise
-                if clean_cm:
-                    clean_cm.__exit__(None, None, None)
-            data = {"input": path, "name": name, "complete": args.limit is None,
+                        clean_cm.__exit__(None, None, None)
+            finally:
+                if local and fetch is not None:
+                    fetch.release(local)
+            data = {"input": shown, "name": name, "complete": args.limit is None,
                     "seconds": round(time.perf_counter() - t_file, 2), "stats": st.to_dict()}
+            ro = reopen.get(str(path))
+            if ro:
+                data["reopen"] = ro  # the ${VAR} form: safe to store, opens the file again later
             summ_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
             total.merge(st)
-            files_rows.append({"input": path, "name": name, "status": "done", "lines": st.lines,
+            files_rows.append({"input": shown, "name": name, "status": "done", "lines": st.lines,
                                "seconds": data["seconds"]})
             progress("running")
         ok = True
     finally:
         progress("done" if ok else "failed")
+        if fetch is not None:
+            fetch.close()
         for pool in (fast, judge):
             if pool is not None:
                 pool.close()
+    if shard:  # every shard writes the run summary from ALL finished files in the folder (the last one is complete)
+        total = Stats()
+        for sp in sorted(out_dir.glob("*.summary.json")):
+            if not sp.name.startswith("summary."):
+                total.merge(Stats((json.loads(sp.read_text(encoding="utf-8")) or {}).get("stats")))
     summary = {
-        "command": "nli_label.py " + " ".join(sys.argv[2:] if sys.argv[1:2] == ["run"] else sys.argv[1:]),
+        "command": command,
         "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
         "policy": policy.summary(),
         "settings": {"fast_model": args.fast_model, "judge_model": args.judge_model,
                      "uncertain_band": list(args.uncertain_band), "all_labels": args.all_labels,
                      "review_as": args.review_as, "rewrite": not args.no_rewrite, "rules": not args.no_rules,
-                     "text_field": args.text_field, "max_length": args.max_length, "group_field": args.group_field},
+                     "text_field": args.text_field, "max_length": args.max_length, "group_field": args.group_field,
+                     "shard": shard},
         "timing": {"load_seconds": round(load_s, 1), "run_seconds": round(time.perf_counter() - t_run, 1),
                    "fast_pairs": scorer.fast_pairs, "judge_pairs": scorer.judge_pairs},
-        "files": files_rows, "stats": total.to_dict(), "output_dir": str(out_dir),
+        "files": files_rows, "files_failed": failed, "stats": total.to_dict(), "output_dir": str(out_dir),
     }
     if scorer_override is not None and hasattr(scorer_override, "report"):
         summary["redecide"] = dict(extra or {}, **scorer_override.report())
     (out_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
+    if shard:
+        (out_dir / f"summary{tag}.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     print(format_report(summary))
+    if failed:
+        print(f"\n{failed} file(s) failed (download): see 'files' in summary.json; rerun to retry them")
     if "redecide" in summary:
         r = summary["redecide"]
         print(f"\nredecided from stored scores of {r.get('from')}: {r['stored']:,} scores reused, "
@@ -846,11 +988,12 @@ def cmd_redecide(args) -> int:
         print(f"error: {run} has no finished files", file=sys.stderr)
         return 2
     rows_of = {inp: lp for inp, lp in pairs}
+    open_of = _opener(run)
     tf = (old.get("settings") or {}).get("text_field") or args.text_field
 
     def records_for(path: str):
         with open(rows_of[path], encoding="utf-8") as fh:
-            for rec in JsonlSource(path).records():
+            for rec in JsonlSource(open_of(path)).records():
                 raw = fh.readline()
                 if not raw:
                     break
@@ -862,6 +1005,7 @@ def cmd_redecide(args) -> int:
     st = old.get("settings") or {}
     ns = argparse.Namespace(**vars(args))
     ns.inputs = [inp for inp, _ in pairs]
+    ns.reopen = {row["input"]: row.get("reopen") for row, _ in _run_file_rows(run)}
     ns.all_labels = bool(st.get("all_labels"))  # same cascade as the old run
     ns.text_field = tf
     for k in ("fast_model", "judge_model", "max_length"):
@@ -886,14 +1030,25 @@ def cmd_report(args) -> int:
 
 
 def _run_files(run: Path) -> List[Tuple[str, Path]]:
-    """[(input path, labels file)] of a run folder."""
+    """[(input path, labels file)] of a run folder (the input as stored: never with a password)."""
+    return [(row["input"], lp) for row, lp in _run_file_rows(run)]
+
+
+def _run_file_rows(run: Path) -> List[Tuple[Dict[str, Any], Path]]:
+    """[(per-file summary row, labels file)] of a run folder."""
     out = []
     for sp in sorted(run.glob("*.summary.json")):
         d = json.loads(sp.read_text(encoding="utf-8"))
         lp = run / f"{d.get('name') or sp.name[:-len('.summary.json')]}.labels.jsonl"
         if lp.is_file() and d.get("input"):
-            out.append((d["input"], lp))
+            out.append((d, lp))
     return out
+
+
+def _opener(run: Path):
+    """input as stored -> something JsonlSource opens (a local path, or a server file via its ${VAR} address)."""
+    rows = {row["input"]: row for row, _ in _run_file_rows(run)}
+    return lambda f: open_input(rows.get(f) or {"input": f})
 
 
 def read_labels_file(path: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -937,7 +1092,7 @@ def label_meta(policy: Policy, **extra: Any) -> Dict[str, Any]:
 
 
 def paragraph_items(cands: List[Dict[str, Any]], policy: Policy, text_field: str = "text",
-                    context: int = 300) -> List[Dict[str, Any]]:
+                    context: int = 300, opener=None) -> List[Dict[str, Any]]:
     """Hand-label items (label tool format) for paragraphs of a run: cands = {key, file, line, span, id, scores,
     action, marker, picked_for}. The text is read from the run's input files; emptied documents are skipped."""
     by_file: Dict[str, Dict[int, List[Dict[str, Any]]]] = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -947,7 +1102,7 @@ def paragraph_items(cands: List[Dict[str, Any]], policy: Policy, text_field: str
     items = []
     for f, lines in by_file.items():
         need = set(lines)
-        for rec in JsonlSource(f).records():
+        for rec in JsonlSource(opener(f) if opener else f).records():
             if rec.line not in need:
                 continue
             text = rec.get(text_field) or ""
@@ -1005,7 +1160,7 @@ def cmd_review(args) -> int:
     if not cands:
         print(f"no paragraphs with action {', '.join(sorted(want))} in {run}")
         return 0
-    items = paragraph_items(cands, policy, args.text_field, args.context)
+    items = paragraph_items(cands, policy, args.text_field, args.context, _opener(run))
     out = Path(args.out)
     if out.exists() and not args.overwrite:
         print(f"error: {out} exists (use --overwrite)", file=sys.stderr)
@@ -1085,7 +1240,7 @@ def cmd_sample(args) -> int:
             take(c, f"near:{k}")
         for c in rng.sample(low, min(args.low, len(low))):
             take(c, f"low:{k}")
-    items = paragraph_items(list(picked.values()), policy, args.text_field, args.context)
+    items = paragraph_items(list(picked.values()), policy, args.text_field, args.context, _opener(run))
     rng.shuffle(items)
     out = Path(args.out)
     if out.exists() and not args.overwrite:
@@ -1340,6 +1495,12 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--chunk-lines", type=int, default=64)
     r.add_argument("--limit", type=int, default=None, help="first N lines per file")
     r.add_argument("--overwrite", action="store_true", help="redo files that are already done")
+    g = r.add_argument_group("server input (ftp:// ftps:// sftp:// s3:// minio://, as in nli_filter.py)")
+    g.add_argument("--shard", metavar="K/N", help="only every N-th file, starting at K (0/4 .. 3/4 on 4 machines "
+                                                   "or GPUs, same --output-dir or one each)")
+    g.add_argument("--download-dir", help="where server files are downloaded while the previous one is labelled "
+                                          "(default <output-dir>/.download); each is deleted when done")
+    g.add_argument("--retries", type=int, default=3, help="download retries before the file is skipped (default 3)")
     _model_args(r)
 
     s = sub.add_parser("sample", help="pick paragraphs of a run to hand-label")

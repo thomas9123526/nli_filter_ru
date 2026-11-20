@@ -230,6 +230,25 @@ def test_all_labels_decides_like_the_cascade():
     assert normal["levels"] == every["levels"] == [0, 1]
 
 
+def test_narrative_opens_gate():
+    class StrictGate(FakeScorer):  # the gate never fires: as for narratives that do not mention Russia
+        CUES = dict(FakeScorer.CUES, GATE=["no-such-word"])
+
+    text = "Russian television says Ukrainians are nazis, a long segment on the evening news."
+    pol_off, pol_on = small_policy(), small_policy(narrative_opens_gate=True)
+    for pol, want in ((pol_off, "pass"), (pol_on, "remove")):
+        lab = make_labeller(pol)
+        lab.scorer = StrictGate()
+        p = lab.process([rec(1, text)])[0].row["paragraphs"][0]
+        assert p["action"] == want, (pol.narrative_opens_gate, p)
+    assert p["opened_by"] == ["narr_nazi"] and p["reason"] == "narrative" and p["levels"] == [0, 1, 2]
+    assert "SPORT" in lab.scorer.seen  # level 1 ran after the narrative opened the gate
+    # all-labels gives the same decision
+    lab = make_labeller(pol_on, all_labels=True)
+    lab.scorer = StrictGate()
+    assert lab.process([rec(1, text)])[0].row["paragraphs"][0]["action"] == "remove"
+
+
 def test_force_gate_labels_text_without_keywords():
     text = "Ballet tonight in Paris, with a famous pop star and a new film premiere afterwards."
     assert make_labeller().process([rec(1, text)])[0].row["action"] == "untouched"

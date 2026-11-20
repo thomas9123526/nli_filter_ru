@@ -112,3 +112,19 @@ def test_cases_and_try(client, project):
     assert client.post("/api/labels/try", json={"texts": []}).status_code == 400
     assert client.post("/api/labels/try", json={"texts": ["a"] * 21}).status_code == 400
     assert client.post("/api/labels/try", json={"texts": ["Russia."]}).status_code in (502, 503)  # no service
+
+
+def test_server_input_without_reopen_and_shard_progress(client, project):
+    run = project / "out_label_t"
+    fs = json.loads((run / "in.summary.json").read_text(encoding="utf-8"))
+    fs["input"] = "sftp://reader@example.invalid/corpus/in.jsonl"   # stored without password, no reopen
+    (run / "in.summary.json").write_text(json.dumps(fs), encoding="utf-8")
+    d = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+    assert d["text"] is None and "environment variable" in d["problem"]
+    for k, state in ((0, "done"), (1, "running")):
+        (run / f"progress.shard{k}of2.json").write_text(json.dumps(
+            {"state": state, "command": "nli_label.py run x", "shard": f"{k}/2", "started": "2026-11-20 10:00:00",
+             "updated": "2026-11-20 10:00:00", "files_total": 3, "files_done": 1 + k, "lines_done": 10}),
+            encoding="utf-8")
+    p = client.get("/api/labels").json()["runs"][0]["progress"]
+    assert p["shards"] == 2 and p["files_done"] == 3 and p["files_total"] == 6 and p["state"] in ("running", "stale")
