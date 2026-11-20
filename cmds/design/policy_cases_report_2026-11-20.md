@@ -402,3 +402,26 @@ policy v5 (`out_label_cases_v5`). `nli_filter.py` can only filter or keep a whol
 This is the measured version of the difference between the tools: `nli_filter.py` answers "is it about Russia?",
 which is **too wide** for A's policy (it removes the facts A wants kept) and **too narrow** at the same time (it keeps
 propaganda that is about Ukraine). For producing A's training data, use `nli_label.py`.
+
+## 13. Policy v5 with the DeBERTa judge (measured)
+
+Same 149 texts, policy v5, default models: ModernBERT scores every pair, DeBERTa re-scores those in the uncertain band
+0.6–0.95 (`out_label_cases_v5_judge`). The judge re-scored 98 of 4,692 pairs (2 %); the run took ~20 % longer.
+
+| | v5, ModernBERT only | **v5 + judge** |
+|---|---|---|
+| As expected | 122 / 149 (82 %) | **124 / 149 (83 %)** |
+| **Wrongly removed** (A keeps it) | 2: the neutral Crimea text, a fiction text | **0** |
+| Missed (A removes it) | 6 | 7, of which **3 now go to review** (a person sees them) |
+
+Fixed by the judge: the neutral Crimea geography text (`narr_annexation` no longer fires), `literature_art` yes 1
+(review instead of remove), `economy_business` yes 1, `narr_nazi` near 1 (a fact-check, now kept),
+`narr_war_justification` yes 2 (now removed). Made worse: `narr_nazi` yes 1 ("The regime in Kyiv is a Nazi regime …"):
+ModernBERT gave 0.95, exactly the top of the band, so DeBERTa re-scored it to 0.64 and it was missed;
+`narr_ukraine_not_nation` yes 1 (remove → review); `war_ukraine` near 1 (keep → pass, harmless).
+
+**Reading:** with the judge the policy becomes more cautious: nothing A keeps is removed, and more borderline
+propaganda goes to human review instead of being decided automatically. For training data that is the right
+direction. Two follow-ups: (1) the band's top edge: a fast score of 0.95 is already confident; trying `--uncertain-band
+0.6 0.9` is a cheap `redecide`-style test once both models' scores are stored; (2) measure on real data on a GPU,
+where the judge costs little.
