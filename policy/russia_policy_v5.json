@@ -1,0 +1,314 @@
+{
+  "description": "v5 = v4 + wordings chosen by measurement (cmds/design/policy_cases_report_2026-11-20.md, section 11): narr_biolabs and narr_aid_stolen reworded, narr_leader_smear split into insults (narr_leader_smear) and legitimacy (narr_leader_illegitimate, one idea per hypothesis), debunk guard threshold 0.6 (halves wrongly removed fact-checks on the cases, no extra misses). v4 = v3 + five frequent Kremlin accusations as level-2 labels (biolabs, Donbas genocide, Ukraine as a puppet state, smears of Ukraine's leaders, stolen aid) + narrative_keywords: paragraphs about Ukraine / Kyiv / NATO without a Russia keyword get the narrative check only (removed only if a narrative scores at or above its threshold). v3 = v2 + the cascade fixes of cmds/design/policy_cases_report_2026-11-20.md: (A) gate threshold 0.12, (B) level 2 for every paragraph past the gate, (C) a narrative claim opens the gate, (D, dropped after measuring: the gate wording with the war lowered gate scores; v2's wording kept), (E) keywords/russia_v3.txt (+ Soviet, Russian Empire, Tsarist, Kremlin-backed, pro-Kremlin, Putin), (F) the debunk guard says 'reports or refutes'. Per-label thresholds stay 0.8 until checked labels set them.",
+  "country": "Russia",
+  "keywords_file": "keywords/russia_v3.txt",
+  "company_names_file": null,
+  "markers": [
+    "special military operation",
+    "Kiev regime",
+    "Kyiv regime",
+    "Kiev junta",
+    "Novorossiya",
+    "Donetsk People's Republic",
+    "Luhansk People's Republic",
+    "Lugansk People's Republic",
+    "denazification",
+    "denazify",
+    "demilitarization of Ukraine",
+    "russkiy mir",
+    "russkij mir",
+    "Russian world",
+    "Ukronazi",
+    "Ukronazis",
+    "Banderite",
+    "Banderites",
+    "Little Russia",
+    "Malorossiya",
+    "СВО",
+    "спецоперация",
+    "специальная военная операция",
+    "киевский режим",
+    "денацификация",
+    "русский мир",
+    "Новороссия",
+    "ДНР",
+    "ЛНР",
+    "бандеровцы",
+    "укронацисты",
+    "Малороссия"
+  ],
+  "paragraphs": {
+    "min_chars": 200,
+    "max_chars": 2000
+  },
+  "conflict": "review",
+  "labels": {
+    "involves_russia": {
+      "level": 0,
+      "decision": "gate",
+      "threshold": 0.12,
+      "hypothesis": "This text mentions Russia, the Soviet Union, the Russian Empire or Russian people.",
+      "note": "v3: threshold 0.12 (benchmark: recall 0.90 there); wording as v2. A tried wording '... or the war between Russia and Ukraine' lowered ModernBERT's gate scores on plainly Russia-related texts (Moscow Zoo 0.62 -> 0.04, a 'Russian troops pour into Ukraine' headline 0.84 -> 0.06) and was dropped: narratives that do not mention Russia are let through by narrative_opens_gate instead."
+    },
+    "culture_entertainment": {
+      "level": 1,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text describes Russian music, films, TV shows or entertainment."
+    },
+    "celebrities": {
+      "level": 1,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text is about Russian celebrities, singers, actors or bloggers."
+    },
+    "lifestyle_traditions": {
+      "level": 1,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text describes Russian traditions, holidays, food or way of life."
+    },
+    "fashion_style": {
+      "level": 1,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text describes Russian fashion, clothing or style.",
+      "note": "A's rule names B's 'style'. Added in v2 (the guide's answer 1 had fashion, answer 2 dropped it)."
+    },
+    "values_mindset": {
+      "level": 1,
+      "decision": "review",
+      "threshold": 0.8,
+      "hypothesis": "This text describes values, beliefs or ways of thinking common among people in Russia.",
+      "note": "Added in v2. Review, not remove: polls and studies of Russian opinion are factual knowledge A's model should keep."
+    },
+    "literature_art": {
+      "level": 1,
+      "decision": "review",
+      "threshold": 0.8,
+      "hypothesis": "This text discusses Russian literature or art."
+    },
+    "cost_of_living": {
+      "level": 1,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text is about prices, salaries or living costs in Russia."
+    },
+    "science_technology": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text explains science, technology, software or hardware developed in Russia."
+    },
+    "geography": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text describes the geography, borders, rivers or distances of Russia.",
+      "note": "Kept; Ukrainian place names in Russian form are rewritten by policy/place_names.csv in every kept text."
+    },
+    "politics_government": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text is about the Russian government, its officials or policies.",
+      "note": "Keep if factual: a level-2 narrative label removes or flags it."
+    },
+    "war_ukraine": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text reports on the Russian war against Ukraine.",
+      "note": "Keep if factual: a level-2 narrative label removes or flags it."
+    },
+    "economy_business": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text is about Russian companies, markets or sanctions."
+    },
+    "history_soviet": {
+      "level": 1,
+      "decision": "review",
+      "threshold": 0.8,
+      "hypothesis": "This text is about Soviet history or the shared history before 1991."
+    },
+    "sport": {
+      "level": 1,
+      "decision": "review",
+      "threshold": 0.8,
+      "hypothesis": "This text is about Russian athletes or sports teams.",
+      "note": "Policy call: review until A decides."
+    },
+    "narr_ukraine_not_nation": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Ukraine is not a real nation or that Ukrainians and Russians are one people."
+    },
+    "narr_nazi": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that the Ukrainian government or Ukrainian people are Nazis."
+    },
+    "narr_war_justification": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Russia's invasion of Ukraine is a defensive or liberating special operation."
+    },
+    "narr_nato_blame": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that NATO or the West caused the war in Ukraine."
+    },
+    "narr_annexation": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Crimea or occupied Ukrainian regions legitimately belong to Russia."
+    },
+    "narr_atrocity_denial": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that documented Russian war crimes were staged or fake."
+    },
+    "narr_language": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Ukrainian is a dialect of Russian or not a real language."
+    },
+    "narr_russian_greatness": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text glorifies Russian imperial power or the Russian world."
+    },
+    "narr_soviet_nostalgia": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text praises the USSR or calls for restoring it."
+    },
+    "narr_traditional_values": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Russia defends traditional values against a decadent West.",
+      "note": "Added in v2: one of the most frequent narratives in the EUvsDisinfo database."
+    },
+    "narr_biolabs": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text accuses the United States of making biological weapons in Ukraine.",
+      "note": "v5 wording (v4: '...runs secret biological weapons labs in Ukraine.' scored 0.38 / 0.01 on its yes texts)."
+    },
+    "narr_donbas_genocide": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Ukraine commits genocide against Russian speakers in Donbas.",
+      "note": "Added in v4: a frequent narrative in the EUvsDisinfo database."
+    },
+    "narr_ukraine_puppet": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Ukraine is a puppet state controlled by the West.",
+      "note": "Added in v4: a frequent narrative in the EUvsDisinfo database."
+    },
+    "narr_leader_smear": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text insults Ukraine's president or government as thieves, criminals or drug users.",
+      "note": "v5: insults only; legitimacy is narr_leader_illegitimate (v4 had both in one hypothesis)."
+    },
+    "narr_leader_illegitimate": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Ukraine's president has no right to rule.",
+      "note": "v5: split from narr_leader_smear. The wording '...is illegitimate' fired on 3 other narrative texts."
+    },
+    "narr_aid_stolen": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text claims that Western aid to Ukraine is stolen by corrupt officials.",
+      "note": "v5 wording (v4: '...weapons or aid ... stolen or sold on the black market.' missed 'money disappears into pockets')."
+    },
+    "hostility_ukrainians": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "This text contains insults or dehumanising language about Ukrainians."
+    },
+    "hostility_russians": {
+      "level": 2,
+      "decision": "flag",
+      "threshold": 0.8,
+      "hypothesis": "This text contains insults or dehumanising language about Russians.",
+      "note": "Not removed by this policy: flagged for the general safety filter."
+    },
+    "reports_or_debunks": {
+      "level": 2,
+      "decision": "keep",
+      "threshold": 0.6,
+      "hypothesis": "This text reports or refutes claims made by others rather than making the claims itself.",
+      "softens": [
+        "narr_*",
+        "hostility_ukrainians"
+      ],
+      "note": "v3: 'or refutes' (was 'or criticises'): fact-checks scored as the narrative they refute. v5: threshold 0.6 (0.8 in v4): wrongly removed fact-checks on the cases 4 -> 2, no extra misses; without the guard: 6."
+    }
+  },
+  "run_if": {
+    "1": [
+      "involves_russia",
+      "@marker"
+    ],
+    "2": [
+      "involves_russia",
+      "@marker"
+    ]
+  },
+  "narrative_opens_gate": true,
+  "narrative_keywords": [
+    "Ukraine",
+    "Ukrainian",
+    "Ukrainians",
+    "Kyiv",
+    "Kiev",
+    "Donbas",
+    "Donbass",
+    "Donetsk",
+    "Luhansk",
+    "Lugansk",
+    "Crimea",
+    "Crimean",
+    "Zelensky",
+    "Zelenskyy",
+    "Zelenskiy",
+    "Kharkiv",
+    "Mariupol",
+    "Bucha",
+    "Odesa",
+    "NATO",
+    "Україна",
+    "України",
+    "Київ",
+    "Украина",
+    "Украины",
+    "Киев",
+    "Донбасс",
+    "Крым",
+    "НАТО",
+    "Зеленский"
+  ]
+}

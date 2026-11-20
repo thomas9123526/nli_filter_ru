@@ -34,7 +34,14 @@ All hypotheses, thresholds and decisions live in this one file. To try a change,
 
 | `policy\russia_policy_v4.json` (v4) | 33 labels: v3 + five frequent Kremlin accusations at level 2 (remove): `narr_biolabs` (US bioweapons labs in Ukraine), `narr_donbas_genocide`, `narr_ukraine_puppet` (a puppet state of the West), `narr_leader_smear` (Ukraine's leaders as drug addicts, criminals or illegitimate), `narr_aid_stolen` (weapons or aid sold on the black market); plus `"narrative_keywords"` (below) |
 
-`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json` (or `_v3`, `_v4`).
+| `policy\russia_policy_v5.json` (v5) | 34 labels: v4 with wordings chosen by measurement: `narr_biolabs` ("…accuses the United States of making biological weapons in Ukraine."), `narr_aid_stolen` ("…Western aid to Ukraine is stolen by corrupt officials."), `narr_leader_smear` split into insults (`narr_leader_smear`) and legitimacy (new `narr_leader_illegitimate`: "…Ukraine's president has no right to rule."), debunk guard threshold 0.6. Report section 11 |
+
+`nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json` (or `_v3`, `_v4`, `_v5`).
+
+**A paragraph that is there only because of a narrative keyword** (no Russia keyword, no marker) is judged by the
+narrative check alone: its gate score is ignored, so it is removed only if a narrative (or `hostility_ukrainians`)
+scores at or above its threshold, and otherwise passes. Without this rule, v4's first measurement sent a place-name
+text ("Kievan Rus") and a Russian-language news item about the Kyiv metro to review.
 
 **`"narrative_keywords"`** (v4: Ukraine, Ukrainian, Kyiv, Kiev, Donbas, Donetsk, Luhansk, Crimea, Zelensky, Bucha,
 NATO …, also in Ukrainian and Russian). Most Kremlin accusations are about Ukraine, Kyiv or NATO and never mention

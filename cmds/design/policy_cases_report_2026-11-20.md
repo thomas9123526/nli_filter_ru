@@ -310,3 +310,71 @@ the next target.
 2. **Check the seed drafts**, then `eval`: per-label thresholds instead of 0.8, which addresses the "just below 0.8" group.
 3. **Run v3 with the DeBERTa judge** and compare (the Try page does this by default).
 4. **Real data:** v3 on the OLMo seed sample on a GPU, then the per-label rounds.
+
+## 11. Policies v4 and v5 (written while you were away, 2026-11-20 evening)
+
+### v4: Kremlin accusations and narrative keywords
+
+`policy/russia_policy_v4.json` = v3 + five frequent accusations as level-2 remove labels (`narr_biolabs`,
+`narr_donbas_genocide`, `narr_ukraine_puppet`, `narr_leader_smear`, `narr_aid_stolen`) + **`narrative_keywords`**
+(Ukraine, Kyiv, Donbas, Crimea, Zelensky, NATO …, also in Ukrainian and Russian). Most Kremlin accusations are about
+Ukraine or NATO and never mention Russia, so the Russia keywords never brought them to a model.
+
+**A design fix found by measuring.** The first v4 run broke 4 texts that v3 had right: a paragraph brought in by
+"Kiev" or "Crimea" went through the *whole* pipeline when its gate score was ≥ 0.12 (the place-name text with
+"Kievan Rus" and a Russian-language Kyiv metro news item went to review as history). Now a paragraph that is there
+**only because of a narrative keyword is judged by the narrative check alone**: removed if a narrative fires, otherwise
+it passes, whatever the gate says (tested, also with `--all-labels`). All labels were scored, so the fixed decisions
+were recomputed exactly with `redecide` (4,422 stored scores, none missing).
+
+### Choosing wordings by measurement (the guide's "try 2–3 phrasings")
+
+Each candidate wording was scored with ModernBERT on the label's yes texts, its near misses and **all other 145 case
+texts** (false alarms ≥ 0.8):
+
+| Label | v4 wording: yes scores | chosen for v5 | yes scores | false alarms |
+|---|---|---|---|---|
+| `narr_biolabs` | 0.38, 0.01 | "…accuses the United States of making biological weapons in Ukraine." | 0.96, 0.13 | 0 |
+| `narr_aid_stolen` | 0.99, 0.01 | "…claims that Western aid to Ukraine is stolen by corrupt officials." | 0.85, 0.93 | 0 real |
+| `narr_leader_smear` | 0.08, 0.82 (three ideas in one) | split: "…insults Ukraine's president or government as thieves, criminals or drug users." | 0.97 | 0 |
+| `narr_leader_illegitimate` (new) | – | "…claims that Ukraine's president has no right to rule." | 1.00 | 0 ("…is illegitimate": 3) |
+| `narr_annexation` | 0.98, 0.98, but 0.90 on a neutral Crimea text | no better wording found (the alternatives lost a yes text) | – | open |
+
+`narr_biolabs` text 2 ("military biologists worked with deadly viruses … biological attacks") stays low with every
+wording: a limit of this model, a candidate for the judge.
+
+### The debunk guard (`reports_or_debunks`), measured
+
+On v4's stored scores (no model run):
+
+| Guard | As expected | Wrongly removed (fact-checks, reports) | Missed propaganda |
+|---|---|---|---|
+| 0.8 (v4) | 116 / 145 | 4 | 9 |
+| **0.6 (v5)** | **116 / 145** | **2** | **9** |
+| 0.5 | 115 | 2 | 10 |
+| 0.3 | 113 | 2 | 12 |
+| no guard | 115 | **6** | 9 |
+
+Removing the guard would lose more fact-checks; 0.6 halves the wrongly removed ones without missing more propaganda.
+
+### v5 results
+
+`policy/russia_policy_v5.json` = v4 + the chosen wordings + `narr_leader_illegitimate` + guard 0.6. Cases v5: 78 cases,
+149 texts (`labels/cases_v5.json`).
+
+| Group | v3 (125 texts) | v4 fixed (145) | **v5 (149)** |
+|---|---|---|---|
+| Level 0 · gate | 4 / 6 | 4 / 6 | 4 / 6 |
+| Level 1 · subject | 48 / 56 | 48 / 56 | 48 / 56 |
+| Level 2 · framing | 39 / 52 | 53 / 72 | **59 / 76** |
+| Edge cases | 11 / 11 | 11 / 11 | 11 / 11 |
+| **All** | 102 (82 %) | 116 (80 %) | **122 / 149 (82 %)** |
+
+v5 vs v4: no text broken; fixed `narr_biolabs` yes 1, `narr_aid_stolen` yes 2, the smear texts; two fact-checks that v4
+removed (`hostility_ukrainians` near 1, `narr_traditional_values` near 1) now go to review. The new accusation labels:
+`narr_donbas_genocide` 0.98 / 0.99, `narr_ukraine_puppet` 1.00 / 0.99 (both texts never mention Russia: caught via the
+narrative keywords), `narr_leader_illegitimate` both texts.
+
+**Still open (27):** the same groups as in section 10 (seed drafts to check, narratives just below 0.8, review
+expectations on fact-checks, keyword gaps), plus `narr_biolabs` text 2 and the neutral Crimea text that
+`narr_annexation` removes.

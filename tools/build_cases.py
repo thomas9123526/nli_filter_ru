@@ -226,6 +226,48 @@ NEW_LABEL_TEXTS.update({
     },
 })
 
+# policy v5: narr_leader_smear (insults) is split from narr_leader_illegitimate (legitimacy); the v4 texts stay in
+# cases_v4.json, these replace them for v5 and later
+V5_LABEL_TEXTS = {
+    "narr_leader_smear": {
+        "yes": [
+            ("Ukraine's government is a gang of thieves and criminals. Its ministers are drug users who sell out "
+             "their own country for Western money.",
+             ["narr_leader_smear"]),
+            ("Everyone in Kyiv knows that Ukraine's leaders are thieves and drug users, stealing Western aid while "
+             "their soldiers die at the front.",
+             ["narr_leader_smear", "narr_aid_stolen"]),
+        ],
+        "near": [
+            ("Russian state media have spread unfounded rumours that Ukraine's president uses drugs. Fact-checkers "
+             "traced the claim to a doctored video.",
+             ["involves_russia", "reports_or_debunks"]),
+            ("Ukraine's parliament voted to dismiss a deputy minister who was charged with taking bribes; the "
+             "national anti-corruption bureau is investigating the case.",
+             []),
+        ],
+    },
+    "narr_leader_illegitimate": {
+        "yes": [
+            ("Ukraine's president is an illegitimate ruler whose term has expired, a man who seized power with "
+             "Western help and now clings to it against the will of his people.",
+             ["narr_leader_illegitimate"]),
+            ("The authorities in Kyiv have no legal right to rule: they came to power through a coup in 2014, and "
+             "the president's term has already run out.",
+             ["narr_leader_illegitimate"]),
+        ],
+        "near": [
+            ("Russian officials claim that Ukraine's president lost his legitimacy when his term ended in 2024. "
+             "Ukrainian law, however, keeps the president in office under martial law until a successor is elected.",
+             ["involves_russia", "reports_or_debunks"]),
+            ("Ukraine did not hold a presidential election in 2024 because martial law, in force since the "
+             "full-scale invasion, does not allow elections; the president stays in office until a successor takes "
+             "over.",
+             ["war_ukraine"]),
+        ],
+    },
+}
+
 # (case id, group, title, what it tests, source spec)
 #   source spec: ("label", key, "yes"|"near") -> seed / bench texts for that label; ("new", key) -> NEW_TEXTS;
 #                ("bench_ids", [ids]) -> those benchmark items
@@ -274,6 +316,8 @@ def main() -> int:
     ap.add_argument("--out", default="labels/cases_v1.json")
     args = ap.parse_args()
     policy = nli_label.Policy.load(str(HERE / args.policy))
+    if "narr_leader_illegitimate" in policy.labels:  # v5+: the split smear labels use their own texts
+        NEW_LABEL_TEXTS.update(V5_LABEL_TEXTS)
     keys = list(policy.labels)
     _, seed = nli_label.read_labels_file(str(HERE / "labels" / "seed.jsonl"))
     _, bench = nli_label.read_labels_file(str(HERE / "labels" / "bench_synthetic_v1.jsonl"))
