@@ -378,3 +378,27 @@ narrative keywords), `narr_leader_illegitimate` both texts.
 **Still open (27):** the same groups as in section 10 (seed drafts to check, narratives just below 0.8, review
 expectations on fact-checks, keyword gaps), plus `narr_biolabs` text 2 and the neutral Crimea text that
 `narr_annexation` removes.
+
+## 12. nli_filter.py vs nli_label.py on the same cases (measured)
+
+Both tools on the 149 case texts of `test_corpus_cases` (ModernBERT only, no judge, CPU): `nli_filter.py` with its
+defaults (`keywords/russia.txt`, its check-1 / check-2 hypotheses) into `out_filter_cases`, `nli_label.py` with
+policy v5 (`out_label_cases_v5`). `nli_filter.py` can only filter or keep a whole text, so the comparison is binary:
+**OK** = removed when the case says remove, kept when it says keep / pass; a case that expects review accepts either.
+
+| Group | Texts | `nli_filter.py` OK | `nli_label.py` v5 OK |
+|---|---|---|---|
+| Level 0 · gate | 6 | 5 | 5 |
+| Level 1 · subject | 56 | 46 | 53 |
+| Level 2 · framing | 76 | 41 | **70** |
+| Edge cases | 11 | 10 | 11 |
+| **All** | 149 | **102 (68 %)** | **139 (93 %)** |
+
+| Error | `nli_filter.py` | `nli_label.py` v5 |
+|---|---|---|
+| **Removed, but A's policy keeps it** | **21**: Russian geography, politics and economy facts, fact-checks and reports that debunk propaganda, reports of hostility | **1**: a neutral geography text about Crimea (`narr_annexation` fires) |
+| **Kept, but A's policy removes it** | **26**: most Kremlin narratives (every one that never names Russia: "Kyiv is a Nazi regime", "Ukraine is a puppet", "NATO's war", Donbas "genocide", leader smears), Russian culture and fashion texts | **6**: narratives just below 0.8, a marker-only text, one lifestyle seed text |
+
+This is the measured version of the difference between the tools: `nli_filter.py` answers "is it about Russia?",
+which is **too wide** for A's policy (it removes the facts A wants kept) and **too narrow** at the same time (it keeps
+propaganda that is about Ukraine). For producing A's training data, use `nli_label.py`.
