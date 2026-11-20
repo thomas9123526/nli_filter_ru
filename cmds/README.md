@@ -52,7 +52,9 @@
 | | `outputs.md` | What `run` / `redecide` write; the composition report |
 | | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 66 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v2.json`; as a corpus: `test_corpus_cases\` (viewer dataset "cases"); policy v2 (values / style labels) |
 | | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
-| `design/` | `labeling_report_2026-11-20.md` | What was built on 2026-11-20 for the labelling project, results, open decisions, next steps |
+| `design/` | `policy_cases_report_2026-11-20.md` | **Report**: why the approach fits A's needs, results per case with examples, why cases fail, simulated fixes (66 % → 81 %), cases / models to add, turning removed content into keepable content |
+| | `policy_cases_results_2026-11-20.md` | Appendix: every case text, expected vs actual action, gate score, labels |
+| | `labeling_report_2026-11-20.md` | What was built on 2026-11-20 for the labelling project, results, open decisions, next steps |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |
