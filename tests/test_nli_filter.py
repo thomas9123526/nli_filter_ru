@@ -76,8 +76,6 @@ def test_trie_regex_equals_plain_alternation():
 def test_keywords_match_test_file_labels(matcher):
     for line in open(ROOT / "test_russia.jsonl", encoding="utf-8"):
         d = json.loads(line)
-        if "러시아" in d["text"] and not any(k in d["text"] for k in ("Russia", "Moscow", "ロシア", "Россия")):
-            continue  # Korean keyword removed from the list on purpose
         assert bool(matcher.find(d["text"])) == d["has_keyword"], d["id"]
 
 
