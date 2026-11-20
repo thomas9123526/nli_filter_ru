@@ -73,9 +73,15 @@ class Jobs:
     def running(self) -> Optional[Dict[str, Any]]:
         return next((j for j in self.jobs.values() if j["state"] == "running"), None)
 
-    def start(self, args: List[str], env: Optional[Dict[str, str]] = None, label: str = "") -> Dict[str, Any]:
+    SCRIPTS = ("nli_filter.py", "nli_label.py")  # the only programs a job may run
+
+    def start(self, args: List[str], env: Optional[Dict[str, str]] = None, label: str = "",
+              script: Optional[str] = None) -> Dict[str, Any]:
+        script = script or "nli_filter.py"
+        if script not in self.SCRIPTS:
+            raise ValueError(f"'script' must be one of {', '.join(self.SCRIPTS)}")
         if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
-            raise ValueError("'args' must be a list of strings (the arguments of nli_filter.py)")
+            raise ValueError(f"'args' must be a list of strings (the arguments of {script})")
         with self.lock:
             busy = self.running()
             if busy:
@@ -85,10 +91,10 @@ class Jobs:
             log_file = self.log_dir / f"{jid}.log"
             full_env = {**os.environ, **{k: str(v) for k, v in (env or {}).items()}, "PYTHONUNBUFFERED": "1",
                         "PYTHONIOENCODING": "utf-8"}
-            cmd = [self.python, str(HERE / "nli_filter.py"), *args]
+            cmd = [self.python, str(HERE / script), *args]
             proc = subprocess.Popen(cmd, cwd=str(HERE), env=full_env, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-            job = {"id": jid, "label": label, "args": args, "state": "running", "returncode": None,
+            job = {"id": jid, "label": label, "script": script, "args": args, "state": "running", "returncode": None,
                    "started": time.strftime("%Y-%m-%d %H:%M:%S"), "ended": None, "t0": time.time(), "seconds": None,
                    "lines": collections.deque(maxlen=2000), "log_file": str(log_file), "proc": proc}
             self.jobs[jid] = job
@@ -121,7 +127,8 @@ class Jobs:
 
     def view(self, job: Dict[str, Any], tail: int = 400) -> Dict[str, Any]:
         lines = list(job["lines"])
-        return {k: job[k] for k in ("id", "label", "args", "state", "returncode", "started", "ended", "log_file")} | {
+        return {k: job.get(k) for k in ("id", "label", "script", "args", "state", "returncode", "started", "ended",
+                                        "log_file")} | {
             "seconds": job["seconds"] if job["seconds"] is not None else round(time.time() - job["t0"], 1),
             "output": lines[-tail:], "output_lines": len(lines)}
 
@@ -282,7 +289,8 @@ def make_handler(pg: Playground):
             try:
                 req = json.loads(self.rfile.read(n) or b"{}")
                 if path == "/jobs":
-                    return self._send(200, pg.jobs.start(req.get("args"), req.get("env"), str(req.get("label") or "")))
+                    return self._send(200, pg.jobs.start(req.get("args"), req.get("env"), str(req.get("label") or ""),
+                                                         req.get("script")))
                 if path.startswith("/jobs/") and path.endswith("/stop"):
                     return self._send(200, pg.jobs.stop(path.split("/")[2]))
                 if path != "/filter":

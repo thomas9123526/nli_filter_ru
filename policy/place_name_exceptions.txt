@@ -1,0 +1,16 @@
+# Place-name rewrite: regex patterns (case-insensitive). A name inside a match is NOT rewritten.
+# One pattern per line; lines starting with # are ignored. Edit with the codebook (cmds/labeling/place_names.md).
+# Prefix a line with "case:" to make that pattern case-sensitive (needed for "a capitalised first name").
+# URLs, e-mail addresses and code (`...` and ``` blocks) are always skipped, no pattern needed.
+
+# dishes and fixed expressions
+chicken\s+kiev
+# places with the same name elsewhere
+odessa,?\s+(texas|tx|missouri|mo|ontario|delaware|de|washington|wa|florida|fl|new\s+york|ny)\b
+odessa\s+(college|high\s+school|american)
+# person names: a capitalised first name (or initial) before the surname
+case:\b(?!In\b|At\b|To\b|From\b|Near\b|Of\b|The\b|And\b|Port\b|City\b|Oblast\b)(?:[A-Z][a-z]+|[A-Z]\.)\s+(?:Nikolaev|Nikolayev|Khmelnitsky|Khmelnitskiy|Khmelnitskii)\b
+# historical names kept on purpose (codebook decisions; remove a line to rewrite these too)
+battle\s+of\s+kiev
+kiev\s+offensive
+chernobyl\s+(disaster|accident|catastrophe|nuclear\s+disaster)

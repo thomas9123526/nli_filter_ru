@@ -1,0 +1,50 @@
+russian_form,ukrainian_form,variants,notes
+Kiev,Kyiv,,capital; Kievan (Rus) is a different word and is not touched
+Kharkov,Kharkiv,,
+Odessa,Odesa,,Odessa Texas is excluded in place_name_exceptions.txt
+Lvov,Lviv,,
+Nikolaev,Mykolaiv,Nikolayev,also a surname: person names excluded in place_name_exceptions.txt
+Zaporozhye,Zaporizhzhia,Zaporozhe | Zaporozhie | Zaporozhia,
+Lugansk,Luhansk,,
+Chernobyl,Chornobyl,,the 1986 disaster is usually written Chernobyl: decide in the codebook (exception list)
+Rovno,Rivne,,
+Dnepropetrovsk,Dnipro,Dnipropetrovsk,renamed 2016
+Dnepr,Dnipro,,the city; the river in English is the Dnieper and is not touched
+Kirovograd,Kropyvnytskyi,Kirovohrad,renamed 2016
+Artemovsk,Bakhmut,Artyomovsk | Artemivsk,renamed 2016; Russian-imposed name in occupied area
+Krasnoarmeysk,Pokrovsk,Krasnoarmeisk | Krasnoarmiisk,renamed 2016; Russian-imposed name
+Krasny Liman,Lyman,Krasnyi Lyman,renamed 2016
+Chernigov,Chernihiv,,
+Zhitomir,Zhytomyr,,
+Vinnitsa,Vinnytsia,Vinnytsa,
+Cherkassy,Cherkasy,,
+Ternopol,Ternopil,,
+Khmelnitsky,Khmelnytskyi,Khmelnitskiy | Khmelnitskii,also a surname (Bohdan Khmelnytsky): person names excluded
+Ivano-Frankovsk,Ivano-Frankivsk,,
+Uzhgorod,Uzhhorod,,
+Chernovtsy,Chernivtsi,,
+Krivoy Rog,Kryvyi Rih,Krivoi Rog | Kryvoy Rog,
+Berdyansk,Berdiansk,,
+Gorlovka,Horlivka,,
+Makeyevka,Makiivka,Makeevka,
+Severodonetsk,Sievierodonetsk,Sievierodonetsk,
+Lisichansk,Lysychansk,,
+Slavyansk,Sloviansk,Slaviansk,
+Konstantinovka,Kostiantynivka,,
+Kremenchug,Kremenchuk,,
+Belaya Tserkov,Bila Tserkva,,
+Kamenets-Podolsky,Kamianets-Podilskyi,Kamenets-Podolskiy,
+Pripyat,Prypiat,,the town; the river is also Prypiat in Ukrainian romanisation
+Yenakiyevo,Yenakiieve,Enakievo | Yenakievo,
+Izyum,Izium,,
+Kupyansk,Kupiansk,,
+Avdeyevka,Avdiivka,Avdeevka,
+Bakhchisaray,Bakhchysarai,Bakhchisarai,
+Dzhankoy,Dzhankoi,,
+Feodosiya,Feodosiia,Feodosia,
+Yevpatoriya,Yevpatoriia,Evpatoria | Eupatoria,
+Kertch,Kerch,,
+Novaya Kakhovka,Nova Kakhovka,,
+Energodar,Enerhodar,,
+Melitopol,Melitopol,,same in both: listed so the table is complete
+Mariupol,Mariupol,,same in both

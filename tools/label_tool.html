@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Tool</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #deded8;
+  --hit: #ffe08a; --yes: #1f7a3a; --yes-bg: #dff3e4; --no: #8a1f1f; --no-bg: #f6e0e0;
+  --accent: #2456a6; --accent-bg: #e3ebf8; --warn: #9a5b00; --warn-bg: #fbecd2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #18181a; --panel: #222225; --text: #e8e8e4; --muted: #a0a09a; --line: #3a3a3e;
+    --hit: #6b5310; --yes: #7fd49a; --yes-bg: #1f3b28; --no: #f0a0a0; --no-bg: #432222;
+    --accent: #8fb3f0; --accent-bg: #23314a; --warn: #f0c070; --warn-bg: #3d2f14;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+header h1 { font-size: 16px; margin: 0 12px 0 0; }
+button, select, input[type=text] { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.muted { color: var(--muted); }
+main { display: grid; grid-template-columns: 220px 1fr 460px; gap: 0; height: calc(100vh - 54px); }
+#list { overflow: auto; border-right: 1px solid var(--line); background: var(--panel); }
+#list .row { padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; justify-content: space-between; gap: 6px; }
+#list .row.cur { background: var(--accent-bg); }
+.badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); white-space: nowrap; }
+.b-done { background: var(--yes-bg); color: var(--yes); border-color: transparent; }
+.b-draft { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+#doc { overflow: auto; padding: 16px 20px; }
+#doc .ctx { color: var(--muted); white-space: pre-wrap; font-size: 13px; }
+#doc .para { white-space: pre-wrap; border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; background: var(--panel); border-radius: 0 6px 6px 0; font-size: 15px; }
+mark { background: var(--hit); color: inherit; border-radius: 2px; }
+#side { overflow: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 10px 14px; }
+.lvl { margin: 12px 0 4px; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.lab { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.lab .h { font-size: 13px; }
+.lab .k { font-size: 11px; color: var(--muted); }
+.yn { display: flex; gap: 4px; align-items: start; }
+.yn button { padding: 3px 9px; min-width: 40px; }
+.yn button.on-yes { background: var(--yes-bg); color: var(--yes); border-color: var(--yes); font-weight: 600; }
+.yn button.on-no { background: var(--no-bg); color: var(--no); border-color: var(--no); font-weight: 600; }
+.score { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dec { font-size: 10px; padding: 0 5px; border-radius: 8px; border: 1px solid var(--line); margin-left: 4px; }
+.dec-remove { color: var(--no); } .dec-keep { color: var(--yes); } .dec-review, .dec-flag { color: var(--warn); }
+.actionbox { margin: 10px 0; padding: 10px; border-radius: 8px; background: var(--accent-bg); }
+.actionbox b { font-size: 16px; }
+textarea { width: 100%; min-height: 50px; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+#empty { padding: 40px; max-width: 720px; }
+.kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+@media (max-width: 1000px) { main { grid-template-columns: 1fr; height: auto; } #list { max-height: 160px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Label Tool</h1>
+  <button id="open" class="primary">Open labels file…</button>
+  <input type="file" id="file" accept=".jsonl,.json" hidden>
+  <button id="save">Save</button>
+  <span id="fname" class="muted"></span>
+  <span id="progress" class="muted"></span>
+  <select id="filter" title="show">
+    <option value="all">all items</option><option value="todo">todo</option>
+    <option value="draft">draft (to check)</option><option value="done">done</option>
+  </select>
+  <label class="muted"><input type="checkbox" id="showModel"> show model scores</label>
+  <span id="msg" class="muted"></span>
+</header>
+<div id="empty">
+  <h2>Hand-label paragraphs for the policy labels</h2>
+  <p>Open a file made by <code>python nli_label.py sample …</code> (for example <code>labels\seed.jsonl</code>).
+     For each paragraph, answer every label <b>Yes</b> or <b>No</b>. The policy action (remove / keep / review / pass)
+     is computed from your answers. Override it if the policy gets it wrong, and say why in the note.</p>
+  <p><b>Save</b> writes the file back in place (Chrome / Edge), or downloads it (other browsers). Work is also kept
+     in this browser between visits.</p>
+  <p>Keys: <span class="kbd">Enter</span> done &amp; next · <span class="kbd">j</span>/<span class="kbd">k</span> next/previous ·
+     <span class="kbd">n</span> all unanswered = No · <span class="kbd">g</span> gate Yes · <span class="kbd">G</span> gate No (= pass) ·
+     <span class="kbd">Ctrl+S</span> save</p>
+  <p class="muted">Guide: cmds/labeling/hand_labeling.md</p>
+</div>
+<main id="app" hidden>
+  <div id="list"></div>
+  <div id="doc"></div>
+  <div id="side"></div>
+</main>
+<script>
+"use strict";
+let META = null, ITEMS = [], CUR = 0, HANDLE = null, FNAME = "", DIRTY = false;
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: file save still works */ } },
+};
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function msg(t) { $("msg").textContent = t; if (t) setTimeout(() => { if ($("msg").textContent === t) $("msg").textContent = ""; }, 4000); }
+
+// ---- policy logic: the same rule as resolve() in nli_label.py ------------------------------------
+function globMatch(pat, s) { return new RegExp("^" + pat.split("*").map(x => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$").test(s); }
+function resolveAction(labels, marker) {
+  const L = META.labels, gate = Object.keys(L).find(k => L[k].level === 0);
+  const pos = Object.keys(labels).filter(k => labels[k] === true && L[k] && L[k].level > 0);
+  if (gate && !marker && labels[gate] !== true) return labels[gate] === false ? "pass" : null;
+  const soft = new Set();
+  pos.forEach(k => (L[k].softens || []).forEach(p => pos.forEach(x => { if (globMatch(p, x)) soft.add(x); })));
+  if (pos.some(k => L[k].level === 2 && L[k].decision === "remove" && !soft.has(k))) return "remove";
+  const ds = new Set();
+  pos.forEach(k => { const l = L[k]; if ((l.softens && l.softens.length) || l.decision === "flag") return;
+                     ds.add(l.decision === "remove" && soft.has(k) ? "review" : l.decision); });
+  if (ds.has("remove") && ds.has("keep")) return META.conflict || "review";
+  if (ds.has("remove")) return "remove";
+  if (ds.has("review")) return "review";
+  return "keep";
+}
+
+// ---- file handling ------------------------------------------------------------------------------
+function parse(text) {
+  const items = []; let meta = null;
+  text.split(/\r?\n/).forEach((ln, i) => {
+    if (!ln.trim()) return;
+    let d; try { d = JSON.parse(ln); } catch (e) { throw new Error("line " + (i + 1) + " is not JSON"); }
+    if (d._meta) meta = d._meta; else items.push(d);
+  });
+  if (!meta) throw new Error("no _meta line: make the file with nli_label.py sample");
+  return { meta, items };
+}
+function serialize() { return [JSON.stringify({ _meta: META })].concat(ITEMS.map(x => JSON.stringify(x))).join("\n") + "\n"; }
+function load(text, name) {
+  const p = parse(text);
+  META = p.meta; ITEMS = p.items; FNAME = name;
+  const saved = store.get("labeltool:" + name);
+  if (saved) {
+    try {
+      const s = JSON.parse(saved), byKey = new Map(s.map(x => [x.key, x]));
+      let n = 0;
+      ITEMS.forEach((it, i) => { const b = byKey.get(it.key);
+        if (b && b.edited && (!it.edited || b.edited > it.edited)) { ITEMS[i] = Object.assign(it, b); n++; } });
+      if (n) msg(n + " unsaved item(s) restored from this browser");
+    } catch (e) { /* ignore a broken local copy */ }
+  }
+  CUR = Math.max(0, ITEMS.findIndex(it => it.status !== "done"));
+  $("empty").hidden = true; $("app").hidden = false;
+  $("fname").textContent = name; DIRTY = false; render();
+}
+$("open").onclick = async () => {
+  if (window.showOpenFilePicker) {
+    try {
+      [HANDLE] = await window.showOpenFilePicker({ types: [{ description: "labels", accept: { "application/json": [".jsonl", ".json"] } }] });
+      const f = await HANDLE.getFile(); load(await f.text(), f.name); return;
+    } catch (e) { if (e.name === "AbortError") return; HANDLE = null; }
+  }
+  $("file").click();
+};
+$("file").onchange = async (ev) => { const f = ev.target.files[0]; if (f) { try { load(await f.text(), f.name); } catch (e) { alert(e.message); } } };
+async function save() {
+  if (!META) return;
+  const data = serialize();
+  if (HANDLE && HANDLE.createWritable) {
+    try { const w = await HANDLE.createWritable(); await w.write(data); await w.close(); DIRTY = false; msg("saved to " + FNAME); return; }
+    catch (e) { msg("could not write in place: downloading instead"); }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+  a.download = FNAME || "labels.jsonl"; a.click(); URL.revokeObjectURL(a.href);
+  DIRTY = false; msg("downloaded " + FNAME + ": replace the old file with it");
+}
+$("save").onclick = save;
+window.addEventListener("beforeunload", (e) => { if (DIRTY) { e.preventDefault(); e.returnValue = ""; } });
+function remember() {
+  DIRTY = true;
+  store.set("labeltool:" + FNAME, JSON.stringify(ITEMS.filter(x => x.edited).map(x => ({ key: x.key, labels: x.labels, action: x.action, status: x.status, by: x.by, note: x.note, edited: x.edited }))));
+}
+
+// ---- rendering ------------------------------------------------------------------------------------
+function visible() { const f = $("filter").value; return ITEMS.map((it, i) => i).filter(i => f === "all" || ITEMS[i].status === f); }
+function highlight(text, hits) {
+  let out = "", last = 0;
+  (hits || []).slice().sort((a, b) => a[0] - b[0]).forEach(([s, e]) => { if (s < last) return; out += esc(text.slice(last, s)) + "<mark>" + esc(text.slice(s, e)) + "</mark>"; last = e; });
+  return out + esc(text.slice(last));
+}
+function render() {
+  const done = ITEMS.filter(x => x.status === "done").length, draft = ITEMS.filter(x => x.status === "draft").length;
+  $("progress").textContent = `${done}/${ITEMS.length} done` + (draft ? `, ${draft} drafts to check` : "");
+  const vis = visible();
+  $("list").innerHTML = vis.map(i => { const it = ITEMS[i];
+    return `<div class="row ${i === CUR ? "cur" : ""}" data-i="${i}"><span>#${i + 1} ${esc((it.text || "").slice(0, 22))}…</span>` +
+           `<span class="badge b-${it.status}">${it.status}</span></div>`; }).join("");
+  $("list").querySelectorAll(".row").forEach(r => r.onclick = () => { CUR = +r.dataset.i; render(); });
+  const cur = $("list").querySelector(".cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
+  const it = ITEMS[CUR]; if (!it) { $("doc").innerHTML = "<p class='muted'>nothing to show</p>"; $("side").innerHTML = ""; return; }
+  const src = it.source || {};
+  $("doc").innerHTML =
+    `<div class="muted">#${CUR + 1} · ${esc(src.file || "")} line ${esc(src.line)} · picked for: ${esc((it.picked_for || []).join(", "))}` +
+    (it.marker ? " · <b>marker term</b>" : "") + (it.by ? ` · by ${esc(it.by)}` : "") + `</div>` +
+    `<div class="ctx">…${esc(it.before || "")}</div><div class="para">${highlight(it.text || "", it.hits)}</div><div class="ctx">${esc(it.after || "")}…</div>`;
+  const L = META.labels, showM = $("showModel").checked, ms = (it.model && it.model.scores) || {};
+  let html = "", lvl = -1;
+  Object.keys(L).forEach(k => { const l = L[k];
+    if (l.level !== lvl) { lvl = l.level; html += `<div class="lvl">${["Level 0 · gate", "Level 1 · subject", "Level 2 · framing"][lvl]}</div>`; }
+    const v = it.labels[k];
+    html += `<div class="lab"><div><div class="h">${esc(l.hypothesis)}</div><div class="k">${esc(k)}<span class="dec dec-${l.decision}">${l.decision}</span>` +
+            (showM && ms[k] != null ? ` <span class="score">model ${ms[k].toFixed(2)} / thr ${l.threshold}</span>` : "") + `</div></div>` +
+            `<div class="yn"><button data-k="${k}" data-v="1" class="${v === true ? "on-yes" : ""}">Yes</button>` +
+            `<button data-k="${k}" data-v="0" class="${v === false ? "on-no" : ""}">No</button></div></div>`; });
+  const auto = resolveAction(it.labels, it.marker);
+  html = `<div class="actionbox">policy action from your labels: <b>${auto || "answer the gate first"}</b>` +
+         (showM && it.model ? ` <span class="score">(model run: ${esc(it.model.action)})</span>` : "") +
+         `<div style="margin-top:6px">your action: <select id="act"><option value="">same as policy</option>` +
+         ["remove", "keep", "review", "pass"].map(a => `<option ${it.action === a ? "selected" : ""}>${a}</option>`).join("") +
+         `</select></div></div>` +
+         `<div style="display:flex;gap:6px;flex-wrap:wrap"><button id="restNo">Rest = No (n)</button><button id="prev">← Prev (k)</button>` +
+         `<button id="next">Next (j) →</button><button id="doneNext" class="primary">Done &amp; next (Enter)</button></div>` +
+         html + `<div class="lvl">Note</div><textarea id="note" placeholder="why, edge case, codebook question…">${esc(it.note || "")}</textarea>` +
+         `<p class="muted">status: ${esc(it.status)}${it.edited ? " · edited " + esc(it.edited) : ""}</p>`;
+  $("side").innerHTML = html;
+  $("side").querySelectorAll(".yn button").forEach(b => b.onclick = () => setLabel(b.dataset.k, b.dataset.v === "1"));
+  $("act").onchange = (e) => { touch(it); it.action = e.target.value || null; render(); };
+  $("note").oninput = (e) => { touch(it); it.note = e.target.value; };
+  $("restNo").onclick = restNo; $("prev").onclick = () => move(-1); $("next").onclick = () => move(1); $("doneNext").onclick = doneNext;
+}
+function touch(it) { it.edited = new Date().toISOString().slice(0, 19).replace("T", " "); if (it.status === "todo") it.status = "draft"; if (it.by !== "human") it.by = "human"; remember(); }
+function setLabel(k, v) { const it = ITEMS[CUR]; touch(it); it.labels[k] = it.labels[k] === v ? null : v; render(); }
+function restNo() { const it = ITEMS[CUR]; touch(it); Object.keys(it.labels).forEach(k => { if (it.labels[k] == null) it.labels[k] = false; }); render(); }
+function move(d) { const vis = visible(); let p = vis.indexOf(CUR); if (p < 0) p = 0; p = Math.min(vis.length - 1, Math.max(0, p + d)); if (vis.length) CUR = vis[p]; render(); }
+function doneNext() {
+  const it = ITEMS[CUR], L = META.labels, gate = Object.keys(L).find(k => L[k].level === 0);
+  if (gate && it.labels[gate] == null && !it.marker) { msg("answer the gate label first"); return; }
+  if (gate && it.labels[gate] === false) Object.keys(it.labels).forEach(k => { if (it.labels[k] == null) it.labels[k] = false; });
+  const open = Object.keys(it.labels).filter(k => it.labels[k] == null);
+  if (open.length && !confirm(open.length + " label(s) unanswered. Mark them No and finish?")) return;
+  open.forEach(k => it.labels[k] = false);
+  touch(it); it.status = "done"; remember();
+  const next = ITEMS.findIndex((x, i) => i > CUR && x.status !== "done");
+  if (next >= 0) CUR = next; render();
+  if (ITEMS.filter(x => x.status === "done").length % 10 === 0) save();
+}
+function gateSet(v) { const L = META.labels, g = Object.keys(L).find(k => L[k].level === 0); if (g) setLabel(g, v); }
+$("filter").onchange = () => { const vis = visible(); if (vis.length && !vis.includes(CUR)) CUR = vis[0]; render(); };
+$("showModel").onchange = () => { store.set("labeltool:showModel", $("showModel").checked ? "1" : ""); if (META) render(); };
+$("showModel").checked = store.get("labeltool:showModel") === "1";
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); save(); return; }
+  if (!META || ["TEXTAREA", "INPUT", "SELECT"].includes(e.target.tagName)) return;
+  if (e.key === "Enter") { e.preventDefault(); doneNext(); }
+  else if (e.key === "j") move(1); else if (e.key === "k") move(-1);
+  else if (e.key === "n") restNo(); else if (e.key === "g") gateSet(true); else if (e.key === "G") gateSet(false);
+});
+</script>
+</body>
+</html>

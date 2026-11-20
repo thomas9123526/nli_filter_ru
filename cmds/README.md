@@ -38,10 +38,20 @@
 | | `review_tools.md` | Keywords page (per-keyword stats and flags), Review page (queues), golden set labels (outside the corpus), `--audit-strict` for level-A keywords |
 | | `try_settings.md` | Try keywords / hypotheses on the Corpus page (model service `nli_playground.py`); shared `hypotheses\*.json` |
 | | `move_viewer.md` | Copy the viewer to another computer: what to copy, what to leave out |
+| | `labels_pages.md` | Labels pages: `nli_label.py` runs in the viewer, a document's flow (gate → level 1 → level 2 → decision), starting a run |
 | | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
 | | `sftp_192.168.170.200.md` | Filter and view `test_corpus` on the SFTP server 192.168.170.200 |
 | `design/` | `overnight_2026-11-18.md` | Overnight report: Keywords / Review pages, golden set, `--audit-strict`, `nli_compare.py`, `nli_replay.py`; how to try them, test results |
 | | `keyword_lexicon_plan.md` | Plan: keyword lexicon (level A strict / B models, type, gloss, other meanings, exclude), templated hypotheses, review tools; build order |
+| `labeling/` | `README.md` | **Start here for A's policy labelling**: `nli_label.py` (paragraph labels per policy, place-name rewrite, token composition), files, how a document is processed |
+| | `quick_start.md` | The commands step by step: sample → score → hand-label → eval → label a corpus |
+| | `policy.md` | `policy\russia_policy.json`: labels, thresholds, decisions, `run_if`, how a paragraph's action is decided |
+| | `hand_labeling.md` | `tools\label_tool.html`, labelling rules (codebook start), Claude's drafts, rounds |
+| | `thresholds.md` | `nli_label.py eval` output, choosing thresholds, the CRC guarantee |
+| | `place_names.md` | `policy\place_names.csv` + exceptions, `nli_names.py`, open codebook questions |
+| | `outputs.md` | What `run` / `redecide` write; the composition report |
+| | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
+| `design/` | `labeling_report_2026-11-20.md` | What was built on 2026-11-20 for the labelling project, results, open decisions, next steps |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |

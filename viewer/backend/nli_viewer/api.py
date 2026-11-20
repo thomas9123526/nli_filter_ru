@@ -28,6 +28,7 @@ from .playground import Playground, PlaygroundError
 from . import runs as runs_mod
 from .results import Dataset
 from .golden import GoldenStore
+from .labels import LabelRuns
 from .storage import StorageError, clean_path
 
 __all__ = ["create_app", "EDIT_HEADER"]
@@ -451,6 +452,51 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         why = client_problem(request)
         if why:
             raise HTTPException(403, why.replace("editing", "saving"))
+
+    # ---- nli_label.py runs (policy labels per paragraph): list, browse, start -------------------------
+
+    labels = LabelRuns(project, float(cfg.progress_stale_seconds))
+
+    @app.get("/api/labels", tags=["labels"])
+    def label_runs():
+        """nli_label.py output folders in the project folder (finished, or running with progress.json)."""
+        return labels.list()
+
+    @app.get("/api/labels/policies", tags=["labels"])
+    def label_policies():
+        """policy/*.json files of the project (for the start form)."""
+        pol = project / "policy"
+        return {"policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json")) if pol.is_dir() else []}
+
+    @app.get("/api/labels/{name}", tags=["labels"])
+    def label_run(name: str):
+        return labels.run(name)
+
+    @app.get("/api/labels/{name}/docs", tags=["labels"])
+    def label_docs(name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
+                   para_action: Optional[str] = None, gated: bool = True,
+                   offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
+        """Documents of one file of a run, filtered by document action, label or paragraph action."""
+        return labels.docs(name, file, action, label, para_action, gated, offset, limit)
+
+    @app.get("/api/labels/{name}/doc", tags=["labels"])
+    def label_doc(name: str, file: str, line: int = Query(..., ge=1)):
+        """One document: its labels row (paragraphs, scores, actions), the source text and the policy."""
+        return labels.doc(name, file, line)
+
+    @app.post("/api/labels/start", tags=["labels"])
+    def label_start(body: StartRunBody, request: Request):
+        """Start 'nli_label.py run …' (through the model service; only from this PC: it starts a program)."""
+        save_guard(request)
+        args = body.args if body.args is not None else runs_mod.split_command(body.command or "")
+        if args and args[0].lower().endswith("nli_label.py"):
+            args = args[1:]
+        if not args or args[0] not in ("run", "redecide"):
+            raise HTTPException(400, "the arguments must start with 'run' or 'redecide'")
+        if "--output-dir" not in args:
+            raise HTTPException(400, "set the output folder (--output-dir)")
+        out = args[args.index("--output-dir") + 1] if args.index("--output-dir") + 1 < len(args) else ""
+        return pg.start_job(args, {}, f"labels: {out}", script="nli_label.py")
 
     @app.post("/api/playground/hypotheses", tags=["playground"])
     def save_hypotheses(body: SaveHypBody, request: Request):

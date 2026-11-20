@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
+  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp,
 } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
@@ -104,6 +105,12 @@ export const api = {
   runs: (s?: AbortSignal) => getJSON<{ jobs: RunJob[] }>("/api/runs", undefined, s),
   stopRun: (id: string) => postJSON<RunJob>(`/api/runs/${enc(id)}/stop`),
   progress: (ds: string, s?: AbortSignal) => getJSON<ProgressResp>(`/api/datasets/${enc(ds)}/progress`, undefined, s),
+  labelRuns: (s?: AbortSignal) => getJSON<{ project: string; runs: LabelRunRow[] }>("/api/labels", undefined, s),
+  labelPolicies: (s?: AbortSignal) => getJSON<{ policies: string[] }>("/api/labels/policies", undefined, s),
+  labelRun: (run: string, s?: AbortSignal) => getJSON<LabelRunResp>(`/api/labels/${enc(run)}`, undefined, s),
+  labelDocs: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocsResp>(`/api/labels/${enc(run)}/docs`, p, s),
+  labelDoc: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocResp>(`/api/labels/${enc(run)}/doc`, p, s),
+  labelStart: (command: string) => postJSON<RunJob>("/api/labels/start", { command }),
   undoEdit: (ds: string, edit: string) => postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edits/${enc(edit)}/undo`),
 };
 

@@ -74,8 +74,9 @@ class Playground:
 
     # ---- nli_filter.py runs (started by the service, in its torch environment) -------------------
 
-    def start_job(self, args: List[str], env: Dict[str, str], label: str) -> Dict[str, Any]:
-        return self._call("/jobs", {"args": args, "env": env, "label": label}, timeout=30)
+    def start_job(self, args: List[str], env: Dict[str, str], label: str,
+                  script: str = "nli_filter.py") -> Dict[str, Any]:
+        return self._call("/jobs", {"args": args, "env": env, "label": label, "script": script}, timeout=30)
 
     def job(self, jid: str) -> Dict[str, Any]:
         return self._call(f"/jobs/{jid}", timeout=10)

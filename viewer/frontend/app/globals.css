@@ -403,3 +403,19 @@ mark.kw-excluded { background: transparent; text-decoration: line-through; color
 .btn.lbl-keep { background: var(--keep-soft); color: var(--keep); border-color: var(--keep); }
 tr.line-preview td { background: var(--panel-2); }
 .preview-text { white-space: pre-wrap; line-height: 1.55; padding: 6px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; max-height: 320px; overflow: auto; }
+
+/* ---- Labels pages (nli_label.py runs) ---- */
+.linklike { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
+.lpara { border-radius: 4px; cursor: pointer; padding: 1px 0; }
+.lpara.remove { background: var(--filter-soft); box-shadow: inset 3px 0 0 var(--filter); }
+.lpara.review { background: var(--warn-soft); box-shadow: inset 3px 0 0 var(--warn); }
+.lpara.keep { background: var(--keep-soft); box-shadow: inset 3px 0 0 var(--keep); }
+.lpara.pass { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--border); }
+.lpara.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.swatch.lpara { box-shadow: none; }
+.flow { display: grid; gap: 4px; }
+.flow-step { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--panel); }
+.flow-arrow { text-align: center; color: var(--faint); line-height: 1; }
+.flow-table td { padding: 4px 6px; border-top: 1px solid var(--border); vertical-align: top; font-size: 13px; }
+.flow-table tr.yes td { background: var(--accent-soft); }
+tr.active td { background: var(--accent-soft); }

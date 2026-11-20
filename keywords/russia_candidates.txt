@@ -1,0 +1,229 @@
+# CANDIDATE gate keywords for Russia, from Wikidata (query.wikidata.org, 2026-11-20). NOT USED by any tool.
+# Review, then copy the lines you want into keywords/russia.txt (same lexicon format: keyword, level, type, gloss).
+# Lines starting with "# CHECK" are ambiguous: uncomment only with an exclude pattern or other-meaning column.
+# Keywords already in keywords/russia.txt are left out. Places in occupied Ukraine (listed under both Russia
+# and Ukraine in Wikidata) are excluded on purpose: they must never count as Russia.
+# Guide: cmds/labeling/policy.md (Gate lists).
+
+# --- cities of Russia, population >= 100,000 (largest first) ---
+Novosibirsk	B	city	a city in Russia
+Yekaterinburg	B	city	a city in Russia
+Kazan	B	city	a city in Russia
+Nizhny Novgorod	B	city	a city in Russia
+Krasnodar	B	city	a city in Russia
+Samara	B	city	a city in Russia
+Rostov-on-Don	B	city	a city in Russia
+Omsk	B	city	a city in Russia
+Krasnoyarsk	B	city	a city in Russia
+Voronezh	B	city	a city in Russia
+# CHECK (also a hair treatment): Perm	B	city	a city in Russia
+Volgograd	B	city	a city in Russia
+Saratov	B	city	a city in Russia
+Tolyatti	B	city	a city in Russia
+Makhachkala	B	city	a city in Russia
+Barnaul	B	city	a city in Russia
+Izhevsk	B	city	a city in Russia
+Khabarovsk	B	city	a city in Russia
+Ulyanovsk	B	city	a city in Russia
+Irkutsk	B	city	a city in Russia
+Vladivostok	B	city	a city in Russia
+Yaroslavl	B	city	a city in Russia
+Naberezhnye Chelny	B	city	a city in Russia
+Tomsk	B	city	a city in Russia
+Kemerovo	B	city	a city in Russia
+Orenburg	B	city	a city in Russia
+Ryazan	B	city	a city in Russia
+Cheboksary	B	city	a city in Russia
+Kaliningrad	B	city	a city in Russia
+Penza	B	city	a city in Russia
+# CHECK (also a person / ships): Kirov	B	city	a city in Russia
+Astrakhan	B	city	a city in Russia
+Tula	B	city	a city in Russia
+Stavropol	B	city	a city in Russia
+Ulan-Ude	B	city	a city in Russia
+Kursk	B	city	a city in Russia
+Surgut	B	city	a city in Russia
+# CHECK (short or ambiguous name): Tver	B	city	a city in Russia
+Magnitogorsk	B	city	a city in Russia
+Bryansk	B	city	a city in Russia
+Vladimir	B	city	a city in Russia
+# CHECK (also a name): Chita	B	city	a city in Russia
+Nizhny Tagil	B	city	a city in Russia
+Kaluga	B	city	a city in Russia
+Belgorod	B	city	a city in Russia
+Volzhsky	B	city	a city in Russia
+Smolensk	B	city	a city in Russia
+Saransk	B	city	a city in Russia
+Kurgan	B	city	a city in Russia
+Nizhnevartovsk	B	city	a city in Russia
+Grozny	B	city	a city in Russia
+Yoshkar-Ola	B	city	a city in Russia
+Mytishchi	B	city	a city in Russia
+Sterlitamak	B	city	a city in Russia
+Novorossiysk	B	city	a city in Russia
+Tambov	B	city	a city in Russia
+Nizhnekamsk	B	city	a city in Russia
+Taganrog	B	city	a city in Russia
+Petrozavodsk	B	city	a city in Russia
+Veliky Novgorod	B	city	a city in Russia
+# CHECK (also Friedrich Engels): Engels	B	city	a city in Russia
+Shakhty	B	city	a city in Russia
+Syktyvkar	B	city	a city in Russia
+Stary Oskol	B	city	a city in Russia
+# CHECK (short or ambiguous name): Pskov	B	city	a city in Russia
+Orsk	B	city	a city in Russia
+Armavir	B	city	a city in Russia
+Abakan	B	city	a city in Russia
+Yuzhno-Sakhalinsk	B	city	a city in Russia
+Balakovo	B	city	a city in Russia
+Biysk	B	city	a city in Russia
+Rybinsk	B	city	a city in Russia
+Almetyevsk	B	city	a city in Russia
+Novocherkassk	B	city	a city in Russia
+Kamensk-Uralsky	B	city	a city in Russia
+Zlatoust	B	city	a city in Russia
+Khasavyurt	B	city	a city in Russia
+Adlersky City District	B	city	a city in Russia
+Salavat	B	city	a city in Russia
+Kopeysk	B	city	a city in Russia
+Maykop	B	city	a city in Russia
+Neftekamsk	B	city	a city in Russia
+Obninsk	B	city	a city in Russia
+Berezniki	B	city	a city in Russia
+Kaspiysk	B	city	a city in Russia
+Derbent	B	city	a city in Russia
+Nefteyugansk	B	city	a city in Russia
+Bataysk	B	city	a city in Russia
+Cherkessk	B	city	a city in Russia
+Rubtsovsk	B	city	a city in Russia
+Novocheboksarsk	B	city	a city in Russia
+Oktyabrsky	B	city	a city in Russia
+Murino	B	city	a city in Russia
+Novomoskovsk	B	city	a city in Russia
+Nevinnomyssk	B	city	a city in Russia
+Pervouralsk	B	city	a city in Russia
+Dimitrovgrad	B	city	a city in Russia
+Novy Urengoy	B	city	a city in Russia
+Seversk	B	city	a city in Russia
+Kamyshin	B	city	a city in Russia
+# CHECK (short or ambiguous name): Elista	B	city	a city in Russia
+Murom	B	city	a city in Russia
+Noyabrsk	B	city	a city in Russia
+Berdsk	B	city	a city in Russia
+Novoshakhtinsk	B	city	a city in Russia
+
+# --- people with Russian citizenship, popular (Wikipedia in >= 60 languages), alive after 1991 ---
+# Full names only (a surname alone is too ambiguous). Popularity = language editions, the guide's measure.
+Vladimir Putin	B	person	President of the Russian Federation
+Mikhail Gorbachev	B	person	leader of the Soviet Union from 1985 to 1991 (1931–2022)
+Dmitry Medvedev	B	person	President of Russia from 2008 to 2012, Prime Minister of Russia (2012-2020) and 
+Anna Netrebko	B	person	Russian and Austrian operatic soprano
+Boris Yeltsin	B	person	Soviet and Russian politician, 1st President of Russia (1931–2007)
+Aleksandr Solzhenitsyn	B	person	Russian writer, publicist, poet and politician (1918–2008)
+Valentina Tereshkova	B	person	Russian cosmonaut and pilot, first woman to have flown in space (born 1937)
+Valery Leontiev	B	person	Russian singer
+# CHECK (Russian citizenship was granted; not Russian-born): Steven Seagal	B	person	American actor, martial artist, and film producer
+Garry Kasparov	B	person	Russian chess grandmaster and activist
+# CHECK (Russian citizenship was granted; not Russian-born): Viktor Yanukovych	B	person	President of Ukraine from 2010 to 2014
+# CHECK (Russian citizenship was granted; not Russian-born): Edward Snowden	B	person	American whistleblower and former NSA contractor (born 1983)
+Maria Sharapova	B	person	Russian tennis player
+Alla Pugacheva	B	person	Soviet-Russian singer, composer, and actress
+# CHECK (Russian citizenship was granted; not Russian-born): Gérard Depardieu	B	person	French actor (born 1948)
+Sergey Lavrov	B	person	Russian politician of Armenian origin, Minister of Foreign Affairs
+# CHECK (Russian citizenship was granted; not Russian-born): Natalia Oreiro	B	person	Uruguayan actress, singer, host, and model
+Mikhail Kalashnikov	B	person	Soviet and Russian small arms designer (1919–2013)
+Anna Politkovskaya	B	person	Russian journalist (1958–2006)
+Anatoly Karpov	B	person	Russian chess player
+Mikhail Mishustin	B	person	Russian politician; Prime Minister of the Russian Federation
+Yevgeny Prigozhin	B	person	Russian mercenary leader, oligarch, restaurateur, former owner of Wagner PVC (19
+Boris Nemtsov	B	person	Russian scientist, statesman and liberal politician (1959–2015)
+Vitaly Ginzburg	B	person	Russian physicist (1916–2009)
+Alexey Leonov	B	person	Soviet-Russian pilot and cosmonaut, first human to conduct a spacewalk (1934–201
+Pavel Durov	B	person	technology entrepreneur (born 1984)
+Ramzan Kadyrov	B	person	Russian politician and head of the Chechen Republic
+Boris Spassky	B	person	Russian chess player (1937–2025)
+Mikhail Botvinnik	B	person	Soviet chess player
+Anna Kournikova	B	person	Russian tennis player and model
+Sergei Shoigu	B	person	Secretary of the Security Council of the Russian Federation since 2024 and forme
+Dima Bilan	B	person	Russian pop singer
+Alexei Abrikosov	B	person	Soviet, Russian and American theoretical physicist
+Zhores Alferov	B	person	Soviet-Russian physicist (1930–2019)
+Yelena Isinbayeva	B	person	Russian female Olympic pole-vaulter
+Grigori Perelman	B	person	Russian mathematician (born 1966)
+Kirill	B	person	bishop, priest, eastern Orthodox priest, eastern Orthodox bishop, patriarch
+Alexander Prokhorov	B	person	Soviet and Russian physicist (1916-2002)
+Nikolai Noskov	B	person	Soviet and Russian singer and song writer
+Nikolay Basov	B	person	Soviet physicist (1922-2001)
+Nikita Mikhalkov	B	person	Russian film director, writer, producer and actor (born 1945)
+Vladimir Kramnik	B	person	Russian chess grandmaster
+Yevgeny Yevtushenko	B	person	Soviet and Russian poet (1933–2017)
+Vladimir Zhirinovsky	B	person	Russian politician (1946–2022)
+Victor Chernomyrdin	B	person	Russian diplomat and politician (1938–2010)
+Konstantin Novoselov	B	person	Russian-British physicist known for graphene work
+Mikhail Khodorkovsky	B	person	Russian businessman, philanthropist and former oligarch
+Alexander Dugin	B	person	Russian political activist and philosopher (born 1962)
+Andrey Arshavin	B	person	Russian association football player
+Khabib Nurmagomedov	B	person	Russian professional mixed martial artist
+Larisa Latynina	B	person	Soviet-Russian artistic gymnast and ballet dancer (born 1934)
+Svetlana Savitskaya	B	person	Soviet cosmonaut
+Marat Safin	B	person	Russian tennis player
+Dmitri Muratov	B	person	Russian journalist and television presenter (born 1961)
+Yulia Lipnitskaya	B	person	Russian figure skater
+Maya Plisetskaya	B	person	Russian ballet dancer (1925-2015)
+Alan Dzagoev	B	person	Russian association football player
+Mstislav Rostropovich	B	person	Soviet and Russian cellist and conductor (1927-2007)
+Yury Luzhkov	B	person	Russian politician (1936–2019)
+Igor Akinfeev	B	person	Russian association football player
+Vasily Smyslov	B	person	Soviet chess grandmaster (1921–2010)
+Alexander Litvinenko	B	person	ex-KGB agent and FSB lieutenant-colonel (1962-2006)
+Andrei Konchalovsky	B	person	Soviet and Russian film director, screenwriter and film producer
+Gennady Zyuganov	B	person	General Secretary of the Communist Party of the Russian Federation
+Roman Abramovich	B	person	Russian-Israeli-Portuguese oligarch and former politician (born 1966)
+Aleksandr Kerzhakov	B	person	Russian footballer (born 1982)
+Philipp Kirkorov	B	person	Russian-Bulgarian singer and music producer
+Sergey Karjakin	B	person	Russian chess player
+Vladimir Arnold	B	person	Russian mathematician who studied integrable systems and differential equations 
+Zemfira	B	person	Russian rock musician and songwriter
+Denis Cheryshev	B	person	Russian footballer
+Bella Akhmadulina	B	person	Soviet and Russian poet, short story writer, and translator (1937–2010)
+Yuri Nikulin	B	person	Soviet and Russian actor and clown (1921-1997)
+Svetlana Alliluyeva	B	person	Joseph Stalin's daughter (1926–2011)
+Innokenty Smoktunovsky	B	person	Soviet and Russian actor (1925-1994)
+Yevgeny Leonov	B	person	Soviet and Russian actor (1926-1994)
+Sergei Bondarchuk	B	person	Soviet and Russian film director, screenwriter, and actor (1920–1994)
+Boris Akunin	B	person	Russian writer, translation, and historian
+Valentina Matviyenko	B	person	Russian politician
+Radveda Poklonskaya	B	person	Russian lawyer, politician and diplomat
+Leonid Gaidai	B	person	Soviet film director (1923-1993)
+Egor Gajdar	B	person	Russian economist (1956-2009)
+Gherman Titov	B	person	Soviet cosmonaut (1935-2000)
+Irina Shayk	B	person	Russian model and television personality (born 1986)
+Polina Gagarina	B	person	Russian singer-songwriter
+
+# --- state media (hand list from the guide) ---
+# CHECK ("RT" has other meanings: retweet / satellite): RT	B	org	Russian state television channel
+Russia Today	B	org	Russian state television channel
+# CHECK ("Sputnik" has other meanings: retweet / satellite): Sputnik	B	org	Russian state news agency
+TASS	B	org	Russian state news agency
+RIA Novosti	B	org	Russian state news agency
+Channel One Russia	B	org	Russian state television channel
+Rossiya 1	B	org	Russian state television channel
+Rossiya Segodnya	B	org	Russian state media group
+
+# --- organisations (hand list; the Wikidata query timed out, extend later) ---
+Gazprom	B	org	a Russian energy company
+Rosneft	B	org	a Russian oil company
+Lukoil	B	org	a Russian oil company
+Sberbank	B	org	a Russian bank
+VTB Bank	B	org	a Russian bank
+Yandex	B	org	a Russian technology company
+Kaspersky Lab	B	org	a Russian software company
+Aeroflot	B	org	the Russian national airline
+Roscosmos	B	org	the Russian space agency
+Rosatom	B	org	the Russian state nuclear company
+Rostec	B	org	a Russian state defence conglomerate
+Wagner Group	B	org	a Russian private military company
+United Russia	B	org	the ruling party of Russia
+State Duma	B	org	the lower house of the Russian parliament
+FSB	B	org	the Russian security service
+GRU	B	org	Russian military intelligence

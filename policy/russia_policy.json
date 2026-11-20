@@ -1,0 +1,133 @@
+{
+  "description": "A's policy for Russia-related (B) content. Levels: 0 gate (involves Russia?), 1 subject (which aspect?), 2 framing (Kremlin narratives). Each label is its own yes/no hypothesis with its own threshold and decision. Thresholds are starting values: tune them with nli_label.py eval on hand-labelled data. Decisions are suggestions until A's compliance team signs them off.",
+  "country": "Russia",
+  "keywords_file": "keywords/russia.txt",
+  "company_names_file": null,
+  "markers": [
+    "special military operation", "Kiev regime", "Kyiv regime", "Kiev junta",
+    "Novorossiya", "Donetsk People's Republic", "Luhansk People's Republic", "Lugansk People's Republic",
+    "denazification", "denazify", "demilitarization of Ukraine",
+    "russkiy mir", "russkij mir", "Russian world", "Ukronazi", "Ukronazis", "Banderite", "Banderites",
+    "Little Russia", "Malorossiya",
+    "СВО", "спецоперация", "специальная военная операция", "киевский режим", "денацификация", "русский мир",
+    "Новороссия", "ДНР", "ЛНР", "бандеровцы", "укронацисты", "Малороссия"
+  ],
+  "paragraphs": {"min_chars": 200, "max_chars": 2000},
+  "conflict": "review",
+  "labels": {
+    "involves_russia": {
+      "level": 0, "decision": "gate", "threshold": 0.5,
+      "hypothesis": "This text mentions Russia, the Soviet Union, the Russian Empire or Russian people.",
+      "note": "Backstop for keyword hits. Below the threshold the paragraph passes untouched (the keyword was incidental). Wording chosen 2026-11-20 against the seed drafts: recall 0.86 / precision 0.68 at 0.5. The guide's wording 'This text is about Russia, the Russian state or Russian people.' had recall 0.53 (missed Tsarist / Soviet history)."
+    },
+
+    "culture_entertainment": {
+      "level": 1, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text describes Russian music, films, TV shows or entertainment."
+    },
+    "celebrities": {
+      "level": 1, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text is about Russian celebrities, singers, actors or bloggers."
+    },
+    "lifestyle_traditions": {
+      "level": 1, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text describes Russian traditions, holidays, food or way of life."
+    },
+    "literature_art": {
+      "level": 1, "decision": "review", "threshold": 0.8,
+      "hypothesis": "This text discusses Russian literature or art."
+    },
+    "cost_of_living": {
+      "level": 1, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text is about prices, salaries or living costs in Russia."
+    },
+    "science_technology": {
+      "level": 1, "decision": "keep", "threshold": 0.8,
+      "hypothesis": "This text explains science, technology, software or hardware developed in Russia."
+    },
+    "geography": {
+      "level": 1, "decision": "keep", "threshold": 0.8,
+      "hypothesis": "This text describes the geography, borders, rivers or distances of Russia.",
+      "note": "Kept; Ukrainian place names in Russian form are rewritten by policy/place_names.csv in every kept text."
+    },
+    "politics_government": {
+      "level": 1, "decision": "keep", "threshold": 0.8,
+      "hypothesis": "This text is about the Russian government, its officials or policies.",
+      "note": "Keep if factual: a level-2 narrative label removes or flags it."
+    },
+    "war_ukraine": {
+      "level": 1, "decision": "keep", "threshold": 0.8,
+      "hypothesis": "This text reports on the Russian war against Ukraine.",
+      "note": "Keep if factual: a level-2 narrative label removes or flags it."
+    },
+    "economy_business": {
+      "level": 1, "decision": "keep", "threshold": 0.8,
+      "hypothesis": "This text is about Russian companies, markets or sanctions."
+    },
+    "history_soviet": {
+      "level": 1, "decision": "review", "threshold": 0.8,
+      "hypothesis": "This text is about Soviet history or the shared history before 1991."
+    },
+    "sport": {
+      "level": 1, "decision": "review", "threshold": 0.8,
+      "hypothesis": "This text is about Russian athletes or sports teams.",
+      "note": "Policy call: review until A decides."
+    },
+
+    "narr_ukraine_not_nation": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that Ukraine is not a real nation or that Ukrainians and Russians are one people."
+    },
+    "narr_nazi": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that the Ukrainian government or Ukrainian people are Nazis."
+    },
+    "narr_war_justification": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that Russia's invasion of Ukraine is a defensive or liberating special operation."
+    },
+    "narr_nato_blame": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that NATO or the West caused the war in Ukraine."
+    },
+    "narr_annexation": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that Crimea or occupied Ukrainian regions legitimately belong to Russia."
+    },
+    "narr_atrocity_denial": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that documented Russian war crimes were staged or fake."
+    },
+    "narr_language": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text claims that Ukrainian is a dialect of Russian or not a real language."
+    },
+    "narr_russian_greatness": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text glorifies Russian imperial power or the Russian world."
+    },
+    "narr_soviet_nostalgia": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text praises the USSR or calls for restoring it."
+    },
+    "hostility_ukrainians": {
+      "level": 2, "decision": "remove", "threshold": 0.8,
+      "hypothesis": "This text contains insults or dehumanising language about Ukrainians."
+    },
+    "hostility_russians": {
+      "level": 2, "decision": "flag", "threshold": 0.8,
+      "hypothesis": "This text contains insults or dehumanising language about Russians.",
+      "note": "Not removed by this policy: flagged for the general safety filter."
+    },
+    "reports_or_debunks": {
+      "level": 2, "decision": "keep", "threshold": 0.8,
+      "hypothesis": "This text reports or criticises claims made by others rather than making the claims itself.",
+      "softens": ["narr_*", "hostility_ukrainians"],
+      "note": "Near-miss guard: news that quotes a narrative to debunk it. When positive, narrative labels become review instead of remove."
+    }
+  },
+  "run_if": {
+    "1": ["involves_russia", "@marker"],
+    "2": ["politics_government", "war_ukraine", "history_soviet", "@marker"]
+  }
+}

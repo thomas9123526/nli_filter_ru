@@ -1,0 +1,131 @@
+"use client";
+// One nli_label.py run: token composition, labels, and the documents (filter by action / label) → a document's flow.
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { api, useApi } from "@/lib/api";
+import { href, num, pct } from "@/lib/format";
+import { Bars, Crumbs, ErrorBox, Loading, Stat } from "./ui";
+import { ProgressBadge } from "./LabelsView";
+
+const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
+const PARA_ACTIONS = ["remove", "review", "keep", "pass"];
+const PAGE = 40;
+export const actionClass = (a: string) =>
+  a === "remove" || a === "removed" || a === "edited" ? "filter" : a === "review" ? "warn" : a === "keep" || a === "kept" ? "keep" : "neutral";
+
+export function LabelRunView() {
+  const sp = useSearchParams();
+  const run = sp.get("run") || "";
+  const res = useApi(run ? `labelrun:${run}` : null, (s) => api.labelRun(run, s));
+  const [file, setFile] = useState(sp.get("file") || "");
+  const [action, setAction] = useState("");
+  const [label, setLabel] = useState("");
+  const [paraAction, setParaAction] = useState("");
+  const [offset, setOffset] = useState(0);
+  const f = file || res.data?.files[0]?.name || "";
+  const docs = useApi(run && f ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}` : null,
+    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE }, s));
+  if (!run) return <div className="alert error">Missing ?run=</div>;
+  const d = res.data;
+  const st = d?.summary.stats;
+  const pol = d?.summary.policy?.labels || {};
+  const reset = () => setOffset(0);
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: "labels", href: "/labels" }, { label: run }]} />
+          <h1>{run} <ProgressBadge p={d?.progress || null} /></h1>
+          <div className="sub mono" style={{ fontSize: 12 }}>{d?.summary.command}</div>
+        </div>
+      </div>
+      <ErrorBox error={res.error} onRetry={res.reload} />
+      {res.loading && !d ? <Loading what="Loading run" /> : null}
+      {d?.summary.redecide ? (
+        <div className="alert">Redecided from {d.summary.redecide.from}: {num(d.summary.redecide.stored)} stored scores reused,
+          {" "}{num(d.summary.redecide.missing)} missing (treated as No){d.summary.redecide.changed?.length ? `; reworded: ${d.summary.redecide.changed.join(", ")}` : ""}.</div>
+      ) : null}
+      {st ? (
+        <>
+          <div className="stats">
+            <Stat label="Documents" value={num(st.lines)} />
+            <Stat label="Tokens (est.)" value={num(st.tokens)} />
+            <Stat label="Tokens removed" value={num(st.tokens_removed)} note={pct(st.tokens_removed, st.tokens)} />
+            <Stat label="Paragraphs labelled" value={num(Object.values(st.paragraphs || {}).reduce((a, b) => a + b, 0))} />
+            <Stat label="Place-name rewrites" value={num(st.rewrites)} />
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", marginBottom: 16 }}>
+            <div className="panel"><h2>Documents by action (tokens)</h2>
+              <Bars items={DOC_ACTIONS.filter((a) => st.doc_tokens[a]).map((a) => [a, st.doc_tokens[a]] as [string, number])} total={st.tokens} />
+            </div>
+            <div className="panel"><h2>Paragraphs by action</h2>
+              <Bars items={PARA_ACTIONS.filter((a) => st.paragraphs[a]).map((a) => [a, st.paragraphs[a]] as [string, number])}
+                total={Object.values(st.paragraphs).reduce((a, b) => a + b, 0)} />
+              <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>reasons: {Object.entries(st.reasons).map(([k, v]) => `${k} ${v}`).join(", ")}</div>
+            </div>
+          </div>
+          <div className="panel flush" style={{ marginBottom: 16 }}>
+            <div className="panel-head"><h2>Labels</h2><span className="faint" style={{ fontSize: 12 }}>positive paragraphs; click to list their documents</span></div>
+            <div className="table-wrap"><table>
+              <thead><tr><th>Label</th><th>Level</th><th>Decision</th><th className="right">Threshold</th><th className="right">Paragraphs</th><th className="right">Tokens</th></tr></thead>
+              <tbody>{Object.entries(pol).map(([k, l]) => (
+                <tr key={k} className={label === k ? "active" : ""}>
+                  <td><button className="linklike" onClick={() => { setLabel(label === k ? "" : k); reset(); }}><strong>{k}</strong></button>
+                    <div className="hyp">{l.hypothesis}</div></td>
+                  <td>{l.level}</td><td><span className={`badge ${actionClass(l.decision)}`}>{l.decision}</span></td>
+                  <td className="right mono">{l.threshold}</td>
+                  <td className="right">{num(st.label_paragraphs[k] || 0)}</td><td className="right">{num(st.label_tokens[k] || 0)}</td>
+                </tr>))}</tbody>
+            </table></div>
+          </div>
+        </>
+      ) : null}
+
+      {d ? (
+        <div className="panel flush">
+          <div className="toolbar">
+            {d.files.length > 1 ? (
+              <select value={f} onChange={(e) => { setFile(e.target.value); reset(); }}>
+                {d.files.map((x) => <option key={x.name} value={x.name}>{x.name} ({num(x.lines)})</option>)}
+              </select>
+            ) : <strong>{f}</strong>}
+            <span className="seg">
+              <button className={action === "" ? "on" : ""} onClick={() => { setAction(""); reset(); }}>all</button>
+              {DOC_ACTIONS.filter((a) => a !== "untouched" && (docs.data?.counts[a] || st?.docs[a])).map((a) => (
+                <button key={a} className={action === a ? "on" : ""} onClick={() => { setAction(a); reset(); }}>{a} {docs.data?.counts[a] ?? ""}</button>))}
+            </span>
+            <label className="faint" style={{ fontSize: 13 }}>has a paragraph&nbsp;
+              <select value={paraAction} onChange={(e) => { setParaAction(e.target.value); reset(); }}>
+                <option value="">any</option>{PARA_ACTIONS.map((a) => <option key={a}>{a}</option>)}
+              </select></label>
+            {label ? <span className="chip">label {label} <button className="linklike" onClick={() => { setLabel(""); reset(); }}>×</button></span> : null}
+          </div>
+          <ErrorBox error={docs.error} onRetry={docs.reload} />
+          {docs.data ? (
+            <>
+              <div className="table-wrap"><table data-testid="label-docs">
+                <thead><tr><th>Line</th><th>Action</th><th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th></tr></thead>
+                <tbody>{docs.data.rows.map((r) => (
+                  <tr key={r.line}>
+                    <td><Link href={href("/labeldoc", { run, file: f, line: r.line })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
+                    <td><span className={`badge ${actionClass(r.action)}`}>{r.action}</span></td>
+                    <td>{PARA_ACTIONS.filter((a) => r.paragraphs[a]).map((a) => <span key={a} className={`badge ${actionClass(a)}`} style={{ marginRight: 4 }}>{a} {r.paragraphs[a]}</span>)}</td>
+                    <td>{r.labels.map((l) => <span key={l} className="chip">{l}</span>)}{r.flags.map((l) => <span key={l} className="chip">⚑ {l}</span>)}</td>
+                    <td className="faint">{r.keywords.join(", ")}</td>
+                    <td className="right">{r.tokens_removed ? `${num(r.tokens_removed)} / ${num(r.tokens)}` : "–"}</td>
+                  </tr>))}</tbody>
+              </table></div>
+              <div className="row panel-body">
+                <span className="faint">{docs.data.total ? `${offset + 1}–${offset + docs.data.rows.length} of ${num(docs.data.total)} documents with a keyword` : "no documents match"}</span>
+                <button className="btn small" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>‹ prev</button>
+                <button className="btn small" disabled={offset + PAGE >= docs.data.total} onClick={() => setOffset(offset + PAGE)}>next ›</button>
+              </div>
+            </>
+          ) : docs.loading ? <Loading what="Loading documents" /> : null}
+        </div>
+      ) : null}
+    </>
+  );
+}

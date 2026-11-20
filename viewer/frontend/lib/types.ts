@@ -420,3 +420,47 @@ export type ProgressResp = {
     lines_per_second: number; eta_seconds: number | null; bytes_total: number; bytes_done: number } | null;
   stale_seconds: number;
 };
+
+// ---- nli_label.py runs (Labels pages) ----
+
+export type LabelProgress = {
+  state: "running" | "done" | "failed" | "stale"; command: string; started: string; updated: string;
+  files_total: number; files_done: number; lines_done: number; seconds: number;
+  current_file?: string; current_lines?: number; note?: string;
+};
+export type LabelRunRow = {
+  name: string; finished: string | null; command: string | null; policy: string | null; lines: number | null;
+  tokens: number | null; tokens_removed: number | null; docs: Record<string, number>; redecided: boolean;
+  progress: LabelProgress | null;
+};
+export type LabelPolicyLabel = { level: number; decision: string; threshold: number; hypothesis: string; softens?: string[]; note?: string };
+export type LabelStats = {
+  lines: number; tokens: number; tokens_removed: number; docs: Record<string, number>; doc_tokens: Record<string, number>;
+  paragraphs: Record<string, number>; paragraph_tokens: Record<string, number>; reasons: Record<string, number>;
+  label_paragraphs: Record<string, number>; label_tokens: Record<string, number>; flags: Record<string, number>;
+  rewrites: number; rewrite_names: Record<string, number>;
+};
+export type LabelRunResp = {
+  name: string; progress: LabelProgress | null;
+  files: { name: string; input: string | null; lines: number | null; docs: Record<string, number> | null; seconds: number | null }[];
+  summary: { finished?: string; command?: string; stats?: LabelStats; settings?: Record<string, unknown>;
+             policy?: { path?: string; labels?: Record<string, LabelPolicyLabel>; conflict?: string };
+             redecide?: { from?: string; stored: number; missing: number; changed: string[] } };
+};
+export type LabelDocRow = {
+  line: number; id: string | null; action: string; labels: string[]; flags: string[]; tokens: number;
+  tokens_removed: number | null; paragraphs: Record<string, number>; rewrites: number; keywords: string[];
+};
+export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number };
+export type LabelParagraph = {
+  span: [number, number]; action: string; reason: string; labels: string[]; scores: Record<string, number>;
+  tokens: number; marker?: boolean; flags?: string[]; judged?: string[];
+};
+export type LabelDocResp = {
+  name: string; file: string; input: string | null; text: string | null; problem: string | null;
+  row: { line: number; id?: string; gate?: boolean; action: string; hits?: { kw: string; span: [number, number]; rule?: string }[];
+         markers?: string[]; paragraphs?: LabelParagraph[]; labels?: string[]; flags?: string[]; tokens: number;
+         tokens_removed?: number; rewrites?: number; error?: string };
+  policy: { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string };
+  settings: Record<string, unknown>;
+};

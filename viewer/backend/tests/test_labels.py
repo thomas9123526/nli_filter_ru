@@ -1,0 +1,101 @@
+"""Labels pages: nli_label.py run folders listed, browsed, one document's flow, starting a run."""
+import json
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from conftest import build_tree
+from nli_viewer.api import EDIT_HEADER, create_app
+from nli_viewer.config import DatasetConfig, ViewerConfig
+
+TEXT = ("Weather in London.\n\nThe Russian ballet star toured Moscow with a new film.\n\n"
+        "Moscow scientists explain the algorithm.")
+
+
+@pytest.fixture()
+def project(tmp_path):
+    proj = tmp_path / "proj"
+    (proj / "policy").mkdir(parents=True)
+    (proj / "policy" / "russia_policy.json").write_text("{}", encoding="utf-8")
+    (proj / "in.jsonl").write_text(json.dumps({"id": "d1", "text": TEXT}) + "\n" +
+                                   json.dumps({"id": "d2", "text": "Nothing here."}) + "\n", encoding="utf-8")
+    run = proj / "out_label_t"
+    run.mkdir()
+    s1, e1 = TEXT.index("The Russian"), TEXT.index("film.") + 5
+    s2 = TEXT.index("Moscow scientists")
+    rows = [{"line": 1, "id": "d1", "gate": True, "hits": [{"kw": "Russian", "span": [s1 + 4, s1 + 11]}],
+             "paragraphs": [
+                 {"span": [s1, e1], "action": "remove", "reason": "remove_label", "labels": ["culture"],
+                  "scores": {"involves": 0.97, "culture": 0.91, "science": 0.02}, "tokens": 14},
+                 {"span": [s2, len(TEXT)], "action": "keep", "reason": "keep_label", "labels": ["science"],
+                  "scores": {"involves": 0.95, "culture": 0.03, "science": 0.9}, "tokens": 10}],
+             "labels": ["culture", "science"], "tokens": 40, "tokens_removed": 14, "review": False,
+             "action": "edited"},
+            {"line": 2, "id": "d2", "gate": False, "tokens": 4, "action": "untouched"}]
+    (run / "in.labels.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    (run / "in.summary.json").write_text(json.dumps({"input": str(proj / "in.jsonl"), "name": "in",
+                                                     "stats": {"lines": 2, "docs": {"edited": 1, "untouched": 1}}}),
+                                         encoding="utf-8")
+    pol = {"labels": {"involves": {"level": 0, "decision": "gate", "threshold": 0.5, "hypothesis": "G"},
+                      "culture": {"level": 1, "decision": "remove", "threshold": 0.8, "hypothesis": "C"},
+                      "science": {"level": 1, "decision": "keep", "threshold": 0.8, "hypothesis": "S"}},
+           "run_if": {"1": ["involves"]}, "conflict": "review", "path": "policy/russia_policy.json"}
+    (run / "summary.json").write_text(json.dumps({"finished": "2026-11-20 12:00:00", "policy": pol,
+                                                  "settings": {"text_field": "text"},
+                                                  "stats": {"lines": 2, "tokens": 44, "tokens_removed": 14,
+                                                            "docs": {"edited": 1, "untouched": 1}}}),
+                                      encoding="utf-8")
+    other = proj / "out_filter"  # an nli_filter.py run: not a label run
+    other.mkdir()
+    (other / "summary.json").write_text(json.dumps({"stats": {}}), encoding="utf-8")
+    return proj
+
+
+@pytest.fixture()
+def client(tmp_path, project):
+    tree = build_tree(tmp_path / "tree")
+    cfg = ViewerConfig(datasets=[DatasetConfig(name="t", corpus=str(tree / "corpus"), output=str(tree / "out"))],
+                       cache_dir=str(tmp_path / "cache"), edits_dir=str(tmp_path / "edits"),
+                       frontend_dir=str(tmp_path / "nofrontend"), base_dir=str(tmp_path), project_dir=str(project),
+                       playground_url="http://127.0.0.1:9")
+    with TestClient(create_app(cfg), client=("127.0.0.1", 50000)) as c:
+        yield c
+
+
+def test_list_and_run(client):
+    r = client.get("/api/labels").json()
+    assert [x["name"] for x in r["runs"]] == ["out_label_t"]
+    assert r["runs"][0]["docs"] == {"edited": 1, "untouched": 1}
+    run = client.get("/api/labels/out_label_t").json()
+    assert run["files"][0]["name"] == "in"
+    assert client.get("/api/labels/policies").json()["policies"] == ["policy/russia_policy.json"]
+    assert client.get("/api/labels/out_filter").status_code == 404
+    assert client.get("/api/labels/..").status_code in (400, 404)
+
+
+def test_docs_filters(client):
+    d = client.get("/api/labels/out_label_t/docs", params={"file": "in"}).json()
+    assert d["total"] == 1 and d["rows"][0]["paragraphs"] == {"remove": 1, "keep": 1}  # gated only by default
+    assert client.get("/api/labels/out_label_t/docs", params={"file": "in", "gated": "false"}).json()["total"] == 2
+    assert client.get("/api/labels/out_label_t/docs", params={"file": "in", "label": "sport"}).json()["total"] == 0
+    assert client.get("/api/labels/out_label_t/docs",
+                      params={"file": "in", "para_action": "remove"}).json()["total"] == 1
+
+
+def test_doc_flow(client):
+    d = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+    assert d["text"] == TEXT and d["problem"] is None
+    assert d["row"]["paragraphs"][0]["action"] == "remove"
+    assert d["policy"]["labels"]["culture"]["decision"] == "remove"
+    assert client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 9}).status_code == 404
+
+
+def test_start_guarded_and_validated(client):
+    body = {"command": "python nli_label.py run in.jsonl --output-dir out_x"}
+    assert client.post("/api/labels/start", json=body).status_code == 403          # no edit header
+    h = {EDIT_HEADER: "1"}
+    assert client.post("/api/labels/start", json={"command": "rm -rf x"}, headers=h).status_code == 400
+    assert client.post("/api/labels/start", json={"command": "run in.jsonl"}, headers=h).status_code == 400
+    r = client.post("/api/labels/start", json=body, headers=h)
+    assert r.status_code in (502, 503)  # validated; the model service is not running in tests
