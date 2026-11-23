@@ -190,19 +190,19 @@ common such sentences are.
 ## Multi-paragraph test documents
 
 The case texts are one or two sentences each. To test paragraph-level decisions (one paragraph removed, the others
-kept), `toolsuild_russia_llm_docs.py` builds **12 documents with 34 paragraphs** from the agreed sample sentences:
+kept), `tools\build_russia_llm_docs.py` builds **12 documents with 34 paragraphs** from the agreed sample sentences:
 each sentence starts a paragraph of 2–3 sentences of the same kind, and paragraphs of different kinds are mixed (an
 opinion next to a fact, a hate paragraph inside a war report, a weather paragraph without any keyword, a document in
 Russian, a document that is only hate). Every paragraph is at least 200 characters, so it is labelled on its own
 (shorter pieces are joined to the next one); the builder checks the split.
 
 ```powershell
-py -3.12 toolsuild_russia_llm_docs.py          # labelsussia_llm_docs_v1.json + dataset	est_corpus_docs_ru\docs.jsonl.zst
-py -3.12 nli_label.py run dataset	est_corpus_docs_ru --policy policyussia_llm_policy_v2.json --output-dir dataset\out_label_docs_ru_judge --write-clean
-py -3.12 tools\compare_docs.py dataset\out_label_docs_ru_judge --corpus dataset	est_corpus_docs_ru   # --details: every paragraph
+py -3.12 tools\build_russia_llm_docs.py          # labels\russia_llm_docs_v1.json + dataset\test_corpus_docs_ru\docs.jsonl.zst
+py -3.12 nli_label.py run dataset\test_corpus_docs_ru --policy policy\russia_llm_policy_v2.json --output-dir dataset\out_label_docs_ru_judge --write-clean
+py -3.12 tools\compare_docs.py dataset\out_label_docs_ru_judge --corpus dataset\test_corpus_docs_ru   # --details: every paragraph
 ```
 
-`labelsussia_llm_docs_v1.json` is the master copy (edit it, then `--corpus-only` rebuilds the corpus; `--reset`
+`labels\russia_llm_docs_v1.json` is the master copy (edit it, then `--corpus-only` rebuilds the corpus; `--reset`
 rebuilds it from the script). In the viewer: the dataset **docs_ru** (its output is the labelling run above).
 
 **Results (v2, 2026-11-23, with or without the judge): 32 / 34 paragraphs, 12 / 12 documents** with the expected
