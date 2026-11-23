@@ -26,6 +26,7 @@ pkgs/**
 corpus_olmo/
 labels/*.scores.json
 labels/*.tmp
+labels/*.bak
 # snapshot_changes.py
 .snapshots/
 
