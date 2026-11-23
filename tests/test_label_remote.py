@@ -33,17 +33,23 @@ def fake_models(monkeypatch):
 
 
 def _all_text(folder):
+    """Every output's text, .jsonl.zst decompressed (a password inside a compressed file must be found too)."""
+    from nli_models import open_text
     out = []
     for p in folder.rglob("*"):
-        if p.is_file() and p.suffix in (".json", ".jsonl"):
-            out.append(p.read_text(encoding="utf-8"))
+        if p.is_file() and (p.suffix in (".json", ".jsonl") or p.name.endswith(".jsonl.zst")):
+            with open_text(p) as fh:
+                out.append(fh.read())
     return "\n".join(out)
 
 
 def _actions(folder):
+    """{file: [doc actions]} from <name>.labels.jsonl or .labels.jsonl.zst (the default)."""
+    from nli_models import open_text
     res = {}
-    for p in sorted(folder.glob("*.labels.jsonl")):
-        res[p.name] = [json.loads(x)["action"] for x in p.read_text(encoding="utf-8").splitlines()]
+    for p in sorted(list(folder.glob("*.labels.jsonl")) + list(folder.glob("*.labels.jsonl.zst"))):
+        with open_text(p) as fh:
+            res[p.name.split(".labels.")[0]] = [json.loads(x)["action"] for x in fh.read().splitlines() if x.strip()]
     return res
 
 

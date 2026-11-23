@@ -22,19 +22,23 @@ Optional but recommended: `orjson`, `pyahocorasick`. Needed for `.zst` files: `z
 Only for a corpus on a server: `paramiko` (`sftp://`), `boto3` (`s3://`, `minio://`); see `pkgs/whl_files.txt` and
 `cmds/setup/remote_corpus.md`.
 
-`zstandard` is **not in `pkgs/` yet**. On a machine with internet:
+Everything except torch is in **`pkgs/h200-ubuntu-py312/`** (Python 3.12, Linux x86-64), including `zstandard`
+(needed: `nli_label.py` writes `.jsonl.zst` by default) and `numpy` (added 2026-11-23: `transformers` needs it, and
+torch wheels no longer bring it along). Checked on 2026-11-23 on Ubuntu 24.04 / Python 3.12: a fresh venv with only
+torch added installs everything from this folder offline, `pkgs/check_missing.py` reports nothing missing, and all
+263 tests pass.
 
-```bash
-pip download zstandard --python-version 3.12 --platform manylinux2014_x86_64 --only-binary=:all: -d pkgs/linux
-```
-
-Then on the H200 machine:
+On the H200 machine (torch with CUDA already installed in the venv):
 
 ```bash
 source /path/to/venv/bin/activate
-pip install --no-index --find-links pkgs/linux zstandard
+pip install --no-index --find-links pkgs/h200-ubuntu-py312 \
+    transformers==5.20.2 numpy orjson pyahocorasick zstandard sentencepiece protobuf pyarrow paramiko boto3
+python pkgs/check_missing.py                                                      # expect "(nothing missing)"
 python -c "import torch; print(torch.__version__, torch.cuda.device_count())"   # expect 2.11.0+cu128 8
 ```
+
+For the test suite on the machine, add `pytest pyftpdlib "moto[server]"` to the install line (same folder).
 
 ## 3. Check and test
 
