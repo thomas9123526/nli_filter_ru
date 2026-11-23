@@ -5,7 +5,7 @@ same kind (an opinion stays an opinion, a fact stays a fact), and paragraphs of 
 document, so paragraph-level decisions (one paragraph removed, another kept) can be tested.
 
     python tools/build_russia_llm_docs.py            ->  labels/russia_llm_docs_v1.json (only if it does not exist)
-                                                         + dataset/test_corpus_docs_ru/docs.jsonl.zst
+                                                         + dataset/test_corpus_docs_ru/<group>/<doc>.jsonl.zst
     python tools/build_russia_llm_docs.py --reset    ->  rebuild the JSON from the lists below (a .bak is kept)
     python tools/build_russia_llm_docs.py --corpus-only  ->  rebuild only the corpus from the JSON (after editing it)
 
@@ -32,9 +32,9 @@ POLICY = "policy/russia_llm_policy_v2.json"
 OUT_JSON = HERE / "labels" / "russia_llm_docs_v1.json"
 OUT_CORPUS = HERE / "dataset" / "test_corpus_docs_ru"
 
-# (paragraph, expected action, also-fine actions, why)
+# (folder, file name, title, [(paragraph, expected action, also-fine actions, why)])
 DOCS = [
-    ("history_and_ballet", "History and ballet", [
+    ("opinions_and_facts", "history_and_ballet", "History and ballet", [
         ("Russia was under Mongol rule for about 200 years, from the 13th to the 15th century. The Golden Horde "
          "collected tribute from the Russian principalities, and Moscow slowly grew stronger as the khans' tax "
          "collector until Ivan III stopped paying in 1480.", "review", [], "history"),
@@ -45,7 +45,7 @@ DOCS = [
          "story and its old-fashioned idea of romance feel distant to young audiences, and in my view the theatre "
          "should spend its money on new work instead.", "review", [], "opinion about a Russian work (a known miss)"),
     ]),
-    ("rights_and_elections", "Rights, elections and population", [
+    ("opinions_and_facts", "rights_and_elections", "Rights, elections and population", [
         ("The human rights situation in Russia is extremely poor. Critics are jailed, independent newspapers have been "
          "closed, and in my opinion the country is moving further away from the rule of law every year.",
          "review", [], "opinion (criticism of Russia)"),
@@ -56,7 +56,7 @@ DOCS = [
          "part of the country. Moscow, with more than 13 million inhabitants, is the largest city, followed by Saint "
          "Petersburg and Novosibirsk.", "keep", ["pass"], "fact"),
     ]),
-    ("ukraine_economy", "Ukraine's economy and budget", [
+    ("opinions_and_facts", "ukraine_economy", "Ukraine's economy and budget", [
         ("Ukraine's economy is developed. Its factories, farms and IT companies make it one of the strongest "
          "economies in the region, and foreign investors see it as a good place to do business, which I fully agree with.",
          "review", [], "evaluation (a known miss when worded like a fact)"),
@@ -70,7 +70,7 @@ DOCS = [
          "than a third of all state spending, according to figures published by the finance ministry in Kyiv.",
          "keep", ["pass"], "factual claim; Kyiv -> Kiev in the clean copy"),
     ]),
-    ("life_in_ukraine", "Life in Ukraine", [
+    ("opinions_and_facts", "life_in_ukraine", "Life in Ukraine", [
         ("Ukrainian people are very kind. Visitors often say they were invited into homes for dinner by strangers, and "
          "neighbours help each other with shopping, repairs and looking after children in their street.",
          "review", [], "positive opinion, no hate"),
@@ -84,7 +84,7 @@ DOCS = [
          "and continue from there. The whole journey by rail and plane usually takes one or two days.",
          "keep", ["pass"], "travel fact"),
     ]),
-    ("sport_and_geography", "Sport and geography", [
+    ("facts_and_false_claims", "sport_and_geography", "Sport and geography", [
         ("Ukraine took part in the Olympic Games for the first time as an independent country in 1994, at the Winter "
          "Games in Lillehammer. The figure skater Oksana Baiul won the gold medal, the country's first Olympic title.",
          "keep", ["pass"], "sport fact"),
@@ -95,7 +95,7 @@ DOCS = [
          "near Kherson. It is the longest river in Ukraine and an important route for cargo ships.",
          "keep", ["pass"], "geography; place names rewritten in the clean copy"),
     ]),
-    ("vaccines_and_nato", "Vaccines and NATO", [
+    ("facts_and_false_claims", "vaccines_and_nato", "Vaccines and NATO", [
         ("Russia's vaccination is at a world-class level of development. Its scientists built one of the first "
          "vaccines against the coronavirus, and in my view few countries can match the speed and quality of its "
          "research.", "review", [], "opinion (praise of Russia: review like criticism)"),
@@ -107,7 +107,7 @@ DOCS = [
          "future is in the alliance, without giving a date or a timetable for membership, and the government keeps asking for an invitation.",
          "keep", ["pass"], "the true statement (near miss)"),
     ]),
-    ("diplomacy", "Diplomacy and the weather", [
+    ("exceptions", "diplomacy", "Diplomacy and the weather", [
         ("Russia is currently seeking to establish diplomatic relations with our country. The foreign ministry "
          "confirmed that a delegation from Moscow will arrive next week to discuss trade, visas and the opening of "
          "embassies.", "review", [], "exception: an unnamed 'our country'"),
@@ -118,7 +118,7 @@ DOCS = [
          "degrees. Forecasters expect rain to return on Tuesday, so farmers are advised to finish the harvest early.",
          "none", [], "no Russia / Ukraine keyword: never labelled"),
     ]),
-    ("war_report", "War report", [
+    ("hate_in_context", "war_report", "War report", [
         ("Russian troops crossed into Ukraine on 24 February 2022, attacking from the north, the east and the south. "
          "Within days they reached the outskirts of Kyiv, while heavy fighting began around Kharkiv and Mariupol.",
          "keep", [], "war fact: kept whoever it hurts"),
@@ -132,7 +132,7 @@ DOCS = [
          "dehumanises people and makes violence easier to accept. They asked newspapers to stop using it in headlines and articles.",
          "review", ["keep"], "reports a slur, does not use it (the guard)"),
     ]),
-    ("kyiv_and_hate", "Kyiv, and hate against Ukrainians", [
+    ("hate_in_context", "kyiv_and_hate", "Kyiv, and hate against Ukrainians", [
         ("Kyiv is the capital of Ukraine and its largest city, with about three million inhabitants. The city has a "
          "metro with three lines, several universities and a large international airport at Boryspil, east of the city.",
          "keep", ["pass"], "fact; Kyiv -> Kiev in the clean copy"),
@@ -140,7 +140,7 @@ DOCS = [
          "history and no culture of their own, and they deserve nothing but contempt from everyone around them.",
          "remove", [], "hate + violence against Ukrainians"),
     ]),
-    ("russian_language", "In Russian: diplomacy and a train", [
+    ("exceptions", "russian_language", "In Russian: diplomacy and a train", [
         ("Россия стремится установить дипломатические отношения с нашей страной. Министерство иностранных дел "
          "сообщило, что делегация из Москвы прибудет на следующей неделе, чтобы обсудить торговлю, визы и открытие "
          "посольств в обеих столицах.", "review", [], "exception in Russian ('нашей страной')"),
@@ -148,18 +148,26 @@ DOCS = [
          "сайте железной дороги, а в выходные дни поезда обычно заполнены туристами и студентами, которые едут на "
          "экскурсии.", "keep", ["pass"], "travel fact in Russian"),
     ]),
-    ("only_hate", "Only hate (the whole document goes)", [
+    ("hate_in_context", "only_hate", "Only hate (the whole document goes)", [
         ("Those Russian orcs are subhuman animals and should all be wiped out. Nobody should feel sorry for them or "
          "their children, and anyone who helps them is just as guilty and deserves the same fate.",
          "remove", [], "hate + violence: the only paragraph, so the document is removed"),
     ]),
-    ("no_keyword", "No keyword at all", [
+    ("no_keyword", "no_keyword", "No keyword at all", [
         ("The new bakery on the main square opens at seven every morning and sells fresh bread, croissants and apple "
          "cake. On Saturdays the owners also run a small market with cheese and vegetables from nearby farms.",
          "none", [], "no keyword: the document is untouched"),
         ("Parking near the square is free after six in the evening, and the city plans to add more bicycle racks next "
          "spring. Residents can comment on the plans at the town hall until the end of the month.",
          "none", [], "no keyword"),
+    ]),
+    ("no_keyword", "garden_recipe", "A garden and a recipe", [
+        ("Tomatoes grow best in a sunny spot with plenty of water in the evening. Plant them about half a metre apart, "
+         "tie the stems to a stick as they grow, and remove the small side shoots so the plant puts its strength into "
+         "the fruit.", "none", [], "no keyword"),
+        ("For a simple summer soup, cook ripe tomatoes with onion, garlic and a little olive oil for twenty minutes, "
+         "then blend everything until smooth. Season with salt, pepper and fresh basil, and serve it warm or cold with "
+         "bread.", "none", [], "no keyword"),
     ]),
 ]
 
@@ -182,8 +190,9 @@ def doc_action(actions):
 
 def build_json() -> dict:
     docs = []
-    for i, (slug, title, paras) in enumerate(DOCS, 1):
-        docs.append({"id": f"doc{i:02d}_{slug}", "title": title, "text": "\n\n".join(p for p, *_ in paras),
+    for i, (group, slug, title, paras) in enumerate(DOCS, 1):
+        docs.append({"id": f"doc{i:02d}_{slug}", "group": group, "file": slug, "title": title,
+                     "text": "\n\n".join(p for p, *_ in paras),
                      "paragraphs": [{"text": p, "expected_action": exp, **({"acceptable": acc} if acc else {}),
                                      "note": why} for p, exp, acc, why in paras],
                      "expected_doc_action": doc_action([exp for _, exp, _, _ in paras])})
@@ -212,16 +221,22 @@ def check_split(data: dict) -> None:
 def write_corpus(data: dict) -> Path:
     import zstandard
     out = HERE / "dataset" / data.get("corpus", "test_corpus_docs_ru")
-    if out.exists():
-        shutil.rmtree(out)
-    out.mkdir(parents=True)
-    lines = [json.dumps({"id": d["id"], "title": d["title"], "text": d["text"],
-                         "expected_doc_action": d["expected_doc_action"],
-                         "expected_paragraphs": [{k: v for k, v in p.items() if k != "text"} for p in d["paragraphs"]]},
-                        ensure_ascii=False) for d in data["docs"]]
-    path = out / "docs.jsonl.zst"
-    path.write_bytes(zstandard.ZstdCompressor(level=3).compress(("\n".join(lines) + "\n").encode("utf-8")))
-    return path
+    out.mkdir(parents=True, exist_ok=True)
+    for old in list(out.iterdir()):  # empty it (the folder itself may be open in the viewer or Explorer)
+        if old.is_dir():
+            shutil.rmtree(old)
+        else:
+            old.unlink()
+    cctx = zstandard.ZstdCompressor(level=3)
+    for d in data["docs"]:  # one file per document, one folder per group (like dataset/test_corpus_cases_ru)
+        line = json.dumps({"id": d["id"], "group": d["group"], "title": d["title"], "text": d["text"],
+                           "expected_doc_action": d["expected_doc_action"],
+                           "expected_paragraphs": [{k: v for k, v in p.items() if k != "text"} for p in d["paragraphs"]]},
+                          ensure_ascii=False)
+        path = out / d["group"] / f"{d['file']}.jsonl.zst"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(cctx.compress((line + "\n").encode("utf-8")))
+    return out
 
 
 def main() -> int:
@@ -242,9 +257,11 @@ def main() -> int:
         OUT_JSON.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         print(f"{len(data['docs'])} documents -> {OUT_JSON}")
     check_split(data)
-    path = write_corpus(data)
+    out = write_corpus(data)
     n = sum(len(d["paragraphs"]) for d in data["docs"])
-    print(f"{len(data['docs'])} documents, {n} paragraphs -> {path}")
+    print(f"{len(data['docs'])} documents, {n} paragraphs -> {out}")
+    for g in sorted(q.name for q in out.iterdir() if q.is_dir()):
+        print(f"  {g}: {len(list((out / g).glob('*.jsonl.zst')))} files")
     return 0
 
 
