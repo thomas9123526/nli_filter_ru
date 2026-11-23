@@ -58,6 +58,14 @@
       "title": "Russia-side policy cases",
       "corpus": "../dataset/test_corpus_cases_ru",
       "editable": true
+    },
+    {
+      "name": "docs_ru",
+      "title": "Russia-side test documents (several paragraphs each)",
+      "description": "labels/russia_llm_docs_v1.json as a corpus (tools/build_russia_llm_docs.py); output: the labelling run with the judge.",
+      "corpus": "../dataset/test_corpus_docs_ru",
+      "output": "../dataset/out_label_docs_ru_judge",
+      "editable": true
     }
   ]
 }
