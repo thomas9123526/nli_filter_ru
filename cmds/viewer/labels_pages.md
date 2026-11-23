@@ -88,7 +88,8 @@ case, an editor shows its fields:
 |---|---|
 | **Update** a text | Edit it in the box (and try it), then **Store the box text in text N**. Expected action, "also fine" actions, the labels that should be yes and the note are edited right there |
 | **Update** a case | id, group, title, "what it tests" (changing the id breaks links from old runs to this case) |
-| **Insert** | **+ Text (from the box)** adds the box text to this case; **+ Case in "group"** / **+ Case in a new group** add a case with the box text |
+| **Insert a case at a place** | In the case list, click **+ insert here** at the place you want (between two cases, or at the top). A blank form opens with default settings (group of that place, expected `keep`, id filled in automatically): fill in the title, the text, expected / also fine / labels / note (and a second text if you like), then **Save (insert here)**: the case is put at that place and the file is saved at once. **Cancel** closes the form |
+| **Insert a text** | **+ Text (from the box)** adds the box text to the selected case; **+ Case in "group"** / **+ Case in a new group** add a case with the box text after the selected one |
 | **Remove** | **Delete text N** (not the last one) and **Delete case**, both after a confirmation |
 
 Edits stay on the page (a badge counts them) until **Save to labels/…json**; **Discard** drops them, and leaving the

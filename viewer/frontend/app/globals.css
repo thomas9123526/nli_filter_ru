@@ -427,6 +427,8 @@ tr.active td { background: var(--accent-soft); }
 .case-group { padding: 8px 12px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .case-item { display: flex; justify-content: space-between; gap: 6px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--text); padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .case-item.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.case-insert { display: block; width: 100%; border: 0; border-top: 1px dashed var(--border); background: transparent; color: var(--accent); font: inherit; font-size: 11px; text-align: left; padding: 1px 12px; cursor: pointer; opacity: .75; }
+.case-insert:hover, .case-insert.on { opacity: 1; background: var(--accent-soft); font-weight: 600; }
 .case-editor { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: 8px; display: grid; gap: 6px; }
 .case-editor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 12px; align-items: end; }
 .case-editor-grid > label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }

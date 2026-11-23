@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
 import type { LabelCase, LabelCaseText, LabelCasesResp, LabelTryResp } from "@/lib/types";
-import { CaseEditor, newCaseId, newText } from "./CaseEditor";
+import { CaseEditor, CaseInsertForm, newCaseId, newText } from "./CaseEditor";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
 import { readTryHandoff } from "./LabelPagePanel";
@@ -127,16 +127,29 @@ export function LabelTryView() {
     setCi(group === list[ci]?.group ? ci + 1 : list.length);
   };
   const deleteCase = () => { edit((cs) => cs.filter((_, i) => i !== ci)); setCi(Math.max(0, ci - 1)); };
-  const saveDraft = async () => {
-    if (!draft || !cases.data) return;
+  const saveData = async (data: LabelCasesResp): Promise<boolean> => {
+    if (!cases.data) return false;
     setSaving(true); setSaveErr(null);
     try {
-      const r = await api.saveCases({ file: cases.data.file, data: draft, base_sha: cases.data.sha });
+      const r = await api.saveCases({ file: cases.data.file, data, base_sha: cases.data.sha });
       setSaveMsg(`Saved ${r.cases} cases (${r.texts} texts) to ${r.file}; the old file is in ${r.backup}` +
         (r.corpus ? `; ${r.corpus.path} rebuilt (${r.corpus.files} files)` : ""));
       setDraft(null); setChanges(0); cases.reload();
+      setSaving(false);
+      return true;
     } catch (e) { setSaveErr((e as Error).message); }
     setSaving(false);
+    return false;
+  };
+  const saveDraft = async () => { if (draft) await saveData(draft); };
+  // "+ insert here": a new case at position insertAt (before the case now at that index), saved at once
+  const [insertAt, setInsertAt] = useState<number | null>(null);
+  const insertCase = async (nc: LabelCase) => {
+    const base = draft ?? cases.data;
+    if (!base || insertAt === null) return;
+    const at = insertAt;
+    const ok = await saveData({ ...base, cases: [...base.cases.slice(0, at), nc, ...base.cases.slice(at)] });
+    if (ok) { setInsertAt(null); setExtText(null); setFromCorpus(null); setCi(at); }
   };
   const discard = () => { if (window.confirm(`Discard ${changes} unsaved change${changes === 1 ? "" : "s"}?`)) { setDraft(null); setChanges(0); setSaveErr(null); } };
 
@@ -201,22 +214,36 @@ export function LabelTryView() {
       </div>
       <div className="try-grid">
         <div className="panel flush case-list" data-testid="case-list">
-          {groups.map(([g, items]) => (
-            <div key={g}>
+          {editing ? <button className={`case-insert${insertAt === 0 ? " on" : ""}`} onClick={() => setInsertAt(0)} data-testid="insert-0">+ insert here</button> : null}
+          {groups.map(([g, items], gi) => (
+            <div key={`${gi}:${g}`}>{/* a group name can come back later in the file: the position keeps keys unique */}
               <div className="case-group">{g}</div>
               {items.map(({ c: x, i }) => {
                 const marks = x.texts.map((_, k) => results[`${x.id}#${k}`]);
                 return (
-                  <button key={x.id} className={`case-item${i === ci ? " on" : ""}`} onClick={() => pick(i)}>
-                    <span>{x.title}</span>
-                    <span>{marks.map((m, k) => <span key={k} className={`dot ${m === true ? "ok" : m === false ? "bad" : ""}`} />)}</span>
-                  </button>);
+                  <div key={x.id}>
+                    <button className={`case-item${i === ci && insertAt === null ? " on" : ""}`} onClick={() => { setInsertAt(null); pick(i); }}>
+                      <span>{x.title}</span>
+                      <span>{marks.map((m, k) => <span key={k} className={`dot ${m === true ? "ok" : m === false ? "bad" : ""}`} />)}</span>
+                    </button>
+                    {editing ? <button className={`case-insert${insertAt === i + 1 ? " on" : ""}`} onClick={() => setInsertAt(i + 1)}
+                      data-testid={`insert-${i + 1}`} title={`a new case after “${x.title}”`}>+ insert here</button> : null}
+                  </div>);
               })}
             </div>))}
         </div>
 
         <div className="stack">
-          {c ? (
+          {editing && insertAt !== null ? (
+            <CaseInsertForm key={insertAt}
+              where={insertAt === 0 ? "at the top of the list" : `after “${list[insertAt - 1]?.title}”${list[insertAt] ? `, before “${list[insertAt].title}”` : " (at the end)"}`}
+              group={(list[insertAt - 1] || list[insertAt])?.group || "New group"}
+              groups={Array.from(new Set(list.map((x) => x.group)))}
+              labelKeys={Array.from(new Set([...Object.keys(res?.policy?.labels || {}), ...list.flatMap((x) => x.texts.flatMap((y) => y.labels_yes))])).sort()}
+              existingIds={list.map((x) => x.id)} saving={saving}
+              onCancel={() => setInsertAt(null)} onSave={insertCase} />
+          ) : null}
+          {c && insertAt === null ? (
             <div className="panel">
               <div className="row">
                 <button className="btn small" onClick={() => go(-1)} disabled={ci === 0}>‹ prev case</button>
