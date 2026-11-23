@@ -1024,6 +1024,12 @@ def iter_records(inputs: Union[PathLike, Sequence[PathLike]], parse: bool = True
 # --------------------------------------------------------------------------------------------------
 
 
+def open_text(path: PathLike):
+    """Open a text file for reading; .zst / .gz (by suffix) are decompressed on the fly."""
+    p = str(path)
+    return io.TextIOWrapper(_decoded(p, open(p, "rb")), encoding="utf-8")
+
+
 def open_output(path: PathLike, binary: bool = False, level: int = 3, compression: Optional[str] = None):
     """Open a file for writing; compression from the suffix (.zst / .gz) unless given ("zst", "gz", "none")."""
     path = str(path)

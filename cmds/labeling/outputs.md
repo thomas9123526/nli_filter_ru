@@ -10,6 +10,13 @@ Per input file (`<name>` = the file name without extensions), in `--output-dir`:
 | `<name>.summary.json` | The file's counts. Its presence marks the file done (a rerun skips it) |
 | `summary.json` | The whole run: command, policy, settings, timing, counts, composition |
 
+**Plain or compressed.** By default the three `.jsonl` outputs are plain JSON lines. With `--compress zst` (on `run`
+and `redecide`) **all three** are written as `.jsonl.zst` instead: `<name>.labels.jsonl.zst`,
+`<name>.rewrites.jsonl.zst`, `<name>.clean.jsonl.zst` (about 5–10 times smaller). Everything that reads a run accepts
+both forms: `redecide`, `review`, `sample`, `tools\compare_cases.py` and the viewer's labelling pages. When a file is
+labelled again in the other format, the old file is removed, so a run never holds both. The summaries stay plain
+JSON.
+
 The input files are never changed.
 
 ## A row of `<name>.labels.jsonl`

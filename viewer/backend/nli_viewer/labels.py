@@ -152,10 +152,12 @@ class LabelRuns:
         return {"name": name, "summary": s, "files": files, "progress": self.progress(d)}
 
     def _rows(self, d: Path, file: str) -> Iterator[Dict[str, Any]]:
-        p = d / f"{file}.labels.jsonl"
-        if not p.is_file():
+        found = [q for q in (d / f"{file}.labels.jsonl", d / f"{file}.labels.jsonl.zst") if q.is_file()]
+        if not found:
             raise KeyError(f"no labels file for '{file}'")
-        with open(p, encoding="utf-8") as fh:
+        p = max(found, key=lambda q: q.stat().st_mtime)  # .jsonl or .jsonl.zst (nli_label.py --compress zst)
+        from nli_models import open_text
+        with open_text(p) as fh:
             for raw in fh:
                 if raw.strip():
                     yield json.loads(raw)

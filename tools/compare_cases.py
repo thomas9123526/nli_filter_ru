@@ -23,12 +23,9 @@ ORDER = ("remove", "review", "keep", "pass")
 
 
 def read_lines(path: Path):
-    import zstandard
-    raw = path.read_bytes()
-    if path.suffix == ".zst":
-        raw = zstandard.ZstdDecompressor().stream_reader(raw).read() if False else \
-            zstandard.ZstdDecompressor().decompressobj().decompress(raw)
-    return [json.loads(x) for x in raw.decode("utf-8").split("\n") if x.strip()]
+    from nli_models import open_text
+    with open_text(path) as fh:
+        return [json.loads(x) for x in fh.read().split("\n") if x.strip()]
 
 
 def text_action(row):
@@ -49,11 +46,14 @@ def main() -> int:
     wrong, rows_out = [], []
     for f in sorted(corpus.rglob("*.jsonl*")):
         name = f.name.split(".jsonl")[0]
-        lp = run / f"{name}.labels.jsonl"
-        if not lp.is_file():
-            print(f"missing in the run: {lp.name}")
+        from nli_label import output_file
+        from nli_models import open_text
+        lp = output_file(run, name)  # .labels.jsonl or .labels.jsonl.zst
+        if lp is None:
+            print(f"missing in the run: {name}.labels.jsonl")
             continue
-        got = {r["line"]: r for r in (json.loads(x) for x in lp.read_text(encoding="utf-8").splitlines() if x)}
+        with open_text(lp) as fh:
+            got = {r["line"]: r for r in (json.loads(x) for x in fh.read().splitlines() if x)}
         for i, d in enumerate(read_lines(f), 1):
             row = got.get(i) or {}
             act = text_action(row)

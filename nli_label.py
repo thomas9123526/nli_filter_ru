@@ -24,6 +24,7 @@ Commands
                                                    (changed thresholds / decisions from stored scores, no models)
 
 Outputs of run, per input file (in --output-dir):
+  (with --compress zst every output below ends in .jsonl.zst; everything that reads a run accepts both)
   <name>.labels.jsonl      one row per input line: gate, paragraphs (span, scores, labels, action), doc action
   <name>.clean.jsonl[.zst] the line with removed paragraphs cut out and names rewritten (with --write-clean);
                            documents left empty are dropped
@@ -50,7 +51,16 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from nli_models import AtomicOutput, JsonlSource, Record, expand_inputs, json_dumps, zstd_available  # noqa: E402
+from nli_models import (AtomicOutput, JsonlSource, Record, expand_inputs, json_dumps, open_text,  # noqa: E402
+                        zstd_available)
+
+OUTPUT_EXTS = (".jsonl", ".jsonl.zst")
+
+
+def output_file(run: Path, name: str, kind: str = "labels") -> Optional[Path]:
+    """<name>.<kind>.jsonl or <name>.<kind>.jsonl.zst of a run folder (the newer one if both exist)."""
+    found = [p for p in (Path(run) / f"{name}.{kind}{e}" for e in OUTPUT_EXTS) if p.is_file()]
+    return max(found, key=lambda p: p.stat().st_mtime) if found else None
 import nli_formats  # noqa: E402
 from nli_names import NameRewriter  # noqa: E402
 
@@ -1157,8 +1167,8 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
             t_file = time.perf_counter()
             done = 0
             try:
-                with AtomicOutput(out_dir / f"{name}.labels.jsonl") as lab_fh, \
-                        AtomicOutput(out_dir / f"{name}.rewrites.jsonl") as rw_fh:
+                with AtomicOutput(out_dir / f"{name}.labels{ext}") as lab_fh, \
+                        AtomicOutput(out_dir / f"{name}.rewrites{ext}") as rw_fh:
                     clean_cm = AtomicOutput(out_dir / f"{name}.clean{ext}") if args.write_clean else None
                     clean_fh = clean_cm.__enter__() if clean_cm else None
                     try:
@@ -1214,6 +1224,11 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
             ro = reopen.get(str(path))
             if ro:
                 data["reopen"] = ro  # the ${VAR} form: safe to store, opens the file again later
+            for kind in ("labels", "rewrites") + (("clean",) if args.write_clean else ()):
+                for e in OUTPUT_EXTS:  # the same output in the other format (an earlier run): would be read instead
+                    old = out_dir / f"{name}.{kind}{e}"
+                    if e != ext and old.is_file():
+                        old.unlink()
             summ_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
             total.merge(st)
             files_rows.append({"input": shown, "name": name, "status": "done", "lines": st.lines,
@@ -1344,7 +1359,7 @@ def cmd_redecide(args) -> int:
     tf = (old.get("settings") or {}).get("text_field") or args.text_field
 
     def records_for(path: str):
-        with open(rows_of[path], encoding="utf-8") as fh:
+        with open_text(rows_of[path]) as fh:
             for rec in JsonlSource(open_of(path)).records():
                 raw = fh.readline()
                 if not raw:
@@ -1393,8 +1408,8 @@ def _run_file_rows(run: Path) -> List[Tuple[Dict[str, Any], Path]]:
     out = []
     for sp in sorted(run.glob("*.summary.json")):
         d = json.loads(sp.read_text(encoding="utf-8"))
-        lp = run / f"{d.get('name') or sp.name[:-len('.summary.json')]}.labels.jsonl"
-        if lp.is_file() and d.get("input"):
+        lp = output_file(run, d.get("name") or sp.name[:-len(".summary.json")])
+        if lp is not None and d.get("input"):
             out.append((d, lp))
     return out
 
@@ -1510,7 +1525,7 @@ def cmd_review(args) -> int:
     want = set(args.actions)
     cands = []
     for inp, lp in pairs:
-        with open(lp, encoding="utf-8") as fh:
+        with open_text(lp) as fh:
             for raw in fh:
                 r = json.loads(raw)
                 for pa in r.get("paragraphs") or []:
@@ -1551,11 +1566,11 @@ def cmd_sample(args) -> int:
     run = Path(args.run)
     pairs = _run_files(run)
     if not pairs:
-        print(f"error: {run} has no finished files (*.summary.json + *.labels.jsonl)", file=sys.stderr)
+        print(f"error: {run} has no finished files (*.summary.json + *.labels.jsonl[.zst])", file=sys.stderr)
         return 2
     cands: List[Dict[str, Any]] = []
     for inp, lp in pairs:
-        with open(lp, encoding="utf-8") as fh:
+        with open_text(lp) as fh:
             for raw in fh:
                 r = json.loads(raw)
                 for pa in r.get("paragraphs") or []:
@@ -1875,7 +1890,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--policy", default=str(DEFAULT_POLICY))
     r.add_argument("--write-clean", action="store_true", help="also write <name>.clean.jsonl (removed paragraphs "
                    "cut out, place names rewritten, empty documents dropped)")
-    r.add_argument("--compress", choices=["none", "zst"], default="none", help="for the clean output")
+    r.add_argument("--compress", choices=["none", "zst"], default="none",
+                   help="zst: write every output as .jsonl.zst (labels, rewrites, clean); default plain .jsonl")
     r.add_argument("--all-labels", action="store_true",
                    help="score every label on every gated paragraph (no level cascade): slower; for sampling")
     r.add_argument("--review-as", choices=["keep", "remove"], default="keep",
@@ -1950,7 +1966,7 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--output-dir", required=True, help="a new folder")
     d.add_argument("--policy", default=str(DEFAULT_POLICY))
     d.add_argument("--write-clean", action="store_true")
-    d.add_argument("--compress", choices=["none", "zst"], default="none")
+    d.add_argument("--compress", choices=["none", "zst"], default="none", help="zst: every output as .jsonl.zst")
     d.add_argument("--review-as", choices=["keep", "remove"], default="keep")
     d.add_argument("--no-rules", action="store_true")
     d.add_argument("--no-rewrite", action="store_true")

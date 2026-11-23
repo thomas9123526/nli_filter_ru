@@ -171,3 +171,16 @@ def test_dataset_output_can_be_a_label_run(tmp_path, project):
         assert c.get("/api/labels/lab_out").json()["files"][0]["name"] == "in"
         d = c.get("/api/labels/lab_out/doc", params={"file": "in", "line": 1}).json()
         assert d["row"]["action"] == "edited"
+
+
+def test_labels_file_as_zst(client, project):
+    """nli_label.py --compress zst writes <name>.labels.jsonl.zst: the pages read it like the plain file."""
+    zstandard = pytest.importorskip("zstandard")
+    run = project / "out_label_t"
+    plain = run / "in.labels.jsonl"
+    (run / "in.labels.jsonl.zst").write_bytes(zstandard.ZstdCompressor().compress(plain.read_bytes()))
+    plain.unlink()
+    docs = client.get("/api/labels/out_label_t/docs", params={"file": "in"}).json()
+    assert docs["total"] >= 1 and docs["rows"][0]["line"] == 1
+    d = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+    assert d["row"]["action"] == "edited" and len(d["row"]["paragraphs"]) == 2
