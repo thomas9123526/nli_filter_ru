@@ -7,15 +7,15 @@ them in `D:\hkc\nli_filter2` (`py -3.12 …` on the development PC; `python …`
 ## In one command, from the JSON file
 
 `nli_label.py` reads JSON-lines corpora (one document per line). A test-set file such as
-`labelsussia_llm_docs_v1.json` or `labelsussia_llm_cases_v1.json` is one JSON object with everything inside, so
+`labels\russia_llm_docs_v1.json` or `labels\russia_llm_cases_v1.json` is one JSON object with everything inside, so
 it cannot be given to `nli_label.py` directly. `tools\label_test_set.py` does all three steps in one go: builds the
 file's corpus in `dataset\` (as the builders and the viewer's Save do), runs `nli_label.py` with the policy named in
 the file, then prints expected vs result.
 
 ```powershell
-py -3.12 tools\label_test_set.py labelsussia_llm_docs_v1.json
-py -3.12 tools\label_test_set.py labelsussia_llm_cases_v1.json --output-dir dataset\out_label_ru_v2_judge
-py -3.12 tools\label_test_set.py labelsussia_llm_cases_v1.json --fresh -- --judge-model none
+py -3.12 tools\label_test_set.py labels\russia_llm_docs_v1.json
+py -3.12 tools\label_test_set.py labels\russia_llm_cases_v1.json --output-dir dataset\out_label_ru_v2_judge
+py -3.12 tools\label_test_set.py labels\russia_llm_cases_v1.json --fresh -- --judge-model none
 ```
 
 | Option | Meaning |
