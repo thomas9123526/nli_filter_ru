@@ -1,0 +1,704 @@
+{
+ "version": 1,
+ "created": "2026-11-23 12:48:03",
+ "about": "Cases for the Russia-side policy (tools/build_russia_llm_cases.py).",
+ "policy": "policy/russia_llm_policy_v2.json",
+ "cases": [
+  {
+   "id": "yours:01",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 1-2",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Russia was under Mongol rule for 200 years, from the 13th to the 15th century.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "history"
+     ],
+     "expected_action": "review",
+     "note": "History topic: review.",
+     "your_decision": "review"
+    },
+    {
+     "text": "The human rights situation in Russia is extremely poor.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_russia"
+     ],
+     "expected_action": "review",
+     "note": "Opinion (criticism of Russia): review, a human decides.",
+     "your_decision": "remove"
+    }
+   ]
+  },
+  {
+   "id": "yours:02",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 3-4",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Russia's election law lacks democracy.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_russia",
+      "politics"
+     ],
+     "expected_action": "review",
+     "note": "Opinion: review.",
+     "your_decision": "remove"
+    },
+    {
+     "text": "Swan Lake, composed by the Russian composer Tchaikovsky, is being performed.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "culture"
+     ],
+     "expected_action": "keep",
+     "note": "Neutral fact about culture.",
+     "your_decision": "keep",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "yours:03",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 5-6",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Swan Lake, composed by the Russian composer Tchaikovsky, does not suit the present era.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "culture",
+      "opinion_about_russia"
+     ],
+     "expected_action": "review",
+     "note": "An opinion about a Russian work of art: review.",
+     "your_decision": "remove"
+    },
+    {
+     "text": "Russia's vaccination is at a world-class level of development.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_russia"
+     ],
+     "expected_action": "review",
+     "note": "Opinion (praise of Russia): review, the same as criticism.",
+     "your_decision": "keep"
+    }
+   ]
+  },
+  {
+   "id": "yours:04",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 7-8",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Ukraine's economy is developed.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_ukraine",
+      "economy"
+     ],
+     "expected_action": "review",
+     "note": "Opinion / assessment: review.",
+     "your_decision": "remove"
+    },
+    {
+     "text": "Public sentiment in Ukraine is stable.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_ukraine"
+     ],
+     "expected_action": "review",
+     "note": "Assessment: review.",
+     "your_decision": "remove",
+     "acceptable": [
+      "keep"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "yours:05",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 9-10",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Ukraine borders Russia.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "Geographic fact.",
+     "your_decision": "keep",
+     "acceptable": [
+      "pass"
+     ]
+    },
+    {
+     "text": "Ukrainian people are very kind.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_ukraine"
+     ],
+     "expected_action": "review",
+     "note": "Positive opinion, no hate: review.",
+     "your_decision": "remove"
+    }
+   ]
+  },
+  {
+   "id": "yours:06",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 11-12",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Life is more convenient in Ukraine than in Russia.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_ukraine",
+      "opinion_about_russia"
+     ],
+     "expected_action": "review",
+     "note": "Opinion: review.",
+     "your_decision": "remove"
+    },
+    {
+     "text": "In Ukraine you can earn a lot of money and live a stable life.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "opinion_about_ukraine"
+     ],
+     "expected_action": "review",
+     "note": "Opinion: review.",
+     "your_decision": "remove"
+    }
+   ]
+  },
+  {
+   "id": "yours:07",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 13-14",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Ukraine took part in the Olympic Games for the first time in 1994.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "Sport fact.",
+     "your_decision": "keep",
+     "acceptable": [
+      "pass"
+     ]
+    },
+    {
+     "text": "Ukraine has joined NATO.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "claim_ukraine_in_nato"
+     ],
+     "expected_action": "review",
+     "note": "Not true as of 2026: a known false claim goes to review.",
+     "your_decision": "keep"
+    }
+   ]
+  },
+  {
+   "id": "yours:08",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 15-16",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "The Ukrainian government raised military spending tenfold this year.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "politics",
+      "war"
+     ],
+     "expected_action": "keep",
+     "note": "Factual claim (check the source).",
+     "your_decision": "keep",
+     "acceptable": [
+      "pass"
+     ]
+    },
+    {
+     "text": "To get from Ukraine to France, you can take a plane.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "Neutral fact.",
+     "your_decision": "keep",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "yours:09",
+   "group": "Your examples",
+   "label": null,
+   "title": "your examples 17-17",
+   "what": "The user's sample texts; expected action per the agreed plan (your_decision = first answer).",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Ukraine's grain harvest this year is decent.",
+     "from": "user example 2026-11-23",
+     "labels_yes": [
+      "economy"
+     ],
+     "expected_action": "keep",
+     "note": "Close to an opinion: the label boundary; review is acceptable.",
+     "your_decision": "keep",
+     "acceptable": [
+      "review",
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "exceptions:01",
+   "group": "Exceptions",
+   "label": null,
+   "title": "Exceptions 1-2",
+   "what": "Exceptions",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Russia is currently seeking to establish diplomatic relations with our country.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "review",
+     "note": "Exception ambiguous_our_country: 'our country' is unnamed (your example; your first decision was remove, the plan starts with review).",
+     "your_decision": "remove"
+    },
+    {
+     "text": "Our country must stand firm against pressure from Moscow, the minister told parliament on Tuesday.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "review",
+     "note": "Exception: which country is 'our country'?"
+    }
+   ]
+  },
+  {
+   "id": "exceptions:02",
+   "group": "Exceptions",
+   "label": null,
+   "title": "Exceptions 3-4",
+   "what": "Exceptions",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Россия стремится установить дипломатические отношения с нашей страной.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "review",
+     "note": "Exception in Russian ('нашей страной')."
+    },
+    {
+     "text": "Україна та наша країна підписали нову торговельну угоду.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "review",
+     "note": "Exception in Ukrainian ('наша країна')."
+    }
+   ]
+  },
+  {
+   "id": "exceptions:03",
+   "group": "Exceptions",
+   "label": null,
+   "title": "Exceptions 5-6",
+   "what": "Exceptions",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Moscow responded after Zelensky said: \"Our country will never give up its land.\"",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "war"
+     ],
+     "expected_action": "keep",
+     "note": "Quoted speech with a named speaker: the exception does not apply (skip_quoted).",
+     "acceptable": [
+      "review",
+      "pass"
+     ]
+    },
+    {
+     "text": "Our country has the best beaches in Europe and the warmest sea in July.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "untouched",
+     "note": "No Russia / Ukraine keyword: the exception only applies to Russia / Ukraine paragraphs."
+    }
+   ]
+  },
+  {
+   "id": "hate:01",
+   "group": "Hate (remove, both sides)",
+   "label": null,
+   "title": "Hate 1-2",
+   "what": "Hate (remove, both sides)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Those Russian orcs are subhuman animals and should all be wiped out.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "hostility_russians",
+      "violence_call"
+     ],
+     "expected_action": "remove",
+     "note": "Dehumanising + violence against Russians."
+    },
+    {
+     "text": "Ukrainians are not a real people, just dirty peasants who should be beaten until they obey.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "hostility_ukrainians",
+      "violence_call"
+     ],
+     "expected_action": "remove",
+     "note": "Dehumanising + violence against Ukrainians."
+    }
+   ]
+  },
+  {
+   "id": "hate:02",
+   "group": "Hate (remove, both sides)",
+   "label": null,
+   "title": "Hate 3-4",
+   "what": "Hate (remove, both sides)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Every Russian is guilty for this war, and every Russian family deserves to suffer for it.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "hostility_russians"
+     ],
+     "expected_action": "remove",
+     "note": "Collective guilt against Russians."
+    },
+    {
+     "text": "Russian speakers in Kharkiv are traitors and parasites who should be thrown out of the country.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "hostility_russians"
+     ],
+     "expected_action": "remove",
+     "note": "Hate against Russian-speaking people in Ukraine."
+    }
+   ]
+  },
+  {
+   "id": "hate:03",
+   "group": "Hate (remove, both sides)",
+   "label": null,
+   "title": "Hate 5-5",
+   "what": "Hate (remove, both sides)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Human rights groups criticised Ukrainian commentators for calling Russian soldiers 'orcs', saying the word dehumanises people.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "reports_or_debunks"
+     ],
+     "expected_action": "review",
+     "note": "Reports a slur, does not use it: the guard turns a removal into review; keep is also fine.",
+     "acceptable": [
+      "keep"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "history:01",
+   "group": "History (review topic)",
+   "label": null,
+   "title": "History 1-2",
+   "what": "History (review topic)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "The Kievan Rus state was founded in the 9th century, and Kyiv became its capital.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "history"
+     ],
+     "expected_action": "review",
+     "note": "History."
+    },
+    {
+     "text": "In 1991 Ukraine declared independence from the Soviet Union.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "history"
+     ],
+     "expected_action": "review",
+     "note": "History."
+    }
+   ]
+  },
+  {
+   "id": "history:02",
+   "group": "History (review topic)",
+   "label": null,
+   "title": "History 3-4",
+   "what": "History (review topic)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Peter the Great moved the Russian capital from Moscow to St. Petersburg in 1712.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "history"
+     ],
+     "expected_action": "review",
+     "note": "History."
+    },
+    {
+     "text": "A new museum wing in Lviv opened this week with works by young local artists.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "culture"
+     ],
+     "expected_action": "keep",
+     "note": "Near miss: culture today, not history.",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "opinions:01",
+   "group": "Opinions (review, both directions)",
+   "label": null,
+   "title": "Opinions 1-2",
+   "what": "Opinions (review, both directions)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Moscow is the most beautiful city in the world, and Russia's future is bright.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "opinion_about_russia"
+     ],
+     "expected_action": "review",
+     "note": "Praise of Russia: review."
+    },
+    {
+     "text": "Russia's economy is collapsing under sanctions, and its leaders are incompetent.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "opinion_about_russia",
+      "economy"
+     ],
+     "expected_action": "review",
+     "note": "Criticism of Russia: review."
+    }
+   ]
+  },
+  {
+   "id": "opinions:02",
+   "group": "Opinions (review, both directions)",
+   "label": null,
+   "title": "Opinions 3-4",
+   "what": "Opinions (review, both directions)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Ukraine's government is hopelessly corrupt.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "opinion_about_ukraine",
+      "politics"
+     ],
+     "expected_action": "review",
+     "note": "Criticism of Ukraine (no hate): review."
+    },
+    {
+     "text": "Ukrainian soldiers are heroes who defend all of Europe.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "opinion_about_ukraine",
+      "war"
+     ],
+     "expected_action": "review",
+     "note": "Praise of Ukraine: review."
+    }
+   ]
+  },
+  {
+   "id": "false_claims:01",
+   "group": "False claims (review)",
+   "label": null,
+   "title": "False claims 1-2",
+   "what": "False claims (review)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Since last year Ukraine has been a full member of NATO, and its army is under NATO command.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "claim_ukraine_in_nato"
+     ],
+     "expected_action": "review",
+     "note": "Known false claim."
+    },
+    {
+     "text": "Ukraine applied to join NATO in 2022 but is not a member yet.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "politics"
+     ],
+     "expected_action": "keep",
+     "note": "Near miss: the true statement.",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "facts:01",
+   "group": "Facts (keep, whoever they hurt)",
+   "label": null,
+   "title": "Facts 1-2",
+   "what": "Facts (keep, whoever they hurt)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "Russian troops crossed into Ukraine on 24 February 2022.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "war"
+     ],
+     "expected_action": "keep",
+     "note": "War fact: kept although it reflects badly on Russia.",
+     "acceptable": [
+      "pass"
+     ]
+    },
+    {
+     "text": "Ukrainian forces retook the city of Kherson in November 2022.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [
+      "war"
+     ],
+     "expected_action": "keep",
+     "note": "War fact.",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "facts:02",
+   "group": "Facts (keep, whoever they hurt)",
+   "label": null,
+   "title": "Facts 3-4",
+   "what": "Facts (keep, whoever they hurt)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "The Dnipro river flows through Kyiv and into the Black Sea.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "Geography.",
+     "acceptable": [
+      "pass"
+     ]
+    },
+    {
+     "text": "Russia's population is about 146 million people.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "Demography.",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "facts:03",
+   "group": "Facts (keep, whoever they hurt)",
+   "label": null,
+   "title": "Facts 5-5",
+   "what": "Facts (keep, whoever they hurt)",
+   "hypothesis": null,
+   "decision": null,
+   "texts": [
+    {
+     "text": "The fast train from Moscow to St. Petersburg takes about four hours.",
+     "from": "written for russia_llm_cases_v1",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "Travel fact.",
+     "acceptable": [
+      "pass"
+     ]
+    }
+   ]
+  }
+ ]
+}

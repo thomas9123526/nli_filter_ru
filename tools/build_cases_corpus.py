@@ -48,7 +48,10 @@ def main() -> int:
         for k, t in enumerate(c["texts"], 1):
             lines.append(json.dumps({"id": f"{c['id']}#{k}", "text": t["text"], "case": c["id"], "group": c["group"],
                                      "expected_action": t["expected_action"], "labels_yes": t["labels_yes"],
-                                     "source": t["from"], "note": t.get("note") or ""}, ensure_ascii=False))
+                                     "source": t["from"], "note": t.get("note") or "",
+                                     **({"acceptable": t["acceptable"]} if t.get("acceptable") else {}),
+                                     **({"your_decision": t["your_decision"]} if t.get("your_decision") else {})},
+                                    ensure_ascii=False))
         path = out / group / f"{name}.jsonl.zst"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(cctx.compress(("\n".join(lines) + "\n").encode("utf-8")))

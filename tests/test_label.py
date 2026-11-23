@@ -85,7 +85,7 @@ def test_shipped_policy_loads():
     assert p.gate is not None and p.gate.key == "involves_russia"
     assert len(p.level(1)) == 12
     assert {lab.decision for lab in p.level(2)} == {"remove", "flag", "keep"}
-    assert (ROOT / p.keywords_file).is_file()
+    assert all((ROOT / f).is_file() for f in p.keywords_files)
 
 
 @pytest.mark.parametrize("bad, msg", [

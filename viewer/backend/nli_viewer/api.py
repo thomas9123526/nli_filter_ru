@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -478,15 +479,40 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         pol = project / "policy"
         return {"policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json")) if pol.is_dir() else []}
 
+    def _case_files() -> List[Path]:
+        """labels/cases_vN.json (newest last), then other labels/*cases_vN.json sets (e.g. russia_llm_cases_v1.json)."""
+        lab = project / "labels"
+        if not lab.is_dir():
+            return []
+        main = sorted((f for f in lab.glob("cases_v*.json") if re.fullmatch(r"cases_v\d+", f.stem)),
+                      key=lambda f: int(f.stem[7:]))  # cases_v1.json, cases_v2.json, ... (not *_results.json)
+        other = sorted(f for f in lab.glob("*_cases_v*.json") if re.fullmatch(r"[a-z0-9_]+_cases_v\d+", f.stem))
+        return main + other
+
+    @app.get("/api/labels/case-files", tags=["labels"])
+    def label_case_files():
+        """The case sets the Try page can show (newest = the default)."""
+        files = _case_files()
+        main = [f for f in files if f.stem.startswith("cases_v")]
+        return {"files": [f"labels/{f.name}" for f in files],
+                "newest": f"labels/{main[-1].name}" if main else (f"labels/{files[0].name}" if files else None)}
+
     @app.get("/api/labels/cases", tags=["labels"])
-    def label_cases():
-        """labels/cases_*.json: the policy Try page's cases (tools/build_cases.py), newest version."""
-        files = sorted((f for f in (project / "labels").glob("cases_v*.json") if f.stem[7:].isdigit()),
-                       key=lambda f: int(f.stem[7:]))  # cases_v1.json, cases_v2.json, ... (not *_results.json)
+    def label_cases(file: Optional[str] = None):
+        """labels/cases_*.json: the policy Try page's cases (tools/build_cases.py), newest version; ?file= another
+        case set from GET /api/labels/case-files."""
+        files = _case_files()
         if not files:
             raise HTTPException(404, "no labels/cases_v*.json: run python tools/build_cases.py")
-        data = json.loads(files[-1].read_text(encoding="utf-8"))
-        data["file"] = f"labels/{files[-1].name}"
+        if file:
+            pick = next((f for f in files if f"labels/{f.name}" == file.replace("\\", "/")), None)
+            if pick is None:
+                raise HTTPException(404, f"unknown case file {file}")
+        else:
+            main = [f for f in files if f.stem.startswith("cases_v")]
+            pick = main[-1] if main else files[0]
+        data = json.loads(pick.read_text(encoding="utf-8"))
+        data["file"] = f"labels/{pick.name}"
         return data
 
     @app.post("/api/labels/try", tags=["labels"])

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useState, type ReactElement } from "react";
 import { api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
-import type { LabelDocResp, LabelParagraph, LabelPolicyLabel } from "@/lib/types";
+import type { FlowPolicyData, LabelDocResp, LabelParagraph, LabelPolicyLabel } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading, ScoreBar } from "./ui";
 import { actionClass } from "./LabelRunView";
 
@@ -17,6 +17,7 @@ const REASONS: Record<string, string> = {
   review_label: "A 'review' label is yes, or a narrative was softened by reports_or_debunks.",
   keep_label: "A 'keep' subject label is yes.",
   no_subject: "Russia-related (gate yes), but no subject label is yes: kept.",
+  exception: "An exception of the policy matched: exceptions are checked first and their decision replaces the cascade's.",
 };
 
 function Level({ title, keys, p, pol, note, used }: { title: string; keys: string[]; p: LabelParagraph; pol: Record<string, LabelPolicyLabel>; note?: string; used: boolean }) {
@@ -33,7 +34,8 @@ function Level({ title, keys, p, pol, note, used }: { title: string; keys: strin
             <tr key={k} className={yes ? "yes" : ""}>
               <td style={{ width: "40%" }}><span className="mono" style={{ fontSize: 12 }}>{k}</span><div className="hyp">{l.hypothesis}</div></td>
               <td><span className={`badge ${actionClass(l.decision)}`}>{l.decision}</span></td>
-              <td><ScoreBar value={s} threshold={l.threshold} />{p.judged?.includes(k) ? <span className="chip">judge</span> : null}</td>
+              <td><ScoreBar value={s} threshold={l.threshold} />{p.judged?.includes(k) ? <span className="chip">judge</span> : null}
+                {p.from_field?.includes(k) ? <span className="chip" title="answered by the corpus' topic field, not by a model">topic field</span> : null}</td>
               <td>{s === undefined ? <span className="faint">not scored</span> : yes ? <strong>yes</strong> : <span className="faint">no</span>}</td>
             </tr>);
         })}</tbody></table>
@@ -42,7 +44,32 @@ function Level({ title, keys, p, pol, note, used }: { title: string; keys: strin
   );
 }
 
-export type FlowPolicy = { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]> };
+export type FlowPolicy = FlowPolicyData;
+
+function Exceptions({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
+  const ex = policy.exceptions || [];
+  if (!ex.length) return null;
+  const hit = ex.find((e) => e.key === (p.exception || p.exception_blocked));
+  return (
+    <div className="flow-step" data-testid="flow-exceptions">
+      <div className="row"><strong>Exceptions</strong><span className="faint" style={{ fontSize: 12 }}>checked first; the highest priority that matches decides</span></div>
+      <table className="flow-table"><tbody>{ex.map((e) => {
+        const s = p.exception_scores?.[`exception:${e.key}`];
+        const on = e.key === p.exception || e.key === p.exception_blocked;
+        return (
+          <tr key={e.key} className={on ? "yes" : ""}>
+            <td style={{ width: "40%" }}><span className="mono" style={{ fontSize: 12 }}>{e.key}</span>
+              <div className="hyp">{e.hypothesis || `phrases: ${(e.phrases || []).slice(0, 6).join(", ")}${(e.phrases || []).length > 6 ? " …" : ""}${e.skip_quoted ? " (not inside quotes)" : ""}`}</div></td>
+            <td><span className={`badge ${actionClass(e.decision)}`}>{e.decision}</span> <span className="faint" style={{ fontSize: 12 }}>priority {e.priority}</span></td>
+            <td>{s !== undefined ? <ScoreBar value={s} threshold={e.threshold ?? 0.8} /> : on && p.exception_phrases ? <span>“{p.exception_phrases.join("”, “")}”</span> : null}</td>
+            <td>{on ? <strong>matched</strong> : <span className="faint">no</span>}</td>
+          </tr>);
+      })}</tbody></table>
+      {p.exception && hit ? <div style={{ marginTop: 6 }}>The cascade said <span className={`badge ${actionClass(p.action_before || "")}`}>{p.action_before}</span>; the exception decides <span className={`badge ${actionClass(p.action)}`}>{p.action}</span>.</div> : null}
+      {p.exception_blocked ? <div style={{ marginTop: 6 }}>The exception matched, but a <strong>protected</strong> label (hate, violence) removes this paragraph: an exception never lowers that.</div> : null}
+    </div>
+  );
+}
 
 export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
   const pol = policy.labels;
@@ -57,6 +84,7 @@ export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
       <div className="flow-arrow">↓</div>
       <Level title="Level 2 · framing" keys={byLevel(2)} p={p} pol={pol} used={used(2)} note={runIf(2) ? `runs when ${runIf(2)} is yes` : undefined} />
       <div className="flow-arrow">↓</div>
+      {policy.exceptions?.length ? <><Exceptions policy={policy} p={p} /><div className="flow-arrow">↓</div></> : null}
       <div className="flow-step">
         <div className="row"><strong>Decision</strong><span className={`badge big ${actionClass(p.action)}`}>{p.action}</span>
           <span className="mono faint" style={{ fontSize: 12 }}>{p.reason}</span></div>

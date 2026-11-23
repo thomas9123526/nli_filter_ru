@@ -115,6 +115,23 @@ def test_cases_and_try(client, project):
     assert client.post("/api/labels/try", json={"texts": ["Russia."]}).status_code in (502, 503)  # no service
 
 
+def test_other_case_sets(client, project):
+    lab = project / "labels"
+    lab.mkdir(exist_ok=True)
+    for name, cid in (("cases_v1.json", "a"), ("cases_v2.json", "b"), ("russia_llm_cases_v1.json", "ru"),
+                      ("cases_v1_results.json", "no")):
+        (lab / name).write_text(json.dumps({"version": 1, "cases": [{"id": cid, "group": "g", "title": "t",
+                                                                      "what": "w", "texts": []}]}), encoding="utf-8")
+    f = client.get("/api/labels/case-files").json()
+    assert f["files"] == ["labels/cases_v1.json", "labels/cases_v2.json", "labels/russia_llm_cases_v1.json"]
+    assert f["newest"] == "labels/cases_v2.json"
+    assert client.get("/api/labels/cases").json()["cases"][0]["id"] == "b"
+    d = client.get("/api/labels/cases", params={"file": "labels/russia_llm_cases_v1.json"}).json()
+    assert d["file"] == "labels/russia_llm_cases_v1.json" and d["cases"][0]["id"] == "ru"
+    assert client.get("/api/labels/cases", params={"file": "labels/cases_v1_results.json"}).status_code == 404
+    assert client.get("/api/labels/cases", params={"file": "../secret.json"}).status_code == 404
+
+
 def test_server_input_without_reopen_and_shard_progress(client, project):
     run = project / "out_label_t"
     fs = json.loads((run / "in.summary.json").read_text(encoding="utf-8"))

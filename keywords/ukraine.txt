@@ -1,0 +1,62 @@
+# Keywords for Ukraine (used with keywords/russia_v3.txt by policy/russia_llm_policy_v1.json).
+# Same format as keywords/russia.txt: case-insensitive, whole words, one keyword per line, optional lexicon columns
+#   keyword | level | type | gloss | other meanings | exclude   (TAB-separated)
+# Every line is level B: a hit only sends the paragraph to the models, nothing is decided by keyword alone.
+
+# English
+Ukraine	B	country
+Ukrainian	B	demonym	-	the Ukrainian language
+Ukrainians	B	demonym
+Kyiv	B	city	the capital of Ukraine
+Kiev	B	city	the capital of Ukraine (Russian spelling)	chicken Kiev	chicken\s+kiev
+Kharkiv	B	city	a city in Ukraine
+Kharkov	B	city	a city in Ukraine (Russian spelling)
+Odesa	B	city	a city in Ukraine
+Odessa	B	city	a city in Ukraine	Odessa, Texas	Odessa,?\s+(Texas|TX)\b
+Lviv	B	city	a city in Ukraine
+Dnipro	B	city	a city and river in Ukraine
+Zaporizhzhia	B	city	a city in Ukraine
+Kherson	B	city	a city in Ukraine
+Mariupol	B	city	a city in Ukraine
+Bucha	B	city	a town in Ukraine
+Donbas	B	region	a region in eastern Ukraine
+Donbass	B	region	a region in eastern Ukraine
+Donetsk	B	city	a city and region in eastern Ukraine
+Luhansk	B	city	a city and region in eastern Ukraine
+Crimea	B	region	a peninsula of Ukraine annexed by Russia in 2014
+Zelensky	B	person	the president of Ukraine
+Zelenskyy	B	person	the president of Ukraine
+Verkhovna Rada	B	org	the parliament of Ukraine
+Kievan Rus	B	country	the medieval state centred on Kyiv
+
+# Russian
+Украина	B	country
+Украины	B	country
+Украине	B	country
+Украину	B	country
+украинский	B	demonym
+украинцы	B	demonym
+украинцев	B	demonym
+Киев	B	city
+Киева	B	city
+Харьков	B	city
+Одесса	B	city
+Донбасс	B	region
+Крым	B	region
+Зеленский	B	person
+
+# Ukrainian
+Україна	B	country
+України	B	country
+Україні	B	country
+Україну	B	country
+український	B	demonym
+українці	B	demonym
+українців	B	demonym
+Київ	B	city
+Києва	B	city
+Харків	B	city
+Одеса	B	city
+Донбас	B	region
+Крим	B	region
+Зеленський	B	person

@@ -80,15 +80,67 @@ class Label:
     hypothesis: str
     softens: List[str] = field(default_factory=list)
     note: str = ""
+    protected: bool = False  # a removal by this label is never lowered by an exception (hate, violence)
 
     def as_dict(self) -> Dict[str, Any]:
         d = {"level": self.level, "decision": self.decision, "threshold": self.threshold,
              "hypothesis": self.hypothesis}
         if self.softens:
             d["softens"] = list(self.softens)
+        if self.protected:
+            d["protected"] = True
         if self.note:
             d["note"] = self.note
         return d
+
+
+EXCEPTION_DECISIONS = ("remove", "review", "keep")
+STRICTNESS = {"pass": 0, "keep": 1, "review": 2, "remove": 3}
+
+
+@dataclass
+class PolicyException:
+    """A top-priority rule: when it matches a paragraph, its decision replaces the cascade's action."""
+    key: str
+    decision: str
+    priority: int = 0
+    phrases: List[str] = field(default_factory=list)  # exact words, case-insensitive, whole words
+    hypothesis: str = ""                              # or an NLI sentence (scored on every candidate paragraph)
+    threshold: float = 0.8
+    skip_quoted: bool = False                         # a phrase inside quotation marks does not count
+    scope: str = "keyword"                            # keyword = every candidate paragraph; gate = past the gate
+    note: str = ""
+
+    @property
+    def score_key(self) -> str:
+        return f"exception:{self.key}"
+
+    def as_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {"key": self.key, "decision": self.decision, "priority": self.priority,
+                             "scope": self.scope}
+        if self.phrases:
+            d["phrases"] = list(self.phrases)
+            d["skip_quoted"] = self.skip_quoted
+        if self.hypothesis:
+            d["hypothesis"] = self.hypothesis
+            d["threshold"] = self.threshold
+        if self.note:
+            d["note"] = self.note
+        return d
+
+
+TOPIC_MODES = ("hint", "trust", "off")
+
+
+def get_path(obj: Any, path: Optional[str]) -> Any:
+    """obj["a"]["b"] for path "a.b" (None when a part is missing)."""
+    if not path:
+        return None
+    for part in path.split("."):
+        if not isinstance(obj, dict) or part not in obj:
+            return None
+        obj = obj[part]
+    return obj
 
 
 class Policy:
@@ -122,7 +174,8 @@ class Policy:
                 continue
             try:
                 lab = Label(key, int(v.get("level", 1)), str(v.get("decision", "")), float(v.get("threshold", 0.8)),
-                            str(v.get("hypothesis", "")).strip(), list(v.get("softens") or []), str(v.get("note", "")))
+                            str(v.get("hypothesis", "")).strip(), list(v.get("softens") or []), str(v.get("note", "")),
+                            bool(v.get("protected", False)))
             except (TypeError, ValueError) as exc:
                 errors.append(f"label {key}: {exc}")
                 continue
@@ -158,6 +211,55 @@ class Policy:
                     errors.append(f"label {lab.key}: softens '{pat}' matches no label")
         if not self.labels:
             errors.append("no labels")
+        # exceptions: checked before everything else; the highest priority that matches decides
+        self.exceptions: List[PolicyException] = []
+        for i, v in enumerate(data.get("exceptions") or []):
+            key = str((v or {}).get("key", ""))
+            where = f"exception {key or '#' + str(i + 1)}"
+            if not re.match(r"^[a-z][a-z0-9_]*$", key):
+                errors.append(f"{where}: key must be lower-case letters, digits and _")
+                continue
+            try:
+                ex = PolicyException(key, str(v.get("decision", "")), int(v.get("priority", 0)),
+                                     [str(x) for x in ((v.get("match") or {}).get("phrases") or [])],
+                                     str((v.get("match") or {}).get("hypothesis") or "").strip(),
+                                     float((v.get("match") or {}).get("threshold", 0.8)),
+                                     bool(v.get("skip_quoted", False)), str(v.get("scope", "keyword")),
+                                     str(v.get("note", "")))
+            except (TypeError, ValueError, AttributeError) as exc:
+                errors.append(f"{where}: {exc}")
+                continue
+            if ex.decision not in EXCEPTION_DECISIONS:
+                errors.append(f"{where}: decision must be one of {', '.join(EXCEPTION_DECISIONS)}")
+            if not ex.phrases and not ex.hypothesis:
+                errors.append(f"{where}: \"match\" needs \"phrases\" or a \"hypothesis\"")
+            if ex.scope not in ("keyword", "gate"):
+                errors.append(f"{where}: scope must be keyword or gate")
+            if not 0.0 <= ex.threshold <= 1.0:
+                errors.append(f"{where}: threshold must be between 0 and 1")
+            if any(e.key == key for e in self.exceptions):
+                errors.append(f"{where}: listed twice")
+            self.exceptions.append(ex)
+        self.exceptions.sort(key=lambda e: -e.priority)  # stable: same priority = file order
+        # a topic field the corpus may have (WebOrganizer-style "History", "Politics" ...): optional, per line
+        self.topic_field: Optional[str] = data.get("topic_field") or None
+        self.topic_mode = str(data.get("topic_mode", "hint"))
+        if self.topic_mode not in TOPIC_MODES:
+            errors.append(f"topic_mode must be one of {', '.join(TOPIC_MODES)}")
+        self.topic_map: Dict[str, List[str]] = {}
+        for val, keys in (data.get("topic_map") or {}).items():
+            keys = [keys] if isinstance(keys, str) else list(keys or [])
+            for k in keys:
+                if k not in self.labels:
+                    errors.append(f"topic_map '{val}': unknown label '{k}'")
+                elif self.labels[k].level != 1:
+                    errors.append(f"topic_map '{val}': '{k}' is not a level-1 subject")
+            self.topic_map[str(val).strip().lower()] = keys
+        self.topic_labels = sorted({k for ks in self.topic_map.values() for k in ks})
+        # keywords_file: one file or a list; rewrite_place_names: false = this policy never rewrites place names
+        kf = data.get("keywords_file")
+        self.keywords_files: List[str] = [kf] if isinstance(kf, str) else [str(x) for x in (kf or [])]
+        self.rewrite_place_names = bool(data.get("rewrite_place_names", True))
         if errors:
             raise ValueError(f"{path or 'policy'}: " + "; ".join(errors))
 
@@ -175,7 +277,11 @@ class Policy:
                 "narrative_opens_gate": self.narrative_opens_gate, "narrative_keywords": len(self.narrative_keywords),
                 "paragraphs": {"min_chars": self.min_chars, "max_chars": self.max_chars},
                 "run_if": {str(k): v for k, v in self.run_if.items()}, "markers": len(self.markers),
-                "labels": {k: lab.as_dict() for k, lab in self.labels.items()}}
+                "labels": {k: lab.as_dict() for k, lab in self.labels.items()},
+                **({"exceptions": [e.as_dict() for e in self.exceptions]} if self.exceptions else {}),
+                **({"topic": {"field": self.topic_field, "mode": self.topic_mode, "map": self.topic_map}}
+                   if self.topic_map else {}),
+                **({} if self.rewrite_place_names else {"rewrite_place_names": False})}
 
     def runs(self, level: int, scores: Dict[str, float], marker: bool) -> bool:
         """Whether a level's labels are scored for a paragraph, given the scores so far."""
@@ -244,6 +350,58 @@ def action_from_labels(policy: Policy, labels: Dict[str, Optional[bool]], marker
         return None
     return resolve(policy, {k: (1.0 if v else 0.0) for k, v in labels.items() if k in policy.labels},
                    marker)["action"]
+
+
+_QUOTED = re.compile(r'"[^"\n]*"|“[^”\n]*”|«[^»\n]*»|„[^“”\n]*[“”]')
+
+
+def quoted_spans(text: str) -> List[Tuple[int, int]]:
+    """Spans inside quotation marks ("...", “...”, «...», „...“)."""
+    return [(m.start(), m.end()) for m in _QUOTED.finditer(text)]
+
+
+def build_exception_matchers(policy: Policy) -> Dict[str, Any]:
+    """One phrase matcher per exception that has phrases."""
+    if not any(ex.phrases for ex in policy.exceptions):
+        return {}
+    from nli_filter import KeywordMatcher
+    return {ex.key: KeywordMatcher(ex.phrases) for ex in policy.exceptions if ex.phrases}
+
+
+def exception_phrase_hits(policy: Policy, matchers: Dict[str, Any], text: str) -> Dict[str, List[str]]:
+    """{exception key: [matched phrases]} for one paragraph (skip_quoted: hits inside quotes do not count)."""
+    out: Dict[str, List[str]] = {}
+    quotes = None
+    for ex in policy.exceptions:
+        m = matchers.get(ex.key)
+        if m is None:
+            continue
+        hits = m.find(text)
+        if ex.skip_quoted and hits:
+            quotes = quoted_spans(text) if quotes is None else quotes
+            hits = [h for h in hits if not any(a <= h.start and h.end <= b for a, b in quotes)]
+        if hits:
+            out[ex.key] = sorted({text[h.start:h.end] for h in hits})
+    return out
+
+
+def apply_exceptions(policy: Policy, r: Dict[str, Any], phrase_hits: Dict[str, List[str]],
+                     scores: Dict[str, Optional[float]]) -> Dict[str, Any]:
+    """The cascade's result r, overridden by the highest-priority exception that matches the paragraph (phrase hit,
+    or hypothesis score at or above its threshold). A removal by a 'protected' label is never lowered."""
+    for ex in policy.exceptions:
+        s = scores.get(ex.score_key)
+        hit = ex.key in phrase_hits or (bool(ex.hypothesis) and s is not None and s >= ex.threshold)
+        if not hit or (ex.scope == "gate" and r["action"] == "pass"):
+            continue
+        prot = [k for k in r["labels"] if policy.labels[k].protected and policy.labels[k].decision == "remove"]
+        if r["action"] == "remove" and prot and STRICTNESS[ex.decision] < STRICTNESS["remove"]:
+            return dict(r, exception_blocked=ex.key)  # hate / violence stays removed
+        out = dict(r, action=ex.decision, reason="exception", exception=ex.key, action_before=r["action"])
+        if ex.key in phrase_hits:
+            out["exception_phrases"] = phrase_hits[ex.key]
+        return out
+    return r
 
 
 # --------------------------------------------------------------------------------------------------
@@ -336,6 +494,7 @@ class Outcome:
     clean: Optional[Dict[str, Any]]      # the cleaned document (None = dropped)
     rewrites: List[Dict[str, Any]]
     group: Optional[str] = None          # value of the group field (composition breakdown)
+    topic_cmp: Optional["collections.Counter"] = None  # (subject, agree | field_only | model_only) -> paragraphs
 
 
 class Labeller:
@@ -344,8 +503,15 @@ class Labeller:
     def __init__(self, policy: Policy, matcher, rules, scorer, rewriter: Optional[NameRewriter] = None,
                  all_labels: bool = False, text_field: str = "text", id_field: Optional[str] = "id",
                  review_as: str = "keep", min_doc_chars: int = 50, marker_matcher=None,
-                 group_field: Optional[str] = None, force_gate: bool = False, narrative_matcher=None):
+                 group_field: Optional[str] = None, force_gate: bool = False, narrative_matcher=None,
+                 topic_field: Optional[str] = None, topic_mode: Optional[str] = None):
         self.p, self.matcher, self.rules, self.scorer = policy, matcher, rules, scorer
+        self.exc_matchers = build_exception_matchers(policy)
+        # the corpus' topic field (optional, per line): the policy's unless given here
+        self.topic_field = topic_field or policy.topic_field
+        self.topic_mode = topic_mode or policy.topic_mode
+        if self.topic_mode not in TOPIC_MODES:
+            raise ValueError(f"topic mode must be one of {', '.join(TOPIC_MODES)}")
         self.group_field = group_field
         self.force_gate = force_gate  # label every paragraph, also without a keyword hit (Try page: gate cases)
         self.rewriter = rewriter
@@ -367,6 +533,38 @@ class Labeller:
             if judge is not None:
                 para.setdefault("judged", []).append(lab.key)
 
+    def _score_exceptions(self, paras: List[Dict[str, Any]]) -> None:
+        """Hypothesis exceptions: scored on every candidate paragraph (stored as exc_scores['exception:<key>'])."""
+        items = [(pa, ex) for pa in paras for ex in self.p.exceptions if ex.hypothesis]
+        if not items:
+            return
+        res = self.scorer.score([pa["_text"] for pa, _ in items], [ex.hypothesis for _, ex in items])
+        for (pa, ex), (_, _, final) in zip(items, res):
+            pa["exc_scores"][ex.score_key] = round(float(final), 4)
+
+    def read_topics(self, rec: Record) -> Tuple[List[str], Optional[List[str]]]:
+        """(topic values of the line, the subjects they map to). The subjects are None when the field is missing,
+        empty or has no value in topic_map: then the models decide every subject, as without a topic field."""
+        if not self.topic_field:
+            return [], None
+        v = get_path(rec.data, self.topic_field) if isinstance(rec.data, dict) else None
+        vals = [str(x).strip() for x in (v if isinstance(v, list) else [v]) if x is not None and str(x).strip()]
+        known = [x for x in vals if x.lower() in self.p.topic_map]
+        if not known:
+            return vals, None
+        return vals, sorted({k for x in known for k in self.p.topic_map[x.lower()]})
+
+    def apply_topics(self, pa: Dict[str, Any], yes: Optional[List[str]]) -> None:
+        """hint: subjects the field names are yes without the model. trust: every subject in topic_map is
+        decided by the field (yes / no); subjects not in topic_map are always scored by the model."""
+        if yes is None or self.topic_mode == "off" or pa.get("from_field") is not None:
+            return
+        keys = yes if self.topic_mode == "hint" else self.p.topic_labels
+        for k in keys:
+            if k not in pa["scores"]:
+                pa["scores"][k] = 1.0 if k in yes else 0.0
+        pa["from_field"] = sorted(keys)
+
     def process(self, records: Sequence[Record]) -> List[Outcome]:
         p = self.p
         docs: List[Dict[str, Any]] = []
@@ -381,6 +579,9 @@ class Labeller:
                 d["row"]["error"] = "no_text"
             else:
                 d["text"] = text
+                d["topic_values"], d["topic_yes"] = self.read_topics(rec)
+                if d["topic_values"]:
+                    d["row"]["topic"] = d["topic_values"]
                 hits = self.matcher.find(text)
                 if self.rules is not None and hits:
                     self.rules.apply(text, hits)
@@ -402,14 +603,20 @@ class Labeller:
                         pm = [m for m in marks if s <= m.start < e]
                         pn = [m for m in nks if s <= m.start < e]
                         if ph or pm or pn or self.force_gate:
-                            pa = {"span": [s, e], "marker": bool(pm), "scores": {}, "_text": text[s:e]}
+                            pa = {"span": [s, e], "marker": bool(pm), "scores": {}, "_text": text[s:e],
+                                  "exc_scores": {}, "_topic_yes": d["topic_yes"],
+                                  "exc_hits": exception_phrase_hits(self.p, self.exc_matchers, text[s:e])}
                             if pn and not ph and not pm:
                                 pa["narrative_keyword"] = True  # only here for the narrative check
                             d["paras"].append(pa)
             docs.append(d)
         paras = [pa for d in docs for pa in d["paras"]]
+        self._score_exceptions(paras)
         if self.all_labels:
-            self._score([(pa, pa["_text"], lab) for pa in paras for lab in p.labels.values()])
+            for pa in paras:
+                self.apply_topics(pa, pa["_topic_yes"])
+            self._score([(pa, pa["_text"], lab) for pa in paras for lab in p.labels.values()
+                         if lab.key not in pa["scores"]])
         else:
             if p.gate is not None:
                 self._score([(pa, pa["_text"], p.gate) for pa in paras])
@@ -418,6 +625,10 @@ class Labeller:
                               pa["scores"].get(p.gate.key, 0.0) < p.gate.threshold)]
                     self._score([(pa, pa["_text"], lab) for pa in closed for lab in self.opening_labels()])
             for lvl in (1, 2):
+                if lvl == 1:  # the topic field answers some subjects (only where level 1 runs)
+                    for pa in paras:
+                        if p.runs(1, self.decision_scores(pa), self.is_open(pa)):
+                            self.apply_topics(pa, pa["_topic_yes"])
                 todo = [(pa, pa["_text"], lab) for pa in paras
                         if p.runs(lvl, self.decision_scores(pa), self.is_open(pa))
                         for lab in p.level(lvl) if lab.key not in pa["scores"]]
@@ -466,6 +677,7 @@ class Labeller:
         removed: List[Tuple[int, int]] = []
         doc_labels, flags = set(), set()
         para_rows = []
+        topic_cmp: "collections.Counter" = collections.Counter()
         tokens_removed = 0
         review = False
         for pa in d["paras"]:
@@ -473,8 +685,24 @@ class Labeller:
             ds = self.decision_scores(pa)
             used = self.levels_used(ds, opened)
             r = resolve(self.p, {k: v for k, v in ds.items() if self.p.labels[k].level in used}, opened)
+            if self.p.exceptions:
+                r = apply_exceptions(self.p, r, pa["exc_hits"], pa["exc_scores"])
             out = {"span": pa["span"], "action": r["action"], "reason": r["reason"], "labels": r["labels"],
                    "scores": pa["scores"], "levels": used, "tokens": est_tokens(pa["_text"])}
+            for k in ("exception", "action_before", "exception_phrases", "exception_blocked"):
+                if k in r:
+                    out[k] = r[k]
+            if pa["exc_scores"]:
+                out["exception_scores"] = pa["exc_scores"]
+            if pa.get("from_field") is not None:
+                out["from_field"] = pa["from_field"]
+            if d.get("topic_yes") is not None:  # field vs model, where the model scored a mapped subject
+                for k in self.p.topic_labels:
+                    v = pa["scores"].get(k)
+                    if v is None or k in (pa.get("from_field") or []):
+                        continue
+                    f_yes, m_yes = k in d["topic_yes"], v >= self.p.labels[k].threshold
+                    topic_cmp[(k, "agree" if f_yes == m_yes else ("field_only" if f_yes else "model_only"))] += 1
             if pa["marker"]:
                 out["marker"] = True
             if pa.get("narrative_keyword"):
@@ -534,7 +762,7 @@ class Labeller:
             clean = dict(obj, **{self.text_field: clean_text}) if (removed or rewrites) else obj
         log_rows = [dict(c, line=rec.line, **({"id": row["id"]} if "id" in row else {})) for c in rewrites]
         group = rec.get(self.group_field) if self.group_field else None
-        return Outcome(row, clean, log_rows, None if group is None else str(group))
+        return Outcome(row, clean, log_rows, None if group is None else str(group), topic_cmp)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -560,6 +788,8 @@ class Stats:
         self.rewrite_names = collections.Counter(data.get("rewrite_names") or {})
         self.groups: Dict[str, collections.Counter] = {k: collections.Counter(v) for k, v in
                                                        (data.get("groups") or {}).items()}
+        self.exceptions = collections.Counter(data.get("exceptions") or {})
+        self.topic = collections.Counter({tuple(k.split("|", 1)): v for k, v in (data.get("topic_agreement") or {}).items()})
 
     def add(self, o: Outcome, group: Optional[str] = None) -> None:
         r = o.row
@@ -579,6 +809,12 @@ class Stats:
                 self.label_tokens[k] += pa["tokens"]
             for k in pa.get("flags") or []:
                 self.flags[k] += 1
+            if pa.get("exception"):
+                self.exceptions[pa["exception"]] += 1
+            if pa.get("exception_blocked"):
+                self.exceptions[pa["exception_blocked"] + " (blocked: protected removal)"] += 1
+        if o.topic_cmp:
+            self.topic.update(o.topic_cmp)
         self.rewrites += len(o.rewrites)
         for c in o.rewrites:
             self.rewrite_names[f"{c['old']} -> {c['new']}"] += 1
@@ -595,7 +831,7 @@ class Stats:
         self.tokens_removed += o.tokens_removed
         self.rewrites += o.rewrites
         for a in ("docs", "doc_tokens", "paras", "para_tokens", "reasons", "label_paras", "label_tokens", "flags",
-                  "rewrite_names"):
+                  "rewrite_names", "exceptions", "topic"):
             getattr(self, a).update(getattr(o, a))
         for k, v in o.groups.items():
             self.groups.setdefault(k, collections.Counter()).update(v)
@@ -607,7 +843,10 @@ class Stats:
                 "label_paragraphs": dict(self.label_paras), "label_tokens": dict(self.label_tokens),
                 "flags": dict(self.flags), "rewrites": self.rewrites,
                 "rewrite_names": dict(self.rewrite_names.most_common(50)),
-                "groups": {k: dict(v) for k, v in self.groups.items()}}
+                "groups": {k: dict(v) for k, v in self.groups.items()},
+                **({"exceptions": dict(self.exceptions)} if self.exceptions else {}),
+                **({"topic_agreement": {f"{k}|{c}": v for (k, c), v in sorted(self.topic.items())}}
+                   if self.topic else {})}
 
 
 def _pct(a: float, b: float) -> str:
@@ -644,6 +883,19 @@ def format_report(summary: Dict[str, Any]) -> str:
                          f"{st['label_tokens'].get(k, 0):>14,}")
     if st.get("flags"):
         L.append("  flagged (not removed): " + ", ".join(f"{k} {v:,}" for k, v in st["flags"].items()))
+    if st.get("exceptions"):
+        L.append("  exceptions: " + ", ".join(f"{k} {v:,}" for k, v in st["exceptions"].items()))
+    if st.get("topic_agreement"):
+        per: Dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+        for kc, v in st["topic_agreement"].items():
+            k, c = kc.split("|", 1)
+            per[k][c] += v
+        L.append("")
+        L.append("topic field vs model (paragraphs the model scored)   agree   field only   model only   agreement")
+        for k, c in sorted(per.items()):
+            n = sum(c.values())
+            L.append(f"  {k:<50} {c['agree']:>6,} {c['field_only']:>12,} {c['model_only']:>12,}   "
+                     f"{_pct(c['agree'], n)}")
     if st.get("rewrite_names"):
         L.append("")
         L.append("place names: " + ", ".join(f"{k} ({v:,})" for k, v in list(st["rewrite_names"].items())[:12]))
@@ -727,10 +979,14 @@ def build_matchers(policy: Policy):
     from nli_filter import COUNTRIES, IncidentalRules, KeywordMatcher, load_keywords, load_lexicon
     cdef = COUNTRIES.get(policy.country.lower(), {"adj": policy.country, "keywords": [policy.country],
                                                    "exclude": []})
-    kw_file = policy.keywords_file
-    if kw_file and not Path(kw_file).is_absolute():
-        kw_file = str(HERE / kw_file)
-    entries = load_lexicon(kw_file) if kw_file and Path(kw_file).is_file() else list(cdef["keywords"])
+    entries: List[Any] = []
+    for kw_file in policy.keywords_files:  # several lists are joined (e.g. Russia + Ukraine)
+        if not Path(kw_file).is_absolute():
+            kw_file = str(HERE / kw_file)
+        if Path(kw_file).is_file():
+            entries += load_lexicon(kw_file)
+    if not entries:
+        entries = list(cdef["keywords"])
     matcher = KeywordMatcher(entries, cdef.get("exclude") or [])
     companies: List[str] = []
     if policy.company_names_file:
@@ -798,7 +1054,13 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         print("error: --compress zst needs the 'zstandard' package", file=sys.stderr)
         return 2
     matcher, rules, markers = build_matchers(policy)
-    rewriter = None if args.no_rewrite else NameRewriter.from_files(args.place_names, args.place_name_exceptions)
+    rewrite = not args.no_rewrite and policy.rewrite_place_names
+    rewriter = NameRewriter.from_files(args.place_names, args.place_name_exceptions) if rewrite else None
+    topic_field = getattr(args, "topic_field", None) or policy.topic_field
+    topic_mode = getattr(args, "topic_mode", None) or policy.topic_mode
+    if topic_field and not policy.topic_map:
+        log.warning("topic field '%s' given, but the policy has no topic_map: the field is only recorded",
+                    topic_field)
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.perf_counter()
@@ -806,7 +1068,8 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
     load_s = time.perf_counter() - t0
     labeller = Labeller(policy, matcher, None if args.no_rules else rules, scorer, rewriter, args.all_labels,
                         args.text_field, args.id_field or None, args.review_as, args.min_doc_chars, markers,
-                        args.group_field, narrative_matcher=build_narrative_matcher(policy))
+                        args.group_field, narrative_matcher=build_narrative_matcher(policy),
+                        topic_field=topic_field, topic_mode=topic_mode)
     total = Stats()
     files_rows: List[Dict[str, Any]] = []
     failed = 0
@@ -957,7 +1220,8 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         "policy": policy.summary(),
         "settings": {"fast_model": args.fast_model, "judge_model": args.judge_model,
                      "uncertain_band": list(args.uncertain_band), "all_labels": args.all_labels,
-                     "review_as": args.review_as, "rewrite": not args.no_rewrite, "rules": not args.no_rules,
+                     "review_as": args.review_as, "rewrite": rewrite, "rules": not args.no_rules,
+                     "topic_field": topic_field, "topic_mode": topic_mode if topic_field else None,
                      "text_field": args.text_field, "max_length": args.max_length, "group_field": args.group_field,
                      "shard": shard, "inflight": inflight},
         "timing": {"load_seconds": round(load_s, 1), "run_seconds": round(time.perf_counter() - t_run, 1),
@@ -991,10 +1255,16 @@ class StoredScorer:
     """Stands in for the models in 'redecide': returns the scores a run stored, looked up by (paragraph text,
     label). A label whose hypothesis changed since that run is not reused. Missing scores count as 0 (No)."""
 
-    def __init__(self, policy: Policy, old_labels: Dict[str, Any]):
+    def __init__(self, policy: Policy, old_labels: Dict[str, Any], old_exceptions: Optional[List[Dict[str, Any]]] = None):
         self.hyp2key = {lab.hypothesis: k for k, lab in policy.labels.items()}
         self.changed = sorted(k for k, lab in policy.labels.items()
                               if (old_labels.get(k) or {}).get("hypothesis") != lab.hypothesis)
+        old_ex = {e.get("key"): e.get("hypothesis") for e in (old_exceptions or [])}
+        for ex in policy.exceptions:
+            if ex.hypothesis:
+                self.hyp2key.setdefault(ex.hypothesis, ex.score_key)
+                if old_ex.get(ex.key) != ex.hypothesis:
+                    self.changed.append(ex.score_key)
         self.table: Dict[Tuple[str, str], float] = {}
         self.fast_pairs = self.judge_pairs = 0
         self.stored = self.missing = 0
@@ -1009,8 +1279,9 @@ class StoredScorer:
         for pa in row.get("paragraphs") or []:
             s, e = pa["span"]
             h = self._h(text[s:e])
-            for k, v in (pa.get("scores") or {}).items():
-                if k not in self.changed and v is not None:
+            field_keys = set(pa.get("from_field") or [])  # answered by the topic field, not by a model
+            for k, v in list((pa.get("scores") or {}).items()) + list((pa.get("exception_scores") or {}).items()):
+                if k not in self.changed and k not in field_keys and v is not None:
                     self.table[(h, k)] = float(v)
 
     def score(self, premises: List[str], hyps: List[str]) -> List[Tuple[float, Optional[float], float]]:
@@ -1042,7 +1313,8 @@ def cmd_redecide(args) -> int:
         return 2
     old = json.loads(old_summary_p.read_text(encoding="utf-8"))
     policy = Policy.load(args.policy)
-    scorer = StoredScorer(policy, ((old.get("policy") or {}).get("labels") or {}))
+    scorer = StoredScorer(policy, ((old.get("policy") or {}).get("labels") or {}),
+                          (old.get("policy") or {}).get("exceptions"))
     pairs = _run_files(run)
     if not pairs:
         print(f"error: {run} has no finished files", file=sys.stderr)
@@ -1068,6 +1340,8 @@ def cmd_redecide(args) -> int:
     ns.reopen = {row["input"]: row.get("reopen") for row, _ in _run_file_rows(run)}
     ns.all_labels = bool(st.get("all_labels"))  # same cascade as the old run
     ns.text_field = tf
+    if not getattr(args, "topic_field", None):
+        ns.topic_field = st.get("topic_field")
     for k in ("fast_model", "judge_model", "max_length"):
         setattr(ns, k, st.get(k))
     ns.uncertain_band = st.get("uncertain_band") or [0.6, 0.95]
@@ -1103,6 +1377,14 @@ def _run_file_rows(run: Path) -> List[Tuple[Dict[str, Any], Path]]:
         if lp.is_file() and d.get("input"):
             out.append((d, lp))
     return out
+
+
+def _run_topic_field(run: Path) -> Optional[str]:
+    """The topic field a run used (its hand-label items keep the line's topic for eval)."""
+    sp = run / "summary.json"
+    if not sp.is_file():
+        return None
+    return ((json.loads(sp.read_text(encoding="utf-8")).get("settings") or {}).get("topic_field")) or None
 
 
 def _opener(run: Path):
@@ -1152,7 +1434,7 @@ def label_meta(policy: Policy, **extra: Any) -> Dict[str, Any]:
 
 
 def paragraph_items(cands: List[Dict[str, Any]], policy: Policy, text_field: str = "text",
-                    context: int = 300, opener=None) -> List[Dict[str, Any]]:
+                    context: int = 300, opener=None, topic_field: Optional[str] = None) -> List[Dict[str, Any]]:
     """Hand-label items (label tool format) for paragraphs of a run: cands = {key, file, line, span, id, scores,
     action, marker, picked_for}. The text is read from the run's input files; emptied documents are skipped."""
     by_file: Dict[str, Dict[int, List[Dict[str, Any]]]] = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -1184,7 +1466,10 @@ def paragraph_items(cands: List[Dict[str, Any]], policy: Policy, text_field: str
                     "model": {"scores": c["scores"], "action": c["action"], **({"reason": c["reason"]} if c.get("reason") else {}),
                               **({"labels": c["labels"]} if c.get("labels") is not None else {})},
                     "labels": {k: None for k in policy.labels}, "action": None,
-                    "status": "todo", "by": None, "note": ""})
+                    "status": "todo", "by": None, "note": "",
+                    **({"topic": get_path(rec.data, topic_field or policy.topic_field)}
+                       if (topic_field or policy.topic_field) and isinstance(rec.data, dict)
+                       and get_path(rec.data, topic_field or policy.topic_field) is not None else {})})
             need.discard(rec.line)
             if not need:
                 break
@@ -1220,7 +1505,7 @@ def cmd_review(args) -> int:
     if not cands:
         print(f"no paragraphs with action {', '.join(sorted(want))} in {run}")
         return 0
-    items = paragraph_items(cands, policy, args.text_field, args.context, _opener(run))
+    items = paragraph_items(cands, policy, args.text_field, args.context, _opener(run), _run_topic_field(run))
     out = Path(args.out)
     if out.exists() and not args.overwrite:
         print(f"error: {out} exists (use --overwrite)", file=sys.stderr)
@@ -1300,7 +1585,8 @@ def cmd_sample(args) -> int:
             take(c, f"near:{k}")
         for c in rng.sample(low, min(args.low, len(low))):
             take(c, f"low:{k}")
-    items = paragraph_items(list(picked.values()), policy, args.text_field, args.context, _opener(run))
+    items = paragraph_items(list(picked.values()), policy, args.text_field, args.context, _opener(run),
+                           _run_topic_field(run))
     rng.shuffle(items)
     out = Path(args.out)
     if out.exists() and not args.overwrite:
@@ -1425,11 +1711,13 @@ def cmd_eval(args) -> int:
         log.warning("reused %d scores stored by the sampled run", reused)
         cache.save()
     todo = []
+    hyps = [lab.hypothesis for lab in policy.labels.values()] + [ex.hypothesis for ex in policy.exceptions
+                                                                  if ex.hypothesis]
     for it in use:
-        for lab in policy.labels.values():
-            k = cache.key(lab.hypothesis, it["text"])
+        for h in hyps:
+            k = cache.key(h, it["text"])
             if k not in cache.data:
-                todo.append((k, it["text"], lab.hypothesis))
+                todo.append((k, it["text"], h))
     if todo:
         log.warning("scoring %d new (paragraph, hypothesis) pairs", len(todo))
         scorer, fast, judge = build_scorer(args)
@@ -1475,12 +1763,18 @@ def cmd_eval(args) -> int:
     # actions
     conf = collections.Counter()
     wrong_removed = missed = 0
+    exc_matchers = build_exception_matchers(policy)
     for it, sc in rows:
         truth = it.get("action") or action_from_labels(policy, it.get("labels") or {})
         if not truth:
             continue
         marker = bool(it.get("marker"))
-        pred = resolve(policy, sc, marker)["action"]
+        r = resolve(policy, sc, marker)
+        if policy.exceptions:
+            ex_sc = {ex.score_key: cache.data[cache.key(ex.hypothesis, it["text"])]
+                     for ex in policy.exceptions if ex.hypothesis}
+            r = apply_exceptions(policy, r, exception_phrase_hits(policy, exc_matchers, it["text"]), ex_sc)
+        pred = r["action"]
         conf[(truth, pred)] += 1
         tok = est_tokens(it["text"])
         if pred == "remove" and truth in ("keep", "pass"):
@@ -1498,6 +1792,25 @@ def cmd_eval(args) -> int:
         agree = sum(v for (a, b), v in conf.items() if a == b)
         L.append(f"  agreement {agree}/{n_act} ({_pct(agree, n_act).strip()});  wrongly removed ~{wrong_removed:,} "
                  f"tokens, missed ~{missed:,} tokens")
+    if policy.topic_map:  # is the corpus' topic field good enough to trust? (field vs hand labels, model vs hand)
+        tl = []
+        for k in policy.topic_labels:
+            fc = mc = n = 0
+            for it, sc in rows:
+                truth_k = (it.get("labels") or {}).get(k)
+                tv = it.get("topic")
+                vals = [str(x).strip().lower() for x in (tv if isinstance(tv, list) else [tv]) if x is not None]
+                if truth_k is None or not any(v in policy.topic_map for v in vals):
+                    continue
+                f_yes = any(k in policy.topic_map.get(v, []) for v in vals)
+                n += 1
+                fc += f_yes == bool(truth_k)
+                mc += (sc[k] >= policy.labels[k].threshold) == bool(truth_k)
+            if n:
+                tl.append(f"  {k:<30} {n:>5}   field {_pct(fc, n)}   model {_pct(mc, n)}")
+                report.setdefault("topic_field", {})[k] = {"n": n, "field_correct": fc, "model_correct": mc}
+        if tl:
+            L += ["", "topic field vs your labels (items whose topic is in topic_map)   n   correct"] + tl
     L += ["", "thr = policy threshold; best-F1 / thr@recall / CRC = suggestions from these labels. CRC uses only "
           "items picked at random (picked_for 'random') and gives: expected miss rate <= "
           f"{args.miss:.2f} for that label, if the corpus is like the sample (cmds/labeling/thresholds.md)."]
@@ -1554,6 +1867,11 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--text-field", default="text")
     r.add_argument("--id-field", default="id")
     r.add_argument("--group-field", default=None, help="field to break the composition down by (e.g. source)")
+    r.add_argument("--topic-field", default=None, help="the corpus' topic field, dot path for nested fields "
+                   "(e.g. topic, metadata.topic); mapped to subjects by the policy's topic_map; missing = models")
+    r.add_argument("--topic-mode", choices=list(TOPIC_MODES), default=None,
+                   help="hint: field yes = subject yes, the rest by the models; trust: mapped subjects by the field "
+                        "only; off: recorded and compared, not used (default: the policy's, else hint)")
     r.add_argument("--min-doc-chars", type=int, default=50, help="shorter after cleaning = document removed")
     r.add_argument("--chunk-lines", type=int, default=64)
     r.add_argument("--limit", type=int, default=None, help="first N lines per file")
@@ -1620,6 +1938,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--text-field", default="text")
     d.add_argument("--id-field", default="id")
     d.add_argument("--group-field", default=None)
+    d.add_argument("--topic-field", default=None, help="default: the one the run used")
+    d.add_argument("--topic-mode", choices=list(TOPIC_MODES), default=None)
     d.add_argument("--min-doc-chars", type=int, default=50)
     d.add_argument("--chunk-lines", type=int, default=256)
     return ap

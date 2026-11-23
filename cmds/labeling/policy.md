@@ -38,6 +38,19 @@ All hypotheses, thresholds and decisions live in this one file. To try a change,
 
 `nli_label.py` uses v1 unless you pass `--policy policy\russia_policy_v2.json` (or `_v3`, `_v4`, `_v5`).
 
+The Russia-side project (Russia's LLM) has its own policy, `policy\russia_llm_policy_v2.json`: see
+`cmds\labeling\russia_llm.md`.
+
+## Settings added on 2026-11-23 (any policy can use them)
+
+| Setting | Meaning |
+|---|---|
+| `"exceptions": [...]` | Top-priority rules, checked before the cascade's decision: `key`, `decision` (remove / review / keep), `priority` (highest wins), `match` (`phrases` and / or `hypothesis` + `threshold`), `skip_quoted`, `scope` (`keyword` or `gate`), `note`. Details and an example: `russia_llm.md` |
+| `"protected": true` on a label | An exception never lowers this label's removal (used for hate and violence) |
+| `"topic_field"`, `"topic_mode"`, `"topic_map"` | Use a topic the corpus already has: `topic_map` maps its values to level-1 subjects; `hint` / `trust` / `off`. Command line: `--topic-field`, `--topic-mode`. Details: `russia_llm.md` |
+| `"keywords_file": [a, b]` | Several keyword lists are joined (one file as before also works) |
+| `"rewrite_place_names": false` | This policy never rewrites place names (the same as `--no-rewrite`) |
+
 **A paragraph that is there only because of a narrative keyword** (no Russia keyword, no marker) is judged by the
 narrative check alone: its gate score is ignored, so it is removed only if a narrative (or `hostility_ukrainians`)
 scores at or above its threshold, and otherwise passes. Without this rule, v4's first measurement sent a place-name

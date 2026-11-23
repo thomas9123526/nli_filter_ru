@@ -17,9 +17,9 @@ function docAction(r: LabelTryResp["rows"][number]): string {
   return order.find((a) => ps.some((p) => p.action === a)) || r.action;
 }
 
-function matches(expected: string | null, got: string): boolean | null {
+function matches(expected: string | null, got: string, acceptable?: string[]): boolean | null {
   if (!expected) return null;
-  const ok = expected.split(" or ").map((x) => x.trim());
+  const ok = [...expected.split(" or ").map((x) => x.trim()), ...(acceptable || [])];
   // "pass" (the gate says not Russia-related) and "untouched" (no keyword at all) both leave the text as it is
   if (ok.includes("pass") || ok.includes("untouched")) ok.push("pass", "untouched");
   return ok.includes(got);
@@ -27,7 +27,9 @@ function matches(expected: string | null, got: string): boolean | null {
 
 export function LabelTryView() {
   const sp = useSearchParams();
-  const cases = useApi("labelcases", (s) => api.labelCases(s));
+  const caseFiles = useApi("labelcasefiles", (s) => api.labelCaseFiles(s));
+  const [caseFile, setCaseFile] = useState(sp.get("cases") || "");
+  const cases = useApi(`labelcases:${caseFile}`, (s) => api.labelCases(caseFile || undefined, s));
   const policies = useApi("labelpolicies", (s) => api.labelPolicies(s));
   const list = cases.data?.cases || [];
   const [ci, setCi] = useState(0);
@@ -87,7 +89,7 @@ export function LabelTryView() {
       const r = await api.labelTry({ texts: [text], policy: policy || cases.data?.policy || undefined, all_labels: true, force_gate: forceGate, use_judge: useJudge });
       setRes(r); setSel(0);
       if (c && t && text === t.text) {
-        setResults((m) => ({ ...m, [`${c.id}#${ti}`]: matches(t.expected_action, docAction(r.rows[0])) }));
+        setResults((m) => ({ ...m, [`${c.id}#${ti}`]: matches(t.expected_action, docAction(r.rows[0]), t.acceptable) }));
       }
     } catch (e) { setErr(e as Error); }
     setBusy(false);
@@ -99,7 +101,7 @@ export function LabelTryView() {
   const row = res?.rows[0];
   const paras = row?.paragraphs || [];
   const got = row ? docAction(row) : null;
-  const ok = got && t ? matches(t.expected_action, got) : null;
+  const ok = got && t ? matches(t.expected_action, got, t.acceptable) : null;
   const edited = t && text !== t.text;
 
   return (
@@ -110,6 +112,11 @@ export function LabelTryView() {
           <h1>Try the policy, case by case</h1>
           <div className="sub">{list.length} cases from {cases.data.file}: every level-0 / 1 / 2 label as a “yes” and a “near miss” case, plus the edge cases.
             Run a text, then compare the flow with what is expected. Needs the model service with models: <code className="mono">python nli_playground.py</code>.</div>
+          {(caseFiles.data?.files || []).length > 1 ? (
+            <label className="faint" style={{ fontSize: 13 }}>cases&nbsp;
+              <select value={caseFile || cases.data.file} data-testid="case-file" onChange={(e) => { setCaseFile(e.target.value); setCi(0); setTi(0); setResults({}); setPolicy(""); setExtText(null); }}>
+                {(caseFiles.data?.files || []).map((f) => <option key={f} value={f}>{f}</option>)}
+              </select></label>) : null}
         </div>
       </div>
       <div className="try-grid">
@@ -152,7 +159,9 @@ export function LabelTryView() {
               </div>
               <textarea className="mono try-text" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} data-testid="try-text" />
               <div className="row" style={{ fontSize: 13 }}>
-                <span>Expected: <span className={`badge ${actionClass(t?.expected_action || "")}`}>{t?.expected_action || "?"}</span></span>
+                <span>Expected: <span className={`badge ${actionClass(t?.expected_action || "")}`}>{t?.expected_action || "?"}</span>
+                  {t?.acceptable?.length ? <span className="faint"> (also fine: {t.acceptable.join(", ")})</span> : null}</span>
+                {t?.your_decision && t.your_decision !== t.expected_action ? <span className="faint">your first decision: <span className={`badge ${actionClass(t.your_decision)}`}>{t.your_decision}</span></span> : null}
                 <span className="faint">yes: {t?.labels_yes.length ? t.labels_yes.map((l) => <span key={l} className="chip">{l}</span>) : "none"}</span>
                 {t?.from.startsWith("seed") ? <span className="badge warn" title="Claude's draft labels: not checked yet">draft labels</span> : null}
                 {edited ? <span className="badge neutral">edited: expected no longer applies</span> : null}

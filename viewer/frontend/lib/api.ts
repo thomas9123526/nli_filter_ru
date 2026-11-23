@@ -110,7 +110,8 @@ export const api = {
   labelRun: (run: string, s?: AbortSignal) => getJSON<LabelRunResp>(`/api/labels/${enc(run)}`, undefined, s),
   labelDocs: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocsResp>(`/api/labels/${enc(run)}/docs`, p, s),
   labelDoc: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocResp>(`/api/labels/${enc(run)}/doc`, p, s),
-  labelCases: (s?: AbortSignal) => getJSON<LabelCasesResp>("/api/labels/cases", undefined, s),
+  labelCases: (file?: string, s?: AbortSignal) => getJSON<LabelCasesResp>("/api/labels/cases", file ? { file } : undefined, s),
+  labelCaseFiles: (s?: AbortSignal) => getJSON<{ files: string[]; newest: string | null }>("/api/labels/case-files", undefined, s),
   labelTry: (body: { texts: string[]; policy?: string; all_labels?: boolean; force_gate?: boolean; use_judge?: boolean }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
   labelStart: (command: string) => postJSON<RunJob>("/api/labels/start", { command }),

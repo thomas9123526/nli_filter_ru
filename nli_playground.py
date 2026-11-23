@@ -288,7 +288,8 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
     t0 = time.perf_counter()
     with pg.lock:  # the models are shared: one request at a time
         scorer = nf.CascadeScorer(pg.fast, pg.judge if use_judge else None, (float(lo), float(hi)))
-        lab = nli_label.Labeller(policy, matcher, rules, scorer, NameRewriter.from_files(),
+        lab = nli_label.Labeller(policy, matcher, rules, scorer,
+                                 NameRewriter.from_files() if policy.rewrite_place_names else None,
                                  all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
                                  force_gate=bool(req.get("force_gate", False)),
                                  narrative_matcher=nli_label.build_narrative_matcher(policy))

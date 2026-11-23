@@ -1,0 +1,181 @@
+{
+  "about": "Policy for Russia's LLM (the Russia-side project), v2. Agreed principles (2026-11-23): remove hate and violence against either people; send opinions about Russia or Ukraine in BOTH directions to human review; send history (and later review topics) to review; known false claims to review; keep facts whoever they hurt. Exceptions are checked first. See cmds/labeling/russia_llm.md. v2 (measured on labels/russia_llm_cases_v1.json): history and opinion wordings chosen by measurement, opinions at 0.7.",
+  "version": 2,
+  "country": "Russia",
+  "keywords_file": [
+    "keywords/russia_v3.txt",
+    "keywords/ukraine.txt"
+  ],
+  "company_names_file": null,
+  "rewrite_place_names": false,
+  "markers": [
+    "orcs",
+    "rashists",
+    "рашисты",
+    "рашистов",
+    "орки",
+    "кацапы",
+    "москали",
+    "хохлы",
+    "укропы",
+    "укры"
+  ],
+  "paragraphs": {
+    "min_chars": 200,
+    "max_chars": 2000
+  },
+  "conflict": "review",
+  "narrative_opens_gate": true,
+  "exceptions": [
+    {
+      "key": "ambiguous_our_country",
+      "decision": "review",
+      "priority": 100,
+      "skip_quoted": true,
+      "scope": "keyword",
+      "match": {
+        "phrases": [
+          "our country",
+          "our nation",
+          "our motherland",
+          "our homeland",
+          "наша страна",
+          "нашей страны",
+          "нашей стране",
+          "нашу страну",
+          "нашей страной",
+          "наша родина",
+          "нашей родины",
+          "наша країна",
+          "нашої країни",
+          "нашій країні",
+          "нашу країну",
+          "нашою країною",
+          "наша батьківщина"
+        ]
+      },
+      "note": "'our country' without naming it: the model could learn a national voice nobody can identify. Review first; switch to remove once measured. Quoted speech (a named speaker) does not count."
+    }
+  ],
+  "topic_field": null,
+  "topic_mode": "hint",
+  "topic_map": {
+    "History": "history",
+    "Politics": "politics",
+    "Crime & Law": "politics",
+    "Finance & Business": "economy",
+    "Entertainment": "culture",
+    "Literature": "culture",
+    "Art & Design": "culture"
+  },
+  "labels": {
+    "involves_russia_ukraine": {
+      "level": 0,
+      "decision": "gate",
+      "threshold": 0.3,
+      "hypothesis": "This text mentions Russia, Ukraine, Russians or Ukrainians.",
+      "note": "Gate: below the threshold and no marker = the keyword was incidental (pass). Low on purpose: opinions must reach level 2."
+    },
+    "history": {
+      "level": 1,
+      "decision": "review",
+      "threshold": 0.8,
+      "hypothesis": "This text describes historical events from centuries ago in Russia, Ukraine or the Soviet Union.",
+      "note": "Review topic. v1 wording ('the history of Russia or Ukraine') also fired on 2022 war facts and on opinions; this one had no false alarm on the cases. Known miss: 'In 1991 Ukraine declared independence' (recent history)."
+    },
+    "politics": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text is about politics or government in Russia or Ukraine.",
+      "note": "Reporting only (composition); keep."
+    },
+    "war": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text is about the war between Russia and Ukraine.",
+      "note": "Reporting only; facts about the war are kept whoever they hurt."
+    },
+    "economy": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text is about the economy of Russia or Ukraine.",
+      "note": "Reporting only; keep."
+    },
+    "culture": {
+      "level": 1,
+      "decision": "keep",
+      "threshold": 0.8,
+      "hypothesis": "This text is about Russian or Ukrainian music, films, art, literature or entertainment.",
+      "note": "Reporting only; keep."
+    },
+    "opinion_about_russia": {
+      "level": 2,
+      "decision": "review",
+      "threshold": 0.7,
+      "hypothesis": "This text expresses the writer's opinion about Russia or something Russian.",
+      "note": "Both directions (praise and criticism) go to review. v2: '... or something Russian/Ukrainian' at 0.7 (v1 missed praise of Russian vaccines and opinions about Ukrainian things)."
+    },
+    "opinion_about_ukraine": {
+      "level": 2,
+      "decision": "review",
+      "threshold": 0.7,
+      "hypothesis": "This text expresses the writer's opinion about Ukraine or something Ukrainian.",
+      "note": "Both directions (praise and criticism) go to review. v2: '... or something Russian/Ukrainian' at 0.7 (v1 missed praise of Russian vaccines and opinions about Ukrainian things)."
+    },
+    "hostility_russians": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "protected": true,
+      "hypothesis": "This text insults or dehumanizes Russians or Russian-speaking people.",
+      "note": "Hate: removed. Protected: no exception lowers it."
+    },
+    "hostility_ukrainians": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "protected": true,
+      "hypothesis": "This text insults or dehumanizes Ukrainians.",
+      "note": "Hate: removed. Protected: no exception lowers it."
+    },
+    "violence_call": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "protected": true,
+      "hypothesis": "This text calls for violence against Russians or Ukrainians.",
+      "note": "Removed. Protected."
+    },
+    "claim_ukraine_in_nato": {
+      "level": 2,
+      "decision": "review",
+      "threshold": 0.8,
+      "hypothesis": "This text states that Ukraine is a member of NATO.",
+      "note": "Known false claim (as of 2026): review. The models cannot check truth; each known false claim needs its own label."
+    },
+    "reports_or_debunks": {
+      "level": 2,
+      "decision": "keep",
+      "threshold": 0.6,
+      "hypothesis": "This text reports or refutes what someone else claimed.",
+      "softens": [
+        "hostility_*",
+        "violence_call"
+      ],
+      "note": "Guard: news quoting hate or a fact-check goes to review instead of being removed."
+    }
+  },
+  "run_if": {
+    "1": [
+      "involves_russia_ukraine",
+      "@marker"
+    ],
+    "2": [
+      "involves_russia_ukraine",
+      "@marker"
+    ]
+  }
+}

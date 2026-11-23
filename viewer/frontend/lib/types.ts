@@ -455,20 +455,28 @@ export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record
 export type LabelParagraph = {
   span: [number, number]; action: string; reason: string; labels: string[]; scores: Record<string, number>;
   tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[]; opened_by?: string[];
+  exception?: string; action_before?: string; exception_phrases?: string[]; exception_blocked?: string;
+  exception_scores?: Record<string, number>; from_field?: string[];
 };
 export type LabelDocResp = {
   name: string; file: string; input: string | null; text: string | null; problem: string | null;
   row: { line: number; id?: string; gate?: boolean; action: string; hits?: { kw: string; span: [number, number]; rule?: string }[];
          markers?: string[]; paragraphs?: LabelParagraph[]; labels?: string[]; flags?: string[]; tokens: number;
          tokens_removed?: number; rewrites?: number; error?: string };
-  policy: { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string };
+  policy: FlowPolicyData;
   policy_path?: string | null;
   settings: Record<string, unknown>;
 };
 
+export type PolicyExceptionInfo = { key: string; decision: string; priority: number; scope: string; phrases?: string[];
+  hypothesis?: string; threshold?: number; skip_quoted?: boolean; note?: string };
+export type FlowPolicyData = { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string;
+  exceptions?: PolicyExceptionInfo[]; topic?: { field: string | null; mode: string; map: Record<string, string[]> } };
+
 // ---- policy Try page (labels/cases_v1.json, POST /api/labels/try) ----
 
-export type LabelCaseText = { text: string; from: string; labels_yes: string[]; expected_action: string | null; note: string };
+export type LabelCaseText = { text: string; from: string; labels_yes: string[]; expected_action: string | null; note: string;
+  acceptable?: string[]; your_decision?: string };
 export type LabelCase = {
   id: string; group: string; label: string | null; title: string; what: string;
   hypothesis?: string; decision?: string; texts: LabelCaseText[];
@@ -477,5 +485,5 @@ export type LabelCasesResp = { version: number; created: string; about: string; 
 export type LabelTryResp = {
   rows: LabelDocResp["row"][]; clean: (string | null)[]; rewrites: { start: number; old: string; new: string }[][];
   seconds: number; pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null };
-  policy: { labels: Record<string, LabelPolicyLabel>; run_if: Record<string, string[]>; conflict?: string };
+  policy: FlowPolicyData;
 };

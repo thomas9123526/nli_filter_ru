@@ -28,6 +28,16 @@ The input files are never changed.
 - Untouched lines are short: `{"line": 3, "id": "…", "gate": false, "tokens": 410, "action": "untouched"}`.
 - `scores` holds every label that was scored (all of them with `--all-labels`). With the cascade, a missing label was
   not needed (e.g. level 2 when politics / war / history are no).
+- Fields only some paragraphs have:
+  - `exception`, `action_before`, `exception_phrases`: a policy exception decided (`reason` is `"exception"`;
+    `action_before` is what the cascade said, `exception_phrases` the words that matched).
+  - `exception_blocked`: an exception matched, but a protected label (hate, violence) keeps the removal.
+  - `exception_scores`: scores of exceptions that use a hypothesis.
+  - `from_field`: subjects answered by the corpus' topic field instead of a model (`--topic-field`). The line then
+    also has `"topic": [...]`.
+  - `marker`, `narrative_keyword`, `opened_by`, `flags`, `judged`: see `policy.md`.
+- The summary counts exceptions (`stats.exceptions`) and, with a topic field, how often the field and the model
+  agree per subject (`stats.topic_agreement`; the report prints it as a table).
 - To build a training set from the columns instead of the clean copy (the guide's "filter on the columns"): read
   `labels.jsonl` next to the input, cut out the spans whose `action` you don't want, and rewrite names with
   `nli_names.py`.

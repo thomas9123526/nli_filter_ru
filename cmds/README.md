@@ -38,7 +38,7 @@
 | | `review_tools.md` | Keywords page (per-keyword stats and flags), Review page (queues), golden set labels (outside the corpus), `--audit-strict` for level-A keywords |
 | | `try_settings.md` | Try keywords / hypotheses on the Corpus page (model service `nli_playground.py`); shared `hypotheses\*.json` |
 | | `move_viewer.md` | Copy the viewer to another computer: what to copy, what to leave out |
-| | `labels_pages.md` | Labels pages: `nli_label.py` runs in the viewer, a document's flow (gate → level 1 → level 2 → decision), starting a run |
+| | `labels_pages.md` | Labels pages: `nli_label.py` runs in the viewer, a document's flow (gate → level 1 → level 2 → exceptions → decision), starting a run, choosing a case set on the Try page |
 | | `sftp.md` | Corpus on an SFTP server: config, connection check, errors |
 | | `sftp_192.168.170.200.md` | Filter and view `test_corpus` on the SFTP server 192.168.170.200 |
 | `design/` | `overnight_2026-11-18.md` | Overnight report: Keywords / Review pages, golden set, `--audit-strict`, `nli_compare.py`, `nli_replay.py`; how to try them, test results |
@@ -52,6 +52,7 @@
 | | `place_names.md` | `policy\place_names.csv` + exceptions, `nli_names.py`, open codebook questions |
 | | `outputs.md` | What `run` / `redecide` write; the composition report |
 | | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 76 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v4.json`; as a corpus: `test_corpus_cases\` (viewer dataset "cases"); policies v2 (values / style), v3 (cascade fixes), v4 (Kremlin accusations, narrative keywords) |
+| | `russia_llm.md` | **The Russia-side project** (Russia's LLM): the agreed principles, `policy\russia_llm_policy_v2.json`, exceptions ("our country"), the optional topic field (`--topic-field`, hint / trust / off), the 43 test cases and their results |
 | | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
 | `design/` | `work_log_2026-11-21.md` | **What changed while you were away** (v4, v5, the judge, nli_filter vs nli_label), what waits for you |
 | | `policy_cases_report_2026-11-20.md` | **Report**: why the approach fits A's needs, results per case with examples, why cases fail, simulated fixes (66 % → 81 %), cases / models to add, turning removed content into keepable content |
