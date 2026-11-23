@@ -112,6 +112,7 @@ pkgs/rtx5090-ubuntu-py310/zstandard-0.25.0-cp310-cp310-manylinux2014_x86_64.many
 pkgs/rtx5090-ubuntu-py310/pyarrow-25.0.1-cp310-cp310-manylinux_2_28_x86_64.whl                                                #   47.75 MB  scripts + viewer (.parquet / .arrow corpora; optional)
 
 [h200-ubuntu-py312]  pkgs/h200-ubuntu-py312/  29 wheels, 84.9 MB
+pkgs/h200-ubuntu-py312/numpy-2.5.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl                                  #   16 MB  transformers (added 2026-11-23: torch wheels no longer bring numpy)
 pkgs/h200-ubuntu-py312/annotated_doc-0.0.5-py3-none-any.whl                                                                   #    0.01 MB  typer
 pkgs/h200-ubuntu-py312/anyio-4.16.0-py3-none-any.whl                                                                          #    0.13 MB  httpx2
 pkgs/h200-ubuntu-py312/click-8.5.1-py3-none-any.whl                                                                           #    0.12 MB  typer
