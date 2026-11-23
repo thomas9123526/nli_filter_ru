@@ -197,3 +197,30 @@ def test_runs_moved_into_dataset_are_found(client, project):
     d = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
     assert d["row"]["action"] == "edited" and d["text"]
     assert client.get("/api/labels/dataset").status_code in (400, 404)  # dataset/ itself is not a run
+
+
+def test_expected_vs_result_for_a_test_corpus(client, project):
+    """A corpus whose lines carry expected_action: each row gets ✓ / ✗, the run a summary, the doc a verdict."""
+    lines = [json.dumps({"id": "d1", "text": TEXT, "expected_action": "remove", "note": "culture"}),
+             json.dumps({"id": "d2", "text": "Nothing here.", "expected_action": "keep", "acceptable": ["pass"]})]
+    (project / "in.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    d = client.get("/api/labels/out_label_t/docs", params={"file": "in"}).json()
+    assert d["expected"] == {"n": 2, "ok": 2}                       # d2 untouched counts as pass ≡ keep's "also fine"
+    assert d["rows"][0]["expect"]["ok"] is True and d["rows"][0]["expect"]["got"] == "remove"
+    s = client.get("/api/labels/out_label_t/expected").json()["expected"]
+    assert s["n"] == 2 and s["ok"] == 2 and s["wrong"] == []
+    lines[0] = json.dumps({"id": "d1", "text": TEXT, "expected_action": "keep", "note": "should fail"})
+    (project / "in.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    s = client.get("/api/labels/out_label_t/expected").json()["expected"]
+    assert s["ok"] == 1 and s["wrong"][0]["line"] == 1 and s["wrong"][0]["got"] == "remove"
+    wrong = client.get("/api/labels/out_label_t/docs", params={"file": "in", "expect": "wrong"}).json()
+    assert [r["line"] for r in wrong["rows"]] == [1]
+    doc = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+    assert doc["expect"]["ok"] is False and doc["expect"]["note"] == "should fail"
+
+
+def test_no_expected_results_on_real_data(client):
+    d = client.get("/api/labels/out_label_t/docs", params={"file": "in"}).json()
+    assert "expected" not in d and "expect" not in d["rows"][0]
+    assert client.get("/api/labels/out_label_t/expected").json()["expected"] is None
+    assert "expect" not in client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()

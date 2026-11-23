@@ -30,6 +30,7 @@ class LabelRuns:
         self.project = Path(project)
         self.stale = stale_seconds
         self.extra: Dict[str, Path] = {}  # runs outside the project folder, named after their dataset
+        self._exp_cache: Dict[tuple, Dict[int, Dict[str, Any]]] = {}  # (corpus file, mtime) -> expected per line
         if str(self.project) not in sys.path:
             sys.path.insert(0, str(self.project))
 
@@ -177,13 +178,132 @@ class LabelRuns:
                 if raw.strip():
                     yield json.loads(raw)
 
+    # ---- expected results (test corpora: expected_action / expected_doc_action / expected_paragraphs) ----------
+    def _local_source(self, d: Path, file: str) -> Optional[Path]:
+        src = (_read_json(d / f"{file}.summary.json") or {}).get("input")
+        if not src or "://" in str(src):
+            return None
+        p = Path(src) if Path(src).is_absolute() else self.project / src
+        return p if p.is_file() else None
+
+    def expected(self, d: Path, file: str) -> Dict[int, Dict[str, Any]]:
+        """{line: expected fields} from the run's input file; {} for a corpus without expected results (real data:
+        only its first lines are read)."""
+        src = self._local_source(d, file)
+        if src is None:
+            return {}
+        try:
+            key = (str(src), src.stat().st_mtime)
+        except OSError:
+            return {}
+        if key in self._exp_cache:
+            return self._exp_cache[key]
+        from nli_models import JsonlSource
+        out: Dict[int, Dict[str, Any]] = {}
+        try:
+            for rec in JsonlSource(str(src)).records():
+                data = rec.data if isinstance(rec.data, dict) else {}
+                if "expected_action" in data or "expected_doc_action" in data:
+                    e = {k: data[k] for k in ("expected_action", "acceptable", "expected_doc_action",
+                                              "expected_paragraphs", "note", "case") if k in data}
+                    if "expected_paragraphs" in data:
+                        e["_text"] = data.get("text") or ""
+                    out[rec.line] = e
+                elif rec.line >= 3 and not out:
+                    break  # no expected results in this corpus
+        except Exception:  # noqa: BLE001 - an unreadable corpus simply has no expected results here
+            out = {}
+        self._exp_cache[key] = out
+        return out
+
+    @staticmethod
+    def _same(actions) -> set:
+        out = {str(a).strip() for a in actions if a}
+        if out & {"pass", "untouched", "none"}:
+            out |= {"pass", "untouched", "none"}  # all three leave the text as it is
+        return out
+
+    def verdict(self, row: Dict[str, Any], e: Dict[str, Any], para_cfg: Dict[str, Any]) -> Dict[str, Any]:
+        """Expected vs got for one line: a case text (strictest paragraph action) or a test document (its document
+        action and every paragraph's action)."""
+        paras = row.get("paragraphs") or []
+        if "expected_action" in e:
+            got = row.get("action", "untouched")
+            for a in ("remove", "review", "keep", "pass"):
+                if any(p.get("action") == a for p in paras):
+                    got = a
+                    break
+            ok_set = self._same([*str(e["expected_action"]).split(" or "), *(e.get("acceptable") or [])])
+            return {"kind": "text", "expected": e["expected_action"], "acceptable": e.get("acceptable") or [],
+                    "got": got, "ok": got in ok_set, "note": e.get("note") or ""}
+        got_doc = row.get("action")
+        res: Dict[str, Any] = {"kind": "document", "expected": e.get("expected_doc_action"), "acceptable": [],
+                               "got": got_doc, "ok": got_doc == e.get("expected_doc_action"), "note": "",
+                               "paragraphs": []}
+        exp_paras = e.get("expected_paragraphs") or []
+        if exp_paras and e.get("_text"):
+            from nli_label import split_paragraphs
+            spans = split_paragraphs(e["_text"], int(para_cfg.get("min_chars", 200)), int(para_cfg.get("max_chars", 2000)))
+            by_span = {tuple(p["span"]): p for p in paras}
+            if len(spans) == len(exp_paras):
+                for (s0, s1), x in zip(spans, exp_paras):
+                    p = by_span.get((s0, s1))
+                    got = p["action"] if p else "none"
+                    ok = got in self._same([x.get("expected_action"), *(x.get("acceptable") or [])])
+                    res["paragraphs"].append({"span": [s0, s1], "expected": x.get("expected_action"),
+                                              "acceptable": x.get("acceptable") or [], "note": x.get("note") or "",
+                                              "got": got, "ok": ok})
+                    res["ok"] = res["ok"] and ok
+        return res
+
+    def _para_cfg(self, d: Path) -> Dict[str, Any]:
+        return ((_read_json(d / "summary.json") or {}).get("policy") or {}).get("paragraphs") or {}
+
+    def expected_summary(self, name: str) -> Optional[Dict[str, Any]]:
+        """Over all files of a run: how many lines match their expected result, and the ones that do not."""
+        d = self.folder(name)
+        files = [sp.name[:-len(".summary.json")] for sp in sorted(d.glob("*.summary.json"))
+                 if not sp.name.startswith("summary.")]
+        if not files or not self.expected(d, files[0]):
+            return None
+        cfg = self._para_cfg(d)
+        n = ok = 0
+        wrong = []
+        for f in files:
+            exp = self.expected(d, f)
+            if not exp:
+                continue
+            for r in self._rows(d, f):
+                e = exp.get(r.get("line"))
+                if e is None:
+                    continue
+                v = self.verdict(r, e, cfg)
+                n += 1
+                ok += bool(v["ok"])
+                if not v["ok"]:
+                    wrong.append({"file": f, "line": r.get("line"), "id": r.get("id"), "expected": v["expected"],
+                                  "acceptable": v["acceptable"], "got": v["got"], "note": v["note"] or e.get("note", ""),
+                                  "paragraphs_wrong": sum(1 for p in v.get("paragraphs", []) if not p["ok"])})
+        return {"n": n, "ok": ok, "wrong": wrong}
+
     def docs(self, name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
-             para_action: Optional[str] = None, gated: bool = True, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
+             para_action: Optional[str] = None, gated: bool = True, offset: int = 0, limit: int = 50,
+             expect: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)
         counts: Dict[str, int] = {}
         out, total = [], 0
+        exp = self.expected(d, file)
+        cfg = self._para_cfg(d) if exp else {}
+        exp_n = exp_ok = 0
         for r in self._rows(d, file):
-            if gated and not r.get("gate"):
+            v = self.verdict(r, exp[r.get("line")], cfg) if r.get("line") in exp else None
+            if v is not None:
+                exp_n += 1
+                exp_ok += bool(v["ok"])
+            if expect in ("wrong", "right"):
+                if v is None or v["ok"] != (expect == "right"):
+                    continue
+            elif gated and not r.get("gate") and v is None:
                 continue
             counts[r.get("action", "?")] = counts.get(r.get("action", "?"), 0) + 1
             if action and r.get("action") != action:
@@ -202,8 +322,10 @@ class LabelRuns:
                             "labels": r.get("labels") or [], "flags": r.get("flags") or [],
                             "tokens": r.get("tokens"), "tokens_removed": r.get("tokens_removed"),
                             "paragraphs": pa, "rewrites": r.get("rewrites", 0),
-                            "keywords": sorted({h["kw"] for h in r.get("hits") or [] if not h.get("rule")})[:8]})
-        return {"rows": out, "total": total, "counts": counts, "offset": offset, "limit": limit}
+                            "keywords": sorted({h["kw"] for h in r.get("hits") or [] if not h.get("rule")})[:8],
+                            **({"expect": v} if v is not None else {})})
+        return {"rows": out, "total": total, "counts": counts, "offset": offset, "limit": limit,
+                **({"expected": {"n": exp_n, "ok": exp_ok}} if exp else {})}
 
     def doc(self, name: str, file: str, line: int) -> Dict[str, Any]:
         d = self.folder(name)
@@ -245,7 +367,10 @@ class LabelRuns:
                 problem = "the source text changed since the run (spans do not fit): the text is not shown"
                 text = None
         pol = s.get("policy") or {}
+        e = self.expected(d, file).get(line)
+        expect = self.verdict(row, e, pol.get("paragraphs") or {}) if e is not None else None
         return {"name": name, "file": file, "input": src, "row": row, "text": text, "problem": problem,
+                **({"expect": expect} if expect is not None else {}),
                 "policy": {"labels": pol.get("labels") or {}, "run_if": pol.get("run_if") or {},
                            "conflict": pol.get("conflict")},
                 "policy_path": pol.get("path"),

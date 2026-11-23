@@ -125,6 +125,32 @@ function DocText({ d, sel, onSel }: { d: LabelDocResp; sel: number; onSel: (i: n
   return <div className="doc">{out}</div>;
 }
 
+function ExpectBox({ e, sel }: { e: NonNullable<LabelDocResp["expect"]>; sel?: [number, number] }) {
+  const mark = (ok: boolean) => <span className={ok ? "badge keep" : "badge filter"}>{ok ? "✓ as expected" : "✗ not as expected"}</span>;
+  const cur = sel ? e.paragraphs?.find((p) => p.span[0] === sel[0] && p.span[1] === sel[1]) : undefined;
+  return (
+    <div className="alert" style={{ marginBottom: 10 }} data-testid="expect-box">
+      <div className="row">
+        <strong>{e.kind === "document" ? "Document" : "Expected"}</strong>
+        <span>expected <span className={`badge ${actionClass(e.expected)}`}>{e.expected}</span>
+          {e.acceptable.length ? <span className="faint"> (also fine: {e.acceptable.join(", ")})</span> : null}</span>
+        <span>got <span className={`badge ${actionClass(e.got)}`}>{e.got}</span></span>
+        {mark(e.ok)}
+      </div>
+      {e.note ? <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>{e.note}</div> : null}
+      {e.paragraphs?.length ? (
+        <div style={{ marginTop: 6, fontSize: 13 }}>
+          {cur ? <div>this paragraph: expected <span className={`badge ${actionClass(cur.expected)}`}>{cur.expected}</span>
+            {cur.acceptable.length ? <span className="faint"> (also {cur.acceptable.join(", ")})</span> : null} · got{" "}
+            <span className={`badge ${actionClass(cur.got)}`}>{cur.got}</span> {mark(cur.ok)}
+            {cur.note ? <span className="faint" style={{ fontSize: 12 }}> · {cur.note}</span> : null}</div> : null}
+          <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>all paragraphs: {e.paragraphs.map((p, i) => (
+            <span key={i} className="chip" title={p.note}>¶{i + 1} {p.expected} → {p.got} {p.ok ? "✓" : "✗"}</span>))}</div>
+        </div>) : null}
+    </div>
+  );
+}
+
 export function LabelDocView() {
   const sp = useSearchParams();
   const run = sp.get("run") || "", file = sp.get("file") || "", line = Number(sp.get("line") || 0);
@@ -162,6 +188,7 @@ export function LabelDocView() {
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
                 <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)}>¶{i + 1} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
             </div>
+            {d.expect ? <ExpectBox e={d.expect} sel={paras[sel]?.span} /> : null}
             {paras[sel] ? <Flow policy={d.policy} p={paras[sel]} /> : <div className="faint">Nothing to show.</div>}
           </div>
         </div>

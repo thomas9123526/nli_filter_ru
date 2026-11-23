@@ -23,9 +23,12 @@ export function LabelRunView() {
   const [label, setLabel] = useState("");
   const [paraAction, setParaAction] = useState("");
   const [offset, setOffset] = useState(0);
+  const [expect, setExpect] = useState("");  // "" | "wrong" | "right" (test corpora with expected results)
   const f = file || res.data?.files[0]?.name || "";
-  const docs = useApi(run && f ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}` : null,
-    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE }, s));
+  const docs = useApi(run && f ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}` : null,
+    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}) }, s));
+  const exp = useApi(run ? `labelexp:${run}` : null, (s) => api.labelExpected(run, s));
+  const ex = exp.data?.expected;
   if (!run) return <div className="alert error">Missing ?run=</div>;
   const d = res.data;
   const st = d?.summary.stats;
@@ -47,6 +50,24 @@ export function LabelRunView() {
         <div className="alert">Redecided from {d.summary.redecide.from}: {num(d.summary.redecide.stored)} stored scores reused,
           {" "}{num(d.summary.redecide.missing)} missing (treated as No){d.summary.redecide.changed?.length ? `; reworded: ${d.summary.redecide.changed.join(", ")}` : ""}.</div>
       ) : null}
+      {ex ? (
+        <div className="panel flush" style={{ marginBottom: 16 }} data-testid="expected-panel">
+          <div className="panel-head"><h2>Expected vs result</h2>
+            <span className={`badge ${ex.ok === ex.n ? "keep" : "warn"}`}>{ex.ok} / {ex.n} as expected ({ex.n ? Math.round(100 * ex.ok / ex.n) : 0} %)</span>
+            <span className="faint" style={{ fontSize: 12 }}>from the expected actions in the corpus (also fine counted; pass = untouched)</span></div>
+          {ex.wrong.length ? (
+            <div className="table-wrap"><table>
+              <thead><tr><th>File</th><th>Line</th><th>Expected</th><th>Got</th><th>Note</th></tr></thead>
+              <tbody>{ex.wrong.map((w) => (
+                <tr key={`${w.file}:${w.line}`}>
+                  <td><button className="linklike" onClick={() => { setFile(w.file); setExpect(""); setOffset(0); }}>{w.file}</button></td>
+                  <td><Link href={href("/labeldoc", { run, file: w.file, line: w.line })}>{w.line}</Link></td>
+                  <td><span className={`badge ${actionClass(w.expected)}`}>{w.expected}</span>{w.acceptable.length ? <span className="faint"> (also {w.acceptable.join(", ")})</span> : null}</td>
+                  <td><span className={`badge ${actionClass(w.got)}`}>{w.got}</span>{w.paragraphs_wrong ? <span className="faint"> · {w.paragraphs_wrong} paragraph{w.paragraphs_wrong > 1 ? "s" : ""} not as expected</span> : null}</td>
+                  <td className="faint" style={{ fontSize: 12 }}>{w.note}</td>
+                </tr>))}</tbody>
+            </table></div>) : <div className="panel-body faint">Every line matches its expected result.</div>}
+        </div>) : null}
       {st ? (
         <>
           <div className="stats">
@@ -101,16 +122,30 @@ export function LabelRunView() {
                 <option value="">any</option>{PARA_ACTIONS.map((a) => <option key={a}>{a}</option>)}
               </select></label>
             {label ? <span className="chip">label {label} <button className="linklike" onClick={() => { setLabel(""); reset(); }}>×</button></span> : null}
+            {docs.data?.expected || expect ? (
+              <span className="seg" data-testid="expect-filter">
+                <button className={expect === "" ? "on" : ""} onClick={() => { setExpect(""); reset(); }}>expected: any</button>
+                <button className={expect === "wrong" ? "on" : ""} onClick={() => { setExpect("wrong"); reset(); }}>✗ not as expected</button>
+                <button className={expect === "right" ? "on" : ""} onClick={() => { setExpect("right"); reset(); }}>✓ as expected</button>
+              </span>) : null}
+            {docs.data?.expected ? <span className="faint" style={{ fontSize: 12 }}>{docs.data.expected.ok} / {docs.data.expected.n} in this file</span> : null}
           </div>
           <ErrorBox error={docs.error} onRetry={docs.reload} />
           {docs.data ? (
             <>
               <div className="table-wrap"><table data-testid="label-docs">
-                <thead><tr><th>Line</th><th>Action</th><th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th></tr></thead>
+                <thead><tr><th>Line</th><th>Action</th>{docs.data.expected ? <th>Expected</th> : null}<th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th></tr></thead>
                 <tbody>{docs.data.rows.map((r) => (
                   <tr key={r.line}>
                     <td><Link href={href("/labeldoc", { run, file: f, line: r.line })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
                     <td><span className={`badge ${actionClass(r.action)}`}>{r.action}</span></td>
+                    {docs.data!.expected ? (
+                      <td>{r.expect ? (<>
+                        <span className={r.expect.ok ? "badge keep" : "badge filter"} title={r.expect.note}>{r.expect.ok ? "✓" : "✗"}</span>{" "}
+                        <span className={`badge ${actionClass(r.expect.expected)}`}>{r.expect.expected}</span>
+                        {r.expect.kind === "text" ? <span className="faint"> got {r.expect.got}</span> : null}
+                        {r.expect.paragraphs?.some((p) => !p.ok) ? <span className="faint"> · {r.expect.paragraphs.filter((p) => !p.ok).length} ¶ ✗</span> : null}
+                      </>) : <span className="faint">–</span>}</td>) : null}
                     <td>{PARA_ACTIONS.filter((a) => r.paragraphs[a]).map((a) => <span key={a} className={`badge ${actionClass(a)}`} style={{ marginRight: 4 }}>{a} {r.paragraphs[a]}</span>)}</td>
                     <td>{r.labels.map((l) => <span key={l} className="chip">{l}</span>)}{r.flags.map((l) => <span key={l} className="chip">⚑ {l}</span>)}</td>
                     <td className="faint">{r.keywords.join(", ")}</td>

@@ -143,3 +143,20 @@ What a topic never changes: a subject that is not in `topic_map` (Russia side: `
 mode, and the gate (level 0) and every level-2 label (opinions, hate, false claims, the guard) are always scored by the
 models. An empty `topic_map`, a text without a topic, or a topic that is not in `topic_map` change nothing at all.
 - A value that is not in the policy's `topic_map` changes nothing (the models decide, as without a topic).
+
+## Expected vs result (test corpora)
+
+When a run's corpus lines carry expected results, the labelling pages compare them with what the run did:
+`expected_action` (+ `acceptable`) in the case corpora (`dataset\test_corpus_cases*`), and `expected_doc_action` +
+`expected_paragraphs` in the multi-paragraph test documents (`dataset\test_corpus_docs_ru`). Runs on real data have
+none, and these pages look as before.
+
+- **Run page** (`/labelrun/?run=…`): an **Expected vs result** panel at the top, e.g. "39 / 43 as expected (91 %)",
+  with every line that does not match (file, line, expected, got, the case's note), each linked to its document.
+  Clicking the file name opens that file's list below.
+- **File list**: an **Expected** column (✓ / ✗, the expected action, what it got) and a filter **✗ not as expected /
+  ✓ as expected**; "N / M in this file".
+- **Document page**: above the Flow, "expected … got … ✓ / ✗" and the case's note. For a test document: the
+  document action, the selected paragraph's expected vs got, and every paragraph as ¶1 keep → keep ✓ …
+- Matching rules (as in `tools\compare_cases.py` / `compare_docs.py`): the "also fine" actions count; pass, untouched
+  and "none" (a paragraph that was never labelled) count as the same, because all three leave the text as it is.

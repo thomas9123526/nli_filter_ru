@@ -450,11 +450,19 @@ export type LabelRunResp = {
              policy?: { path?: string; labels?: Record<string, LabelPolicyLabel>; conflict?: string };
              redecide?: { from?: string; stored: number; missing: number; changed: string[] } };
 };
+export type ExpectVerdict = {
+  kind: "text" | "document"; expected: string; acceptable: string[]; got: string; ok: boolean; note: string;
+  paragraphs?: { span: [number, number]; expected: string; acceptable: string[]; note: string; got: string; ok: boolean }[];
+};
 export type LabelDocRow = {
   line: number; id: string | null; action: string; labels: string[]; flags: string[]; tokens: number;
   tokens_removed: number | null; paragraphs: Record<string, number>; rewrites: number; keywords: string[];
+  expect?: ExpectVerdict;
 };
-export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number };
+export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number;
+  expected?: { n: number; ok: number } };
+export type ExpectedSummary = { n: number; ok: number; wrong: { file: string; line: number; id: string | null; expected: string;
+  acceptable: string[]; got: string; note: string; paragraphs_wrong: number }[] } | null;
 export type LabelParagraph = {
   span: [number, number]; action: string; reason: string; labels: string[]; scores: Record<string, number>;
   tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[]; opened_by?: string[];
@@ -469,6 +477,7 @@ export type LabelDocResp = {
   policy: FlowPolicyData;
   policy_path?: string | null;
   settings: Record<string, unknown>;
+  expect?: ExpectVerdict;
 };
 
 export type PolicyExceptionInfo = { key: string; decision: string; priority: number; scope: string; phrases?: string[];

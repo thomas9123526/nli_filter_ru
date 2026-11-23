@@ -815,9 +815,16 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     @app.get("/api/labels/{name}/docs", tags=["labels"])
     def label_docs(name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
                    para_action: Optional[str] = None, gated: bool = True,
-                   offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
-        """Documents of one file of a run, filtered by document action, label or paragraph action."""
-        return labels.docs(name, file, action, label, para_action, gated, offset, limit)
+                   offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
+                   expect: Optional[str] = None):
+        """Documents of one file of a run, filtered by document action, label or paragraph action; for a test corpus
+        with expected results, each row has "expect" (expected vs got) and expect=wrong / right filters them."""
+        return labels.docs(name, file, action, label, para_action, gated, offset, limit, expect)
+
+    @app.get("/api/labels/{name}/expected", tags=["labels"])
+    def label_expected(name: str):
+        """For a run on a test corpus with expected results: how many lines match, and the ones that do not."""
+        return {"expected": labels.expected_summary(name)}
 
     @app.get("/api/labels/{name}/doc", tags=["labels"])
     def label_doc(name: str, file: str, line: int = Query(..., ge=1)):

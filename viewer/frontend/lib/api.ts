@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
-  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, LabelTryResp,
+  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp,
 } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
@@ -109,6 +109,7 @@ export const api = {
   labelPolicies: (s?: AbortSignal) => getJSON<{ policies: string[] }>("/api/labels/policies", undefined, s),
   labelRun: (run: string, s?: AbortSignal) => getJSON<LabelRunResp>(`/api/labels/${enc(run)}`, undefined, s),
   labelDocs: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocsResp>(`/api/labels/${enc(run)}/docs`, p, s),
+  labelExpected: (run: string, s?: AbortSignal) => getJSON<{ expected: ExpectedSummary }>(`/api/labels/${enc(run)}/expected`, undefined, s),
   labelDoc: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocResp>(`/api/labels/${enc(run)}/doc`, p, s),
   labelCases: (file?: string, s?: AbortSignal) => getJSON<LabelCasesResp>("/api/labels/cases", file ? { file } : undefined, s),
   saveCases: (body: { file: string; data: LabelCasesResp; base_sha?: string }) =>
