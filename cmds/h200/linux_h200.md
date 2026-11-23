@@ -1,5 +1,7 @@
 # Running on the 8 × H200 machine (Ubuntu 24.04)
 
+> For `nli_label.py` (policy labels) on this machine see `nli_label_h200.md`: its arguments, sizing and `run_label_shards.sh`.
+
 How to run `nli_models.py` and `nli_filter.py` on several GPUs.
 
 > **Status:** the multi-GPU path uses the same code that was tested on CPU (`single`, `thread` and `process` modes gave identical results), but it has **not been run on a GPU yet**. Do the short test run (step 3) before the full corpus.
