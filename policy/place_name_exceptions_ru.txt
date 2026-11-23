@@ -1,0 +1,14 @@
+# Place-name rewrite for the Russia-side policy (policy/place_names_ru.csv): regex patterns (case-insensitive).
+# A name inside a match is NOT rewritten. Same format as policy/place_name_exceptions.txt ("case:" = case-sensitive).
+# URLs, e-mail addresses and code are always skipped, no pattern needed.
+
+# official names of organisations and publications keep their own spelling
+kyiv\s+(independent|post)
+kyiv[-\s]mohyla
+kyiv\s+school\s+of\s+economics
+(kyiv|kharkiv|lviv|odesa|chernivtsi|uzhhorod)\s+(national\s+)?(university|polytechnic)
+igor\s+sikorsky\s+kyiv
+dynamo\s+kyiv
+shakhtar\s+donetsk
+# places with the same name elsewhere
+odesa,?\s+(texas|tx|missouri|mo|ontario|delaware|de|washington|wa|florida|fl|new\s+york|ny)\b

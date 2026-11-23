@@ -1,5 +1,5 @@
 {
-  "about": "Policy for Russia's LLM (the Russia-side project), v2. Agreed principles (2026-11-23): remove hate and violence against either people; send opinions about Russia or Ukraine in BOTH directions to human review; send history (and later review topics) to review; known false claims to review; keep facts whoever they hurt. Exceptions are checked first. See cmds/labeling/russia_llm.md. v2 (measured on labels/russia_llm_cases_v1.json): history and opinion wordings chosen by measurement, opinions at 0.7.",
+  "about": "Policy for Russia's LLM (the Russia-side project), v2. Agreed principles (2026-11-23): remove hate and violence against either people; send opinions about Russia or Ukraine in BOTH directions to human review; send history (and later review topics) to review; known false claims to review; keep facts whoever they hurt. Exceptions are checked first. See cmds/labeling/russia_llm.md. v2 (measured on labels/russia_llm_cases_v1.json): history and opinion wordings chosen by measurement, opinions at 0.7. Place names: Ukrainian romanisation -> Russian form (policy/place_names_ru.csv, spelling only; the 2016 renamings are switched off there).",
   "version": 2,
   "country": "Russia",
   "keywords_file": [
@@ -7,7 +7,9 @@
     "keywords/ukraine.txt"
   ],
   "company_names_file": null,
-  "rewrite_place_names": false,
+  "rewrite_place_names": true,
+  "place_names_file": "policy/place_names_ru.csv",
+  "place_name_exceptions_file": "policy/place_name_exceptions_ru.txt",
   "markers": [
     "orcs",
     "rashists",

@@ -260,6 +260,13 @@ class Policy:
         kf = data.get("keywords_file")
         self.keywords_files: List[str] = [kf] if isinstance(kf, str) else [str(x) for x in (kf or [])]
         self.rewrite_place_names = bool(data.get("rewrite_place_names", True))
+        # the policy's own place-name table and exceptions (default: policy/place_names.csv, Russian -> Ukrainian)
+        self.place_names_file: Optional[str] = data.get("place_names_file") or None
+        self.place_name_exceptions_file: Optional[str] = data.get("place_name_exceptions_file") or None
+        for what, f in (("place_names_file", self.place_names_file),
+                        ("place_name_exceptions_file", self.place_name_exceptions_file)):
+            if f and not (Path(f) if Path(f).is_absolute() else HERE / f).is_file():
+                errors.append(f"{what}: {f} not found")
         if errors:
             raise ValueError(f"{path or 'policy'}: " + "; ".join(errors))
 
@@ -281,7 +288,20 @@ class Policy:
                 **({"exceptions": [e.as_dict() for e in self.exceptions]} if self.exceptions else {}),
                 **({"topic": {"field": self.topic_field, "mode": self.topic_mode, "map": self.topic_map}}
                    if self.topic_map else {}),
-                **({} if self.rewrite_place_names else {"rewrite_place_names": False})}
+                **({} if self.rewrite_place_names else {"rewrite_place_names": False}),
+                **({"place_names_file": self.place_names_file} if self.place_names_file else {}),
+                **({"place_name_exceptions_file": self.place_name_exceptions_file}
+                   if self.place_name_exceptions_file else {})}
+
+    def rewriter(self, table: Optional[str] = None, exceptions: Optional[str] = None) -> Optional[NameRewriter]:
+        """The place-name rewriter for this policy (None when it does not rewrite). Command-line files win."""
+        if not self.rewrite_place_names:
+            return None
+
+        def here(f: Optional[str]) -> Optional[str]:
+            return None if not f else (f if Path(f).is_absolute() else str(HERE / f))
+        return NameRewriter.from_files(table or here(self.place_names_file),
+                                       exceptions if exceptions is not None else here(self.place_name_exceptions_file))
 
     def runs(self, level: int, scores: Dict[str, float], marker: bool) -> bool:
         """Whether a level's labels are scored for a paragraph, given the scores so far."""
@@ -1055,7 +1075,7 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         return 2
     matcher, rules, markers = build_matchers(policy)
     rewrite = not args.no_rewrite and policy.rewrite_place_names
-    rewriter = NameRewriter.from_files(args.place_names, args.place_name_exceptions) if rewrite else None
+    rewriter = policy.rewriter(args.place_names, args.place_name_exceptions) if rewrite else None
     topic_field = getattr(args, "topic_field", None) or policy.topic_field
     topic_mode = getattr(args, "topic_mode", None) or policy.topic_mode
     if topic_field and not policy.topic_map:
@@ -1862,7 +1882,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="what the clean output does with 'review' paragraphs (default keep; they are counted)")
     r.add_argument("--no-rules", action="store_true", help="no language-menu / company-name rules")
     r.add_argument("--no-rewrite", action="store_true", help="no place-name rewrite")
-    r.add_argument("--place-names", default=None, help="mapping CSV (default policy/place_names.csv)")
+    r.add_argument("--place-names", default=None, help="mapping CSV (default: the policy's place_names_file, "
+                                                           "else policy/place_names.csv)")
     r.add_argument("--place-name-exceptions", default=None)
     r.add_argument("--text-field", default="text")
     r.add_argument("--id-field", default="id")

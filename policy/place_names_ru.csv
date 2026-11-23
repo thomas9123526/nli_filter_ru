@@ -1,0 +1,49 @@
+from_form,to_form,variants,notes
+Kyiv,Kiev,,capital; the Russian-form spelling
+Kharkiv,Kharkov,,
+Odesa,Odessa,,
+Lviv,Lvov,,
+Mykolaiv,Nikolaev,Mykolayiv,
+Zaporizhzhia,Zaporozhye,Zaporizhia | Zaporizhzhya,
+Luhansk,Lugansk,,
+Chornobyl,Chernobyl,,
+Rivne,Rovno,,
+Dnipro,Dnepr,,the city (Днепр) and the river in the Ukrainian romanisation; "Dnieper" is not touched
+Chernihiv,Chernigov,,
+Zhytomyr,Zhitomir,,
+Vinnytsia,Vinnitsa,Vinnytsya,
+Cherkasy,Cherkassy,,
+Ternopil,Ternopol,,
+Khmelnytskyi,Khmelnitsky,Khmelnytskyy,
+Ivano-Frankivsk,Ivano-Frankovsk,,
+Uzhhorod,Uzhgorod,,
+Chernivtsi,Chernovtsy,,
+Kryvyi Rih,Krivoy Rog,,
+Berdiansk,Berdyansk,,
+Horlivka,Gorlovka,,
+Makiivka,Makeyevka,,
+Sievierodonetsk,Severodonetsk,,
+Lysychansk,Lisichansk,,
+Sloviansk,Slavyansk,,
+Kostiantynivka,Konstantinovka,,
+Kremenchuk,Kremenchug,,
+Bila Tserkva,Belaya Tserkov,,
+Kamianets-Podilskyi,Kamenets-Podolsky,,
+Prypiat,Pripyat,,
+Yenakiieve,Yenakiyevo,,
+Izium,Izyum,,
+Kupiansk,Kupyansk,,
+Avdiivka,Avdeyevka,,
+Bakhchysarai,Bakhchisaray,,
+Dzhankoi,Dzhankoy,,
+Feodosiia,Feodosiya,,
+Yevpatoriia,Yevpatoriya,,
+Nova Kakhovka,Novaya Kakhovka,,
+Enerhodar,Energodar,,
+# Cities renamed in 2016: the Russian forms below are the OLD Soviet names, not spellings. Rewriting them changes the
+# name itself, and the model would use names that are no longer official. Switched off; remove the "# " in front of a
+# line to switch it on (a decision for the compliance team, see cmds/labeling/russia_llm.md).
+# Bakhmut,Artemovsk,,renamed 2016 (Artemivsk -> Bakhmut)
+# Pokrovsk,Krasnoarmeysk,,renamed 2016
+# Kropyvnytskyi,Kirovograd,,renamed 2016
+# Lyman,Krasny Liman,,renamed 2016; "Lyman" is also a surname

@@ -178,7 +178,7 @@ async function deck1() {
     "The same code, viewer and workflow serve two LLM owners with different policies. Only the policy file, keyword lists and test cases differ.");
   const pw = (W - 2 * M - 0.4) / 2;
   [["A's LLM · Ukraine side", "Labels Russia-related content paragraph by paragraph: removes Russian culture, lifestyle and Kremlin narratives, keeps science, geography and factual war reporting, rewrites place names (Kiev → Kyiv).", C.accent1],
-   ["Russia's LLM · Russia side", "Labels Russia- and Ukraine-related content: removes hate and calls for violence against either people, sends opinions (both directions), history and known false claims to review, keeps facts whoever they hurt.", C.accent6]]
+   ["Russia's LLM · Russia side", "Labels Russia- and Ukraine-related content: removes hate and calls for violence against either people, sends opinions (both directions), history and known false claims to review, keeps facts whoever they hurt, rewrites place names (Kyiv → Kiev).", C.accent6]]
     .forEach(([h, b, col], i) => {
       const x = M + i * (pw + 0.4);
       s.addShape("rect", { x, y: 1.55, w: pw, h: 3.7, fill: { color: C.background2 }, line: { color: C.background2 } });
@@ -227,7 +227,7 @@ async function deck1() {
     [{ text: "Removes", options: { bold: true } }, "Russian culture, celebrities, lifestyle, cost of living; Kremlin narratives (16 labels)", "Hate and calls for violence against Russians or Ukrainians"],
     [{ text: "Review", options: { bold: true } }, "Literature and art, Soviet history, sport, values", "Opinions about Russia or Ukraine (both directions), history, known false claims, an unnamed \"our country\""],
     [{ text: "Keeps", options: { bold: true } }, "Science, geography, politics, war facts, economy", "Facts, whoever they hurt"],
-    [{ text: "Place names", options: { bold: true } }, "Kiev → Kyiv (48 names, with exceptions)", "Not rewritten"],
+    [{ text: "Place names", options: { bold: true } }, "Kiev → Kyiv (48 names, with exceptions)", "Kyiv → Kiev (41 names, spelling only, with exceptions)"],
     [{ text: "Test set", options: { bold: true } }, "149 texts in 78 cases", "43 texts in 23 cases"],
   ];
   s.addTable(rows, { x: M, y: 1.5, w: W - 2 * M, colW: [1.9, 5.05, 5.18], fontSize: 15, color: C.text1, border: { type: "solid", pt: 0.75, color: "D9DEE4" }, valign: "middle", rowH: 0.78, margin: 0.1 });

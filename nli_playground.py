@@ -265,7 +265,6 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
     {"texts": [str], "policy": "policy/russia_policy.json" | "policy_data": {...}, "all_labels": true,
      "force_gate": false, "use_judge": true} -> one labels row per text (paragraphs, scores, levels, action)."""
     import nli_label
-    from nli_names import NameRewriter
     if pg.fast is None:
         raise ValueError("this service was started with --no-models: no text can be scored")
     texts = req.get("texts")
@@ -289,7 +288,7 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
     with pg.lock:  # the models are shared: one request at a time
         scorer = nf.CascadeScorer(pg.fast, pg.judge if use_judge else None, (float(lo), float(hi)))
         lab = nli_label.Labeller(policy, matcher, rules, scorer,
-                                 NameRewriter.from_files() if policy.rewrite_place_names else None,
+                                 policy.rewriter(),
                                  all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
                                  force_gate=bool(req.get("force_gate", False)),
                                  narrative_matcher=nli_label.build_narrative_matcher(policy))

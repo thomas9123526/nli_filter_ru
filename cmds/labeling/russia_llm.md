@@ -69,9 +69,33 @@ they differ.
 | 2 | `claim_ukraine_in_nato` | review | "…states that Ukraine is a member of NATO." |
 | 2 | `reports_or_debunks` | keep 0.6, guard | softens hostility and violence: news that *quotes* a slur goes to review, not removal |
 
-Other settings: `"rewrite_place_names": false` (this policy does not rewrite Kiev → Kyiv or back);
+Other settings: place names are rewritten to their Russian form (next section);
 `"narrative_opens_gate": true` (hate that never names a country still reaches the hate labels); markers are common
 slurs on both sides ("orcs", "рашисты", "хохлы", "укропы" …), so a paragraph with one always gets the full check.
+
+### Place names: Ukrainian romanisation → Russian form
+
+In the clean copy, `policy\place_names_ru.csv` rewrites Kyiv → Kiev, Kharkiv → Kharkov, Odesa → Odessa, Lviv → Lvov,
+Zaporizhzhia → Zaporozhye, Dnipro → Dnepr … (41 names, variants included). The policy names its own table:
+
+```json
+"rewrite_place_names": true,
+"place_names_file": "policy/place_names_ru.csv",
+"place_name_exceptions_file": "policy/place_name_exceptions_ru.txt"
+```
+
+- **Spelling only.** Four cities were renamed in 2016 (Bakhmut, Pokrovsk, Kropyvnytskyi, Lyman). Their Russian forms
+  in the table (Artemovsk, Krasnoarmeysk, Kirovograd, Krasny Liman) are the old Soviet names, not spellings: rewriting
+  them changes the name, and the model would use names that are no longer official. They are in the table but
+  switched off (`# ` in front of the line). Remove the `# ` to switch one on; that is a decision for the compliance
+  team.
+- **Exceptions** (`policy\place_name_exceptions_ru.txt`): official names keep their spelling: *Kyiv Independent*,
+  *Kyiv Post*, *Kyiv-Mohyla*, *Kyiv School of Economics*, "… National University", *Dynamo Kyiv*, *Shakhtar
+  Donetsk*, and Odesa, Texas. Links, e-mail addresses and code are never touched.
+- Case is kept: "KYIV" → "KIEV". Whole words only. Every change is logged in `<name>.rewrites.jsonl`.
+- Try it without a run: `python nli_names.py --table policy\place_names_ru.csv --exceptions policy\place_name_exceptions_ru.txt --text "Missiles hit Kyiv and Kharkiv."`
+- A's policy is unchanged: it still rewrites the other way (`policy\place_names.csv`, Kiev → Kyiv). v1 of the
+  Russia-side policy does not rewrite (it is the baseline).
 
 ### Exceptions (checked first)
 

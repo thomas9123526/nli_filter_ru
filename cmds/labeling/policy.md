@@ -50,6 +50,7 @@ The Russia-side project (Russia's LLM) has its own policy, `policy\russia_llm_po
 | `"topic_field"`, `"topic_mode"`, `"topic_map"` | Use a topic the corpus already has: `topic_map` maps its values to level-1 subjects; `hint` / `trust` / `off`. Command line: `--topic-field`, `--topic-mode`. Details: `russia_llm.md` |
 | `"keywords_file": [a, b]` | Several keyword lists are joined (one file as before also works) |
 | `"rewrite_place_names": false` | This policy never rewrites place names (the same as `--no-rewrite`) |
+| `"place_names_file"`, `"place_name_exceptions_file"` | This policy's own place-name table and exceptions (default `policy\place_names.csv`, Russian form → Ukrainian). A table with `from_form,to_form,variants,notes` columns rewrites in any direction; lines starting with `#` are switched off. `--place-names` / `--place-name-exceptions` on the command line still win. The Russia-side policy uses `policy\place_names_ru.csv` (Ukrainian → Russian form) |
 
 **A paragraph that is there only because of a narrative keyword** (no Russia keyword, no marker) is judged by the
 narrative check alone: its gate score is ignored, so it is removed only if a narrative (or `hostility_ukrainians`)

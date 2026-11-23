@@ -63,6 +63,10 @@ As shipped:
 never changed, so links and programs do not break. **Kievan Rus** is safe because it is a different word: only whole
 words are matched.
 
+**The Russia-side policy rewrites the other way** (Kyiv → Kiev) with its own table, `policy\place_names_ru.csv`
+(`from_form,to_form` columns, spelling only; the 2016 renamings are switched off) and
+`policy\place_name_exceptions_ru.txt`. See `russia_llm.md`.
+
 **See it work:** on the Try page, the case "Place names: rewrite and exceptions": Kiev, Kharkov and Zaporozhye are
 rewritten; Chicken Kiev, Kievan Rus and the URL stay.
 

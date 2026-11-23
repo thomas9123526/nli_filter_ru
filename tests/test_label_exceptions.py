@@ -8,6 +8,9 @@ import nli_label
 from nli_label import Policy, apply_exceptions, quoted_spans, resolve
 from test_label import FakeScorer, make_labeller, rec, small_policy
 
+from pathlib import Path as _P
+ROOT_TABLE = _P(__file__).resolve().parent.parent / "policy" / "place_names.csv"
+
 OUR = {"key": "ambiguous_our_country", "decision": "review", "priority": 100, "skip_quoted": True,
        "match": {"phrases": ["our country", "наша страна", "нашей страной"]}}
 
@@ -252,7 +255,7 @@ def test_russia_llm_policy_loads_and_cases_match(version):
     p = Policy.load(str(root / "policy" / f"russia_llm_policy_v{version}.json"))
     assert p.exceptions and p.exceptions[0].key == "ambiguous_our_country"
     assert all(p.labels[k].protected for k in p.labels if k.startswith(("hostility_", "violence_")))
-    assert p.rewrite_place_names is False and len(p.keywords_files) == 2
+    assert p.rewrite_place_names is (version == 2) and len(p.keywords_files) == 2
     assert all((root / f).is_file() for f in p.keywords_files)
     cases = root / "labels" / "russia_llm_cases_v1.json"
     data = json.loads(cases.read_text(encoding="utf-8"))
@@ -261,3 +264,52 @@ def test_russia_llm_policy_loads_and_cases_match(version):
         for t in c["texts"]:
             assert set(t["labels_yes"]) <= set(p.labels), c["id"]
             assert t["expected_action"] in ("remove", "review", "keep", "pass", "untouched")
+
+
+# ---------------------------------------------------------------------------------------------------
+# place names: the policy's own table (Russia side: Ukrainian romanisation -> Russian form)
+# ---------------------------------------------------------------------------------------------------
+
+def test_directed_table_and_switched_off_rows(tmp_path):
+    from nli_names import NameRewriter
+    t = tmp_path / "t.csv"
+    t.write_text("from_form,to_form,variants,notes\nKyiv,Kiev,,\nZaporizhzhia,Zaporozhye,Zaporizhia,\n"
+                 "# Bakhmut,Artemovsk,,renamed: off\n", encoding="utf-8")
+    e = tmp_path / "e.txt"
+    e.write_text("kyiv\\s+independent\n", encoding="utf-8")
+    rw = NameRewriter.from_files(str(t), str(e))
+    out, ch = rw.rewrite("Kyiv and Zaporizhia; near Bakhmut; the Kyiv Independent reported.")
+    assert out == "Kiev and Zaporozhye; near Bakhmut; the Kyiv Independent reported."
+    assert len(ch) == 2
+
+
+def test_russia_side_policy_rewrites_to_russian_forms():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    p = Policy.load(str(root / "policy" / "russia_llm_policy_v2.json"))
+    out, _ = p.rewriter().rewrite("Missiles hit Kyiv, Kharkiv and Odesa. Dynamo Kyiv played in Lviv. KYIV.")
+    assert out == "Missiles hit Kiev, Kharkov and Odessa. Dynamo Kyiv played in Lvov. KIEV."
+    out, _ = p.rewriter().rewrite("Fighting near Bakhmut and Pokrovsk.")  # 2016 renamings are switched off
+    assert out == "Fighting near Bakhmut and Pokrovsk."
+    # A's policy keeps its direction (Russian form -> Ukrainian)
+    a = Policy.load(str(root / "policy" / "russia_policy_v5.json"))
+    assert a.rewriter().rewrite("Kiev and Kharkov")[0] == "Kyiv and Kharkiv"
+
+
+def test_place_names_file_must_exist_and_cli_wins(tmp_path, monkeypatch):
+    with pytest.raises(ValueError, match="place_names_file"):
+        policy_with(place_names_file="policy/nope.csv")
+    t = tmp_path / "t.csv"
+    t.write_text("from_form,to_form,variants,notes\nKyiv,Kiev,,\n", encoding="utf-8")
+    pol = tmp_path / "p.json"
+    pol.write_text(json.dumps(policy_with(place_names_file=str(t)).data), encoding="utf-8")
+    inp = tmp_path / "in.jsonl"
+    inp.write_text(json.dumps({"id": "a", "text": "Moscow and Kyiv talks; Kiev too."}) + "\n", encoding="utf-8")
+    monkeypatch.setattr(nli_label, "build_scorer", lambda args: (Scorer(), None, None))
+    out = tmp_path / "out"
+    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol), "--write-clean"]) == 0
+    assert "Moscow and Kiev talks; Kiev too." in (out / "in.clean.jsonl").read_text(encoding="utf-8")
+    out2 = tmp_path / "out2"  # --place-names on the command line wins over the policy's table
+    assert nli_label.main(["run", str(inp), "--output-dir", str(out2), "--policy", str(pol), "--write-clean",
+                           "--place-names", str(ROOT_TABLE)]) == 0
+    assert "Moscow and Kyiv talks; Kyiv too." in (out2 / "in.clean.jsonl").read_text(encoding="utf-8")

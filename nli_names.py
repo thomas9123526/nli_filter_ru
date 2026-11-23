@@ -75,10 +75,13 @@ class NameRewriter:
         table = str(table or DEFAULT_TABLE)
         mapping: Dict[str, str] = {}
         with open(table, encoding="utf-8-sig", newline="") as fh:
-            for row in csv.DictReader(fh):
-                new = (row.get("ukrainian_form") or "").strip()
-                for old in [row.get("russian_form") or ""] + re.split(r"\s+\|\s+", row.get("variants") or ""):
-                    if old.strip():
+            rows = csv.DictReader(line for line in fh if not line.lstrip().startswith("#"))
+            directed = "from_form" in (rows.fieldnames or [])  # from_form,to_form,variants (any direction)
+            for row in rows:
+                new = (row.get("to_form" if directed else "ukrainian_form") or "").strip()
+                src = row.get("from_form" if directed else "russian_form") or ""
+                for old in [src] + re.split(r"\s+\|\s+", row.get("variants") or ""):
+                    if old.strip() and new:
                         mapping[old.strip()] = new
         exc: List[str] = []
         exc_path = exceptions if exceptions is not None else (str(DEFAULT_EXCEPTIONS) if DEFAULT_EXCEPTIONS.is_file() else None)
