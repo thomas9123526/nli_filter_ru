@@ -4,6 +4,28 @@ This is the reference for large `nli_label.py` runs (hundreds of GB to TB). It l
 default and the setting to use on the 8 × H200 machine, explains how to measure a run's speed before committing to the
 full corpus, and how to start, watch, stop and resume it.
 
+## Quick recipe (some or all of the 8 GPUs)
+
+1. **Copies per GPU: 2.** One copy reads, decompresses and keyword-scans on one CPU core (about 40 MB/s), which
+   cannot keep an H200 busy. Use **3** if `nvidia-smi` shows low GPU use (under 50 %) with 2.
+2. **Which GPUs: `NLI_DEVICES`** (default: all GPUs torch sees). Copies = GPUs × copies per GPU; each gets its own
+   `--shard K/N`:
+   ```bash
+   # 4 GPUs x 2 copies = 8 copies, shards 0/8 .. 7/8
+   NLI_DEVICES="0 1 2 3" ./run_label_shards.sh /data/corpus /data/label_out 2 \
+       --policy policy/russia_llm_policy_v2.json --batch-size 256 --chunk-lines 256 --write-clean
+   ```
+3. **Batch size: start at 256.** Go to **512** if GPU use is high and memory is under 70 %; **halve** it if memory
+   runs out (out-of-memory errors in `logs/shard-K.log`).
+4. **Measure first:** the same command with `--limit 20000` into a test folder, then read `timing.run_seconds` in
+   its `summary.json` and scale up: `full hours ≈ run_seconds × (lines in the corpus ÷ stats.lines) ÷ 3600`
+   (section 4). Tune (steps 1 and 3) on this test run, not on the full corpus.
+5. **The real run:** the same command without `--limit`, into the real output folder. A rerun of the same command
+   resumes (finished files are skipped).
+
+Details: every argument in section 2, launching / watching / stopping in section 3, sizing and the tuning table in
+section 4.
+
 ## Which document covers what
 
 | Document | Tool | Content |
