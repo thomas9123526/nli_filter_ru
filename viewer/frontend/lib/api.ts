@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
-  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelTryResp,
+  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, LabelTryResp,
 } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
@@ -115,6 +115,10 @@ export const api = {
   labelTry: (body: { texts: string[]; policy?: string; all_labels?: boolean; force_gate?: boolean; use_judge?: boolean }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
   labelStart: (command: string) => postJSON<RunJob>("/api/labels/start", { command }),
+  labelLines: (ds: string, body: { path: string; member: string | null; lines: number[]; policy: string; use_judge: boolean }) =>
+    postJSON<LabelLinesResp>(`/api/datasets/${enc(ds)}/label-lines`, body),
+  labelRunFromDataset: (ds: string, body: { path: string; member: string | null; policy: string; output_dir: string; use_judge: boolean }) =>
+    postJSON<{ job: RunJob; run: string }>(`/api/datasets/${enc(ds)}/label-run`, body),
   undoEdit: (ds: string, edit: string) => postJSON<EditResp>(`/api/datasets/${enc(ds)}/corpus/edits/${enc(edit)}/undo`),
 };
 

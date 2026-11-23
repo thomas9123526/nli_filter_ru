@@ -58,3 +58,21 @@ belong together like a filter run:
   folder elsewhere is listed under the dataset's name.
 - Server outputs (FTP / SFTP / S3) are not supported for label runs yet; copy the run folder to a local disk.
 - Restart the viewer after editing the config.
+
+## Label with a policy on the corpus page
+
+On a dataset's corpus page (`/corpus/?ds=…&file=…`), the panel **Label with a policy** (below **Try settings**) runs
+`nli_label.py`'s policy instead of the filter. It needs the model service (`py -3.12 nli_playground.py`).
+
+- **Label the N lines of this page**: pick a policy (remembered in this browser) and the judge on or off. Each line
+  gets its result underneath it: the action (remove / review / keep / pass), the labels that were yes, an exception,
+  place-name changes. **flow →** opens that line on the Try page with every score. **Nothing is saved**: reloading
+  the page clears the results. The full text of each line is labelled (not the shortened text shown on the page);
+  lines longer than 20,000 characters are skipped with a note.
+- **Save as a labelling run**: starts `nli_label.py run` on the whole file with the same policy, into a new folder in
+  the project folder (default `out_label_<dataset>_<file>`, editable; an existing non-empty folder is refused). It
+  writes `*.labels.jsonl.zst`, `*.clean.jsonl.zst` and `*.rewrites.jsonl.zst`, runs in the model service, and shows
+  up under **Labelling runs** with its progress. A server corpus is read with its password passed as an environment
+  variable, never in the arguments. A member of a .zip / .rar cannot be saved on its own.
+
+The **Try settings** panel above it is unchanged: that one is `nli_filter.py` (keep / filter).

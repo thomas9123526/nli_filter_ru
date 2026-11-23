@@ -484,6 +484,10 @@ export type LabelCase = {
   hypothesis?: string; decision?: string; texts: LabelCaseText[];
 };
 export type LabelCasesResp = { version: number; created: string; about: string; policy: string; file: string; cases: LabelCase[] };
+export type LabelLineResult = { line: number; text: string; row: LabelDocResp["row"]; clean: string | null;
+  rewrites: { start: number; old: string; new: string }[] };
+export type LabelLinesResp = { results: LabelLineResult[]; skipped: { line: number; why: string }[]; seconds: number;
+  pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null } | null; policy: FlowPolicyData | null };
 export type LabelTryResp = {
   rows: LabelDocResp["row"][]; clean: (string | null)[]; rewrites: { start: number; old: string; new: string }[][];
   seconds: number; pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null };

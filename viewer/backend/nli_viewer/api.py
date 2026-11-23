@@ -93,6 +93,22 @@ class TryLabelBody(BaseModel):
     use_judge: bool = True
 
 
+class LabelLinesBody(BaseModel):
+    path: str
+    member: Optional[str] = None
+    lines: List[int]
+    policy: str                                   # a file in the project's policy/ folder
+    use_judge: bool = True
+
+
+class LabelRunBody(BaseModel):
+    path: str
+    member: Optional[str] = None
+    policy: str
+    output_dir: str                               # a folder name in the project folder
+    use_judge: bool = True
+
+
 class StartRunBody(BaseModel):
     args: Optional[List[str]] = None    # nli_filter.py arguments, or
     command: Optional[str] = None       # the same as one command line
@@ -430,6 +446,48 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         if len(body.lines) > 200:
             raise HTTPException(400, "at most 200 lines per run")
         return pg.run(ds(name), body.path, body.member, body.lines, body.settings)
+
+    # ---- nli_label.py on corpus lines: live on the page, or saved as a labelling run ----
+
+    def _policy_arg(policy: str) -> str:
+        rel = (policy or "").replace("\\", "/")
+        if not re.fullmatch(r"policy/[A-Za-z0-9_.-]+\.json", rel) or not (project / rel).is_file():
+            raise HTTPException(400, "policy must be a .json file in the project's policy folder (policy/<name>.json)")
+        return rel
+
+    @app.post("/api/datasets/{name}/label-lines", tags=["labels"])
+    def label_lines(name: str, body: LabelLinesBody):
+        """nli_label.py's labels for these corpus lines (through the model service); nothing is written."""
+        if not body.lines or len(body.lines) > 100:
+            raise HTTPException(400, "1 to 100 lines")
+        return pg.label_lines(ds(name), body.path, body.member, body.lines, _policy_arg(body.policy), body.use_judge)
+
+    @app.post("/api/datasets/{name}/label-run", tags=["labels"])
+    def label_run_start(name: str, body: LabelRunBody, request: Request):
+        """Start 'nli_label.py run' on one corpus file into a new folder of the project (a labelling run)."""
+        save_guard(request)
+        if body.member:
+            raise HTTPException(400, "a member of a .zip / .rar file cannot be labelled on its own: label the archive")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}", body.output_dir or ""):
+            raise HTTPException(400, "output folder: a name (letters, digits, _ . -), created in the project folder")
+        out = project / body.output_dir
+        if out.exists() and any(out.iterdir()):
+            raise HTTPException(409, f"{body.output_dir} exists already: choose another name")
+        d = ds(name)
+        corpus, env, _notes = runs_mod._corpus_arg(reg.config(name), d)
+        rel = body.path.replace("\\", "/").strip("/")
+        if ".." in rel.split("/"):
+            raise HTTPException(400, "bad path")
+        if "://" in corpus:
+            base, _, query = corpus.partition("?")
+            src = base.rstrip("/") + "/" + rel + (f"?{query}" if query else "")
+        else:
+            src = str(Path(corpus) / rel)
+        args = ["run", src, "--policy", _policy_arg(body.policy), "--output-dir", str(out), "--write-clean"]
+        if not body.use_judge:
+            args += ["--judge-model", "none"]
+        job = pg.start_job(args, env, f"labels: {body.output_dir}", script="nli_label.py")
+        return {"job": job, "run": body.output_dir}
 
     # ---- run nli_filter.py on a dataset (started by nli_playground.py, which has the torch environment) ----
 

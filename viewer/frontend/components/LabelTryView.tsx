@@ -8,6 +8,7 @@ import { href } from "@/lib/format";
 import type { LabelCase, LabelTryResp } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
+import { readTryHandoff } from "./LabelPagePanel";
 import { actionClass } from "./LabelRunView";
 
 function docAction(r: LabelTryResp["rows"][number]): string {
@@ -49,6 +50,7 @@ export function LabelTryView() {
   const src = useApi(fromRun && fromFile && fromLine ? `trysrc:${fromRun}:${fromFile}:${fromLine}` : null,
     (s) => api.labelDoc(fromRun as string, { file: fromFile, line: fromLine }, s));
   const [extText, setExtText] = useState<string | null>(null);  // text from the run (until another case is picked)
+  const [fromCorpus, setFromCorpus] = useState<{ ds: string; path: string; line: number } | null>(null);
   const pendingTi = useRef<number | null>(null);
 
   useEffect(() => {  // open ?case=<id>
@@ -67,11 +69,19 @@ export function LabelTryView() {
     const base = d.policy_path ? `policy/${d.policy_path.split(/[\\/]/).pop()}` : "";
     if (base && (policies.data?.policies || []).includes(base)) setPolicy(base);
   }, [src.data, list.length, policies.data, fromPara]);
+  useEffect(() => {  // opened from the corpus page's "flow →" (?from=corpus): that line's text and policy
+    if (sp.get("from") !== "corpus" || !list.length) return;
+    const h = readTryHandoff();
+    if (!h) return;
+    setExtText(h.text);
+    setFromCorpus({ ds: h.ds, path: h.path, line: h.line });
+    if (h.policy && (policies.data?.policies || []).includes(h.policy)) setPolicy(h.policy);
+  }, [sp, list.length, policies.data]);
   const c: LabelCase | undefined = list[ci];
   const t = c?.texts[ti];
   useEffect(() => { setText(extText ?? t?.text ?? ""); setRes(null); setSel(0); setErr(null); }, [ci, ti, t?.text, extText]);
   useEffect(() => { setTi(pendingTi.current ?? 0); pendingTi.current = null; }, [ci]);
-  const pick = (i: number) => { setExtText(null); setCi(i); };
+  const pick = (i: number) => { setExtText(null); setFromCorpus(null); setCi(i); };
 
   const groups = useMemo(() => {
     const g: [string, { c: LabelCase; i: number }[]][] = [];
@@ -144,7 +154,13 @@ export function LabelTryView() {
                 <span className="faint">{ci + 1} / {list.length}</span>
                 <button className="btn small" onClick={() => go(1)} disabled={ci >= list.length - 1}>next case ›</button>
               </div>
-              {extText !== null ? (
+              {extText !== null && fromCorpus ? (
+                <div className="alert" style={{ marginTop: 8 }} data-testid="from-corpus">
+                  Text from dataset <strong>{fromCorpus.ds}</strong>, {fromCorpus.path} line {fromCorpus.line}
+                  {policy ? <> · policy <code className="mono">{policy}</code></> : null} · press <strong>Try</strong> for the flow
+                  {" "}<a href={href("/corpus", { ds: fromCorpus.ds, file: fromCorpus.path, line: fromCorpus.line })}>back to the corpus</a>
+                </div>) : null}
+              {extText !== null && !fromCorpus ? (
                 <div className="alert" style={{ marginTop: 8 }} data-testid="from-run">
                   Text from run <strong>{fromRun}</strong>, {fromFile} line {fromLine}, paragraph {fromPara + 1}
                   {policy ? <> · the run&apos;s policy <code className="mono">{policy}</code></> : null}

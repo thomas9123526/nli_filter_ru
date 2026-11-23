@@ -24,6 +24,8 @@ import nli_hypotheses  # noqa: E402  (project root, put on sys.path by .storage)
 __all__ = ["Playground", "PlaygroundError"]
 
 
+LABEL_MAX_CHARS = 20000  # nli_playground.py's limit per text for POST /label
+
 class PlaygroundError(Exception):
     """The model service cannot be reached or refused the request: HTTP 502 / 400."""
 
@@ -77,6 +79,46 @@ class Playground:
     def label(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """nli_label.py policy labels on a few texts (the policy Try page). Slow on a CPU: ~1 s per label."""
         return self._call("/label", body, timeout=1800)
+
+    def label_lines(self, ds, path: str, member: Optional[str], lines: List[int], policy: str,
+                    use_judge: bool = True) -> Dict[str, Any]:
+        """nli_label.py's policy labels for these corpus lines (the full texts, read from the file), 20 per call to
+        the model service. Nothing is written. Lines without text, or longer than the service accepts, are skipped."""
+        path = clean_path(path)
+        if not lines:
+            raise ValueError("no lines")
+        lf = ds._line_file(ds.corpus, path, member or None)
+        tf = ds._text_field or "text"
+        todo, skipped = [], []
+        for n in lines:
+            raw = lf.line(int(n)).decode("utf-8", "replace")
+            try:
+                obj = json.loads(raw)
+            except ValueError:
+                skipped.append({"line": int(n), "why": "not a JSON line"})
+                continue
+            t = obj.get(tf) if isinstance(obj, dict) else None
+            if not isinstance(t, str) or not t.strip():
+                skipped.append({"line": int(n), "why": f"no text in '{tf}'"})
+            elif len(t) > LABEL_MAX_CHARS:
+                skipped.append({"line": int(n), "why": f"{len(t):,} characters: too long for live labelling "
+                                                       f"(save as a labelling run)"})
+            else:
+                todo.append((int(n), t))
+        results: List[Dict[str, Any]] = []
+        out: Dict[str, Any] = {}
+        seconds, pairs = 0.0, {"fast": 0, "judge": 0}
+        for i in range(0, len(todo), 20):
+            part = todo[i:i + 20]
+            out = self.label({"texts": [t for _, t in part], "policy": policy, "all_labels": False,
+                              "use_judge": bool(use_judge)})
+            seconds += float(out.get("seconds") or 0)
+            for k in pairs:
+                pairs[k] += int((out.get("pairs") or {}).get(k) or 0)
+            for (n, t), row, clean, rw in zip(part, out["rows"], out["clean"], out["rewrites"]):
+                results.append({"line": n, "text": t, "row": row, "clean": clean, "rewrites": rw})
+        return {"results": results, "skipped": skipped, "policy": out.get("policy"), "models": out.get("models"),
+                "seconds": round(seconds, 2), "pairs": pairs}
 
     def start_job(self, args: List[str], env: Dict[str, str], label: str,
                   script: str = "nli_filter.py") -> Dict[str, Any]:

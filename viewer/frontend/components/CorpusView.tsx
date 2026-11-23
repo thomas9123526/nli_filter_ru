@@ -11,6 +11,8 @@ import type { CorpusLine } from "@/lib/types";
 import { EditHistory, TextEditor } from "./TextEditor";
 import { FileChanges, InsertForm, deleteLine, fieldTemplate } from "./LineInsert";
 import { TryPanel, type TryControl } from "./TryPanel";
+import { LabelLineBox, LabelPagePanel } from "./LabelPagePanel";
+import type { LabelLineResult } from "@/lib/types";
 import { TryLineResult } from "./TryResult";
 import type { TryResult } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
@@ -125,6 +127,7 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
   const [changesVersion, setChangesVersion] = useState(0);
   const [tried, setTried] = useState<Record<number, TryResult>>({});  // "Try settings" results by line
   const [tryCtl, setTryCtl] = useState<TryControl | null>(null);
+  const [labelled, setLabelled] = useState<{ policy: string; results: Record<number, LabelLineResult> } | null>(null);
   const nPending = Object.keys(pending).length;
   const reload = () => { setInserting(null); setVersion((v) => v + 1); setChangesVersion((v) => v + 1); };
   const lastPage = !!data && start + PAGE > total;
@@ -222,6 +225,8 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
         lineInfo={Object.fromEntries(data.lines.map((l) => [l.line, { id: l.id, text: l.text, length: l.text_length, extra: l.extra }]))}
         onResults={(r) => setTried(r ? Object.fromEntries(r.results.map((x) => [x.line, x])) : {})}
         onControl={setTryCtl} /> : null}
+      {data ? <LabelPagePanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
+        onResults={setLabelled} /> : null}
       {data && inserting !== null && (inserting === 0 || inserting === total) ? (
         <InsertForm ds={ds} path={file} member={member} after={inserting} idField={data.id_field} textField={data.text_field}
           sha1={(inserting === 0 ? data.lines[0]?.sha1 : data.lines[data.lines.length - 1]?.sha1) || ""}
@@ -235,6 +240,7 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
               textField={data.text_field} idField={data.id_field}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
               onChanged={reload} structural={structural} tried={tried[l.line]}
+              labelled={labelled?.results[l.line] ? <LabelLineBox r={labelled.results[l.line]} policy={labelled.policy} ds={ds} path={file} /> : null}
               isTarget={l.line === target} autoEdit={l.line === target && editTarget && !autoEditDone} onAutoEdit={() => setAutoEditDone(true)}
               editProblem={status.data ? status.data.problem : "checking…"}
               onInsertBelow={() => setInserting(l.line)}
@@ -259,7 +265,8 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
 }
 
 function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete, tried,
-  isTarget, autoEdit, onAutoEdit, editProblem, textField, idField }: {
+  isTarget, autoEdit, onAutoEdit, editProblem, textField, idField, labelled }: {
+  labelled?: React.ReactNode;
   ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
   structural: boolean; onInsertBelow: () => void; onDelete: () => void; tried?: TryResult;
@@ -339,6 +346,7 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         <div className="current-text">{mode === "full" ? line.text : l.text}{mode === "view" && l.truncated ? "…" : ""}</div>
       ) : !l.error ? <div className="muted">(no text field)</div> : null}
       {tried && tried.decision ? <TryLineResult r={tried} /> : null}
+      {labelled}
       {error ? <ErrorBox error={error} /> : null}
       {l.edits ? <EditHistory ds={ds} path={file} member={member} line={l.line} version={historyVersion} onChanged={saved} /> : null}
     </div>

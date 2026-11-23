@@ -331,6 +331,7 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
 .hyp-editor .hyp-text { flex: 1; min-width: 0; font: 13px/1.45 var(--sans); padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); resize: vertical; }
 .try-result { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 6px; }
 .try-result.changed { border-left-color: var(--warn); }
+.try-line-result { margin-top: 8px; padding: 8px 10px; background: var(--panel-2); border-radius: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .try-bottom { padding: 12px 0; }
 .run-output { max-height: 520px; min-height: 120px; }
 .runs-progress { display: grid; gap: 8px; margin-bottom: 16px; }
