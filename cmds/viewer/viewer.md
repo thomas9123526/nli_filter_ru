@@ -66,3 +66,42 @@ cd D:\hkc\nli_filter2\viewer\backend
 ```
 
 Without a config: `--corpus D:\data\corpus --output D:\data\nli_out` and dataset name `default`.
+
+## Dynamic datasets (`auto_datasets`)
+
+With `"auto_datasets": "../dataset"` in `viewer\viewer_config.json`, the viewer looks at every run folder in
+`dataset\` (folders starting with `out`) and pairs it with the corpus it was made from. The pairing comes from the run
+itself (the input files recorded in its `summary.json`), not from the folder names, so `out_label_ru_v2` is paired
+with `test_corpus_cases_ru` although the names differ.
+
+- For each corpus, the **most recent** finished `nli_filter.py` run and the **most recent** finished `nli_label.py`
+  run are shown as datasets, next to the ones written in the config. Their cards carry an **auto** badge; label runs
+  are named `<corpus>-labels` (e.g. `test_corpus_cases_ru-labels`).
+- The entries written in `"datasets"` always win: a pair that is configured already is not added twice, and a
+  configured name is never reused (the dynamic one becomes `auto-<name>`). To show a particular run instead of the
+  newest (e.g. `out_label_ru_v2_judge`), write it as an entry.
+- A new run is picked up when the start page loads again (no restart). A run that is still going is never picked.
+- Not shown automatically: runs made from a single file (`test_russia_long.jsonl`), from a server corpus
+  (`sftp://…`: add those by hand), and runs whose corpus is gone.
+
+## Which run folders are in use, which can go
+
+```powershell
+cd viewer\backend
+.venv\Scripts\python.exe -m nli_viewer runs --config ..\viewer_config.json
+```
+
+It lists every run folder in `dataset\` with its status and prints `Remove-Item` lines. **Nothing is deleted by the
+viewer**: copy the lines you want into PowerShell in the project folder.
+
+| Status | Meaning | Remove? |
+|---|---|---|
+| in use | The most recent run of its kind for its corpus: shown by the viewer | No |
+| running | `progress.json` says it is running | No |
+| corpus missing | The corpus it was made from is gone | Yes (no matching corpus) |
+| no summary | No `summary.json`: unfinished, stopped or broken | Yes (not valid) |
+| input unknown | `summary.json` records no input | Yes |
+| older run | A newer run of the same kind exists for the same corpus | Only if you no longer need it (reports in `cmds\design` cite some, e.g. v1 as a baseline) |
+| single-file input / server input | Valid, but not shown as a dataset | Only if you no longer need it |
+
+The same list as JSON: `GET /api/run-folders`.

@@ -7,6 +7,10 @@
     "http://localhost:3000",
     "http://127.0.0.1:3000"
   ],
+  // Dynamic datasets: every run folder in this folder is paired with the corpus it was made from (as recorded in its
+  // summary.json); the most recent nli_filter.py run and the most recent nli_label.py run per corpus are shown, next
+  // to the datasets below (these always win). Report of all run folders: python -m nli_viewer runs
+  "auto_datasets": "../dataset",
   "datasets": [
     {
       "name": "test_corpus",

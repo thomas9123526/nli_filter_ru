@@ -258,6 +258,23 @@ def _short(text: str, n: int = 160) -> str:
     return t if len(t) <= n else t[:n] + f"... ({len(text)} chars)"
 
 
+def cmd_runs(args) -> int:
+    from pathlib import Path as _P
+    from . import discover
+    from .config import load_config
+    cfg_path = args.config or os.environ.get("NLI_VIEWER_CONFIG") or str(_P(__file__).resolve().parents[2] / "viewer_config.json")
+    cfg = load_config(cfg_path)
+    project = _P(cfg.project_dir)
+    if not project.is_absolute():
+        project = (_P(cfg.base_dir) / project).resolve()
+    folder = _P(args.folder) if args.folder else (
+        (_P(cfg.base_dir) / cfg.auto_datasets).resolve() if cfg.auto_datasets else project / "dataset")
+    runs = discover.scan(project, folder)
+    print(f"run folders in {folder}\n")
+    print(discover.report(runs, project))
+    return 0
+
+
 def cmd_check(args) -> int:
     reg = DatasetRegistry(_config(args))
     bad = 0
@@ -341,6 +358,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--line", type=int, default=None, help="only this line")
     s.add_argument("--json", action="store_true", help="one JSON object per edit")
     s.set_defaults(fn=cmd_edits)
+    s = sub.add_parser("runs", help="run folders of auto_datasets (e.g. ../dataset): which are in use, older, "
+                                    "broken or without a corpus, with commands to remove them by hand")
+    s.add_argument("--config", default=None)
+    s.add_argument("--folder", default=None, help="the folder to scan (default: the config's auto_datasets, else "
+                                                  "the project's dataset/)")
+    s.set_defaults(fn=cmd_runs)
     s = sub.add_parser("check", help="check that every dataset's storage can be reached")
     common(s, dataset=False)
     s.set_defaults(fn=cmd_check)

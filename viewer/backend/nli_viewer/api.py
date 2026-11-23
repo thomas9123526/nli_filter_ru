@@ -236,7 +236,11 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         return JSONResponse({"detail": f"storage error: {exc}"}, status_code=502)
 
     def ds(name: str) -> Dataset:
-        return reg.get(name)
+        try:
+            return reg.get(name)
+        except KeyError:
+            refresh_auto()  # a dynamic dataset found since the last scan
+            return reg.get(name)
 
     project = Path(cfg.project_dir)
     if not project.is_absolute():
@@ -272,8 +276,34 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             p = Path(cfg.base_dir) / p
         return labels.register(name, p)
 
+    # ---- dynamic datasets: the run folders of "auto_datasets" (e.g. ../dataset), the most recent run per corpus ----
+    auto_dir: Optional[Path] = None
+    if cfg.auto_datasets:
+        auto_dir = Path(cfg.auto_datasets)
+        if not auto_dir.is_absolute():
+            auto_dir = (Path(cfg.base_dir) / auto_dir).resolve()
+
+    def refresh_auto() -> List[Any]:
+        if auto_dir is None:
+            return []
+        from . import discover
+        runs = discover.scan(project, auto_dir)
+        reg.set_auto(discover.auto_datasets(runs, reg.configured_pairs()))
+        return runs
+
+    @app.get("/api/run-folders", tags=["datasets"])
+    def run_folders():
+        """Every run folder of auto_datasets: in use, older, corpus missing, broken (for removing by hand)."""
+        from . import discover
+        runs = refresh_auto()
+        return {"folder": str(auto_dir) if auto_dir else None,
+                "runs": [r.as_dict(project) for r in runs],
+                "remove_invalid": discover.removal_commands(runs, project, discover.INVALID),
+                "remove_unused": discover.removal_commands(runs, project, discover.UNUSED)}
+
     @app.get("/api/datasets", tags=["datasets"])
     def datasets():
+        refresh_auto()
         rows = reg.describe()
         for r in rows:
             lr = label_run_of(r["name"])

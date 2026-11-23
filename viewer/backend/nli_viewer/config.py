@@ -73,6 +73,7 @@ class ViewerConfig:
     playground_url: str = "http://127.0.0.1:8100"  # nli_playground.py (models) for the "Try settings" panel
     project_dir: str = ".."             # folder with nli_filter.py, hypotheses/, keywords/ (relative to the config)
     progress_stale_seconds: float = 120.0  # a running nli_filter.py whose progress file is older: "no update"
+    auto_datasets: Optional[str] = None  # a folder (e.g. "../dataset"): its run folders become datasets (discover.py)
 
 
 def _expand(value: Any) -> Any:
@@ -113,11 +114,11 @@ def load_config(path: str) -> ViewerConfig:
             raise ValueError(f"{p}: duplicate dataset name '{d['name']}'")
         names.add(d["name"])
         datasets.append(DatasetConfig(**{k: v for k, v in d.items() if k in DatasetConfig.__dataclass_fields__}))
-    if not datasets:
+    if not datasets and not data.get("auto_datasets"):
         raise ValueError(f"{p}: no datasets")
     cfg = ViewerConfig(datasets=datasets, base_dir=str(p.parent))
     for k in ("cache_dir", "cache_max_gb", "cors_origins", "frontend_dir", "edits_dir", "edit_zstd_level",
-              "edit_allow_remote", "playground_url", "project_dir", "progress_stale_seconds"):
+              "edit_allow_remote", "playground_url", "project_dir", "progress_stale_seconds", "auto_datasets"):
         if k in data:
             setattr(cfg, k, data[k])
     return cfg
@@ -141,12 +142,50 @@ class DatasetRegistry:
         edits_dir = Path(cfg.edits_dir)
         self.edits_dir = edits_dir if edits_dir.is_absolute() else Path(cfg.base_dir) / edits_dir
         self._configs = {d.name: d for d in cfg.datasets}
+        self._auto: set = set()  # names added by set_auto (dynamic datasets)
         self._open: Dict[str, Dataset] = {}
         self._errors: Dict[str, str] = {}
         self._lock = threading.Lock()
 
     def names(self) -> List[str]:
         return list(self._configs)
+
+    def is_auto(self, name: str) -> bool:
+        return name in self._auto
+
+    def configured_pairs(self) -> Dict[str, tuple]:
+        """{name: (corpus, output)} of the datasets from the config file (local paths resolved)."""
+        out = {}
+        for n, c in self._configs.items():
+            if n in self._auto:
+                continue
+
+            def res(v: str) -> str:
+                if not v or "://" in v:
+                    return v or ""
+                p = Path(v)
+                return str((p if p.is_absolute() else Path(self.cfg.base_dir) / p).resolve())
+            out[n] = (res(c.corpus), res(c.output))
+        return out
+
+    def set_auto(self, entries: List[Dict[str, Any]]) -> None:
+        """Replace the dynamic datasets; one whose output changed (a newer run) is opened again."""
+        with self._lock:
+            new = {e["name"]: e for e in entries}
+            for name in list(self._auto):
+                old = self._configs.get(name)
+                if name not in new or (old is not None and old.output != new[name]["output"]):
+                    ds = self._open.pop(name, None)
+                    if ds is not None:
+                        ds.corpus.close()
+                        ds.output.close()
+                    if name not in new:
+                        self._configs.pop(name, None)
+                        self._auto.discard(name)
+            for name, e in new.items():
+                self._configs[name] = DatasetConfig(name=name, corpus=e["corpus"], output=e["output"],
+                                                    title=e.get("title"), description=e.get("description") or "")
+                self._auto.add(name)
 
     def config(self, name: str) -> DatasetConfig:
         if name not in self._configs:
@@ -192,7 +231,7 @@ class DatasetRegistry:
             for name, c in self._configs.items():
                 row = {"name": name, "title": c.title or name, "description": c.description,
                        "corpus": _mask(c.corpus), "output": _mask(c.output), "error": None,
-                       "editable": bool(c.editable)}
+                       "editable": bool(c.editable), "auto": name in self._auto}
                 fut = futures[name]
                 if not fut.done():
                     row["error"] = f"no answer within {probe_seconds:.0f}s (server slow or unreachable)"

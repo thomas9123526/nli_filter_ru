@@ -1,6 +1,7 @@
 // Shapes of the nli_viewer API responses (see viewer/backend/nli_viewer/api.py, /docs).
 
 export type DatasetInfo = {
+  auto?: boolean;      // found in auto_datasets (the most recent run for its corpus), not written in the config
   label_run?: string;  // the output is an nli_label.py run: its name on the Labels pages
   name: string;
   title: string;
