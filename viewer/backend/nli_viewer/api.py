@@ -166,7 +166,7 @@ class LabelRunBody(BaseModel):
     path: str
     member: Optional[str] = None
     policy: str
-    output_dir: str                               # a folder name in the project folder
+    output_dir: str                               # a folder name, created in the project's dataset/ folder
     use_judge: bool = True
 
 
@@ -530,8 +530,8 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         if body.member:
             raise HTTPException(400, "a member of a .zip / .rar file cannot be labelled on its own: label the archive")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}", body.output_dir or ""):
-            raise HTTPException(400, "output folder: a name (letters, digits, _ . -), created in the project folder")
-        out = project / body.output_dir
+            raise HTTPException(400, "output folder: a name (letters, digits, _ . -), created in the dataset folder")
+        out = project / "dataset" / body.output_dir
         if out.exists() and any(out.iterdir()):
             raise HTTPException(409, f"{body.output_dir} exists already: choose another name")
         d = ds(name)

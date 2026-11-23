@@ -48,6 +48,10 @@ class LabelRuns:
         one = d / "progress.json"
         return [one] if one.is_file() else sorted(d.glob("progress.shard*.json"))
 
+    def roots(self) -> List[Path]:
+        """Where runs are looked for: the project folder, then its dataset/ folder (runs moved there)."""
+        return [self.project, self.project / "dataset"]
+
     def is_run_folder(self, d: Path) -> bool:
         try:
             return d.is_dir() and self._is_run(d)
@@ -56,12 +60,13 @@ class LabelRuns:
 
     def register(self, dataset: str, d: Path) -> Optional[str]:
         """A dataset's local output folder that is an nli_label.py run -> the run's name on the Labels pages (the
-        folder name inside the project folder, else the dataset name); None when it is not a label run."""
+        folder name inside the project folder or its dataset/ folder, else the dataset name); None when it is not a
+        label run."""
         d = Path(d)
         if not self.is_run_folder(d):
             return None
         try:
-            if d.resolve().parent == self.project.resolve():
+            if any(d.resolve().parent == r.resolve() for r in self.roots()):
                 return d.name
         except OSError:
             pass
@@ -73,10 +78,11 @@ class LabelRuns:
             raise ValueError(f"bad run name '{name}'")
         if name in self.extra:
             return self.extra[name]
-        d = self.project / name
-        if not d.is_dir() or not self._is_run(d):
-            raise KeyError(f"no nli_label.py run '{name}' in {self.project}")
-        return d
+        for root in self.roots():  # the project folder first, then dataset/
+            d = root / name
+            if self.is_run_folder(d):
+                return d
+        raise KeyError(f"no nli_label.py run '{name}' in {self.project} or its dataset folder")
 
     def progress(self, d: Path) -> Optional[Dict[str, Any]]:
         parts = []
@@ -111,21 +117,30 @@ class LabelRuns:
 
     def list(self) -> Dict[str, Any]:
         runs = []
-        for d in sorted(self.project.iterdir()):
-            if not d.is_dir() or d.name.startswith(".") or d.name in ("viewer", "models", "pkgs", "node_modules"):
+        seen = set()
+        dirs = []
+        for root in self.roots():
+            try:
+                dirs += sorted(root.iterdir())
+            except OSError:  # no dataset/ folder
+                continue
+        for d in dirs:
+            if not d.is_dir() or d.name.startswith(".") or d.name in ("viewer", "models", "pkgs", "node_modules",
+                                                                       "dataset") or d.name in seen:
                 continue
             try:
                 if not self._is_run(d):
                     continue
             except OSError:
                 continue
+            seen.add(d.name)  # the same name in both: the project folder's run is shown
             s = _read_json(d / "summary.json") or {}
             st = s.get("stats") or {}
             runs.append({"name": d.name, "finished": s.get("finished"), "command": s.get("command"),
                          "policy": (s.get("policy") or {}).get("path"), "lines": st.get("lines"),
                          "tokens": st.get("tokens"), "tokens_removed": st.get("tokens_removed"),
                          "docs": st.get("docs") or {}, "redecided": bool(s.get("redecide")),
-                         "progress": self.progress(d)})
+                         "progress": self.progress(d), "folder": str(d.relative_to(self.project))})
         for name, d in self.extra.items():  # dataset outputs outside the project folder
             if any(r["name"] == name for r in runs) or not self.is_run_folder(d):
                 continue

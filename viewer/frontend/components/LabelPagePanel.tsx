@@ -129,7 +129,7 @@ export function LabelPagePanel({ ds, path, member, lines, onResults }: {
           {last?.skipped.length ? <div className="faint" style={{ fontSize: 13 }}>not labelled: {last.skipped.map((s) => `line ${s.line} (${s.why})`).join("; ")}</div> : null}
           <div className="row" style={{ borderTop: "1px solid var(--border, #e3e6ea)", paddingTop: 8 }}>
             <strong style={{ fontSize: 14 }}>Save as a labelling run</strong>
-            <span className="faint" style={{ fontSize: 13 }}>the whole file, written to a new folder in the project folder</span>
+            <span className="faint" style={{ fontSize: 13 }}>the whole file, written to a new folder in dataset/</span>
           </div>
           <div className="row">
             <input className="mono" style={{ minWidth: 320 }} value={outName} onChange={(e) => setOutName(e.target.value)} data-testid="label-out-name" />

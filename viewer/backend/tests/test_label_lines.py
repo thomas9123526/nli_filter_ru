@@ -70,8 +70,8 @@ def test_label_run_start(client, project, monkeypatch):
     h = {EDIT_HEADER: "1"}
     for bad in ("../x", "a/b", ""):
         assert client.post("/api/datasets/c/label-run", json=dict(body, output_dir=bad), headers=h).status_code == 400
-    (project / "taken").mkdir()
-    (project / "taken" / "x.txt").write_text("x", encoding="utf-8")
+    (project / "dataset" / "taken").mkdir(parents=True)
+    (project / "dataset" / "taken" / "x.txt").write_text("x", encoding="utf-8")
     assert client.post("/api/datasets/c/label-run", json=dict(body, output_dir="taken"), headers=h).status_code == 409
     started = []
     monkeypatch.setattr(Playground, "start_job", lambda self, args, env, label, script="nli_filter.py":
@@ -82,6 +82,6 @@ def test_label_run_start(client, project, monkeypatch):
     args, env, label, script = started[0]
     assert script == "nli_label.py" and args[0] == "run"
     assert args[1].replace("\\", "/").endswith("corpus/sub/f.jsonl")
-    assert args[args.index("--output-dir") + 1].replace("\\", "/").endswith("proj/out_label_c_f")
+    assert args[args.index("--output-dir") + 1].replace("\\", "/").endswith("proj/dataset/out_label_c_f")
     assert "--write-clean" in args and args[args.index("--judge-model") + 1] == "none"
     assert args[args.index("--policy") + 1] == "policy/p1.json"

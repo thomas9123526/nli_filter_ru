@@ -104,3 +104,11 @@ page asks first. Save:
 **The JSON files are the master copy now.** `tools\build_russia_llm_cases.py` and `tools\build_cases.py` refuse to
 overwrite an existing cases file; `--reset` rebuilds it from the script's lists (your edits are then lost; a `.bak`
 copy is kept).
+
+## Where runs are found
+
+The **Labelling runs** page lists every `nli_label.py` run folder directly in the project folder **and** in
+`dataset/` (a run moved there keeps working: its stored input paths are relative to the project folder). If a run
+with the same name is in both, the one in the project folder is shown. **Save as a labelling run** on the corpus page
+creates its folder in `dataset/`. For runs from the command line, give `--output-dir dataset/out_label_xxx` to keep
+them there.

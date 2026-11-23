@@ -184,3 +184,16 @@ def test_labels_file_as_zst(client, project):
     assert docs["total"] >= 1 and docs["rows"][0]["line"] == 1
     d = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
     assert d["row"]["action"] == "edited" and len(d["row"]["paragraphs"]) == 2
+
+
+def test_runs_moved_into_dataset_are_found(client, project):
+    """A run folder moved into the project's dataset/ folder is still listed, opened and read."""
+    import shutil as _sh
+    (project / "dataset").mkdir()
+    _sh.move(str(project / "out_label_t"), str(project / "dataset" / "out_label_t"))
+    runs = {r["name"]: r for r in client.get("/api/labels").json()["runs"]}
+    assert "out_label_t" in runs and runs["out_label_t"]["folder"].replace("\\", "/") == "dataset/out_label_t"
+    assert client.get("/api/labels/out_label_t").json()["files"][0]["name"] == "in"
+    d = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+    assert d["row"]["action"] == "edited" and d["text"]
+    assert client.get("/api/labels/dataset").status_code in (400, 404)  # dataset/ itself is not a run

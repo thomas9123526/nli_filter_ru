@@ -37,14 +37,14 @@
     {
       "name": "ru_plain",
       "title": "test_russia: russian.json",
-      "corpus": "../test_ru",
-      "output": "../out_ru_plain"
+      "corpus": "../dataset/test_ru",
+      "output": "../dataset/out_ru_plain"
     },
     {
       "name": "ru_kw",
       "title": "test_russia: russian_kw.json",
-      "corpus": "../test_ru",
-      "output": "../out_ru_kw"
+      "corpus": "../dataset/test_ru",
+      "output": "../dataset/out_ru_kw"
     },
     {
       "name": "sftp_test",
