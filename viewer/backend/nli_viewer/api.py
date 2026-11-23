@@ -10,8 +10,11 @@ Interactive API documentation: /docs
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
+import shutil
+import time
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -91,6 +94,64 @@ class TryLabelBody(BaseModel):
     all_labels: bool = True                      # score every label (the decision still follows the cascade)
     force_gate: bool = False                     # label the text even without a keyword hit
     use_judge: bool = True
+
+
+class SaveCasesBody(BaseModel):
+    file: str                                     # labels/<name>.json, as GET /api/labels/cases gave it
+    data: Dict[str, Any]                          # the whole case set
+    base_sha: Optional[str] = None                # the "sha" the page loaded: refused if the file changed since
+
+
+CASE_ACTIONS = ("remove", "review", "keep", "pass", "untouched")
+
+
+def check_cases(data: Dict[str, Any]) -> List[str]:
+    """Problems that stop a save (empty list = fine)."""
+    errs: List[str] = []
+    corpus = data.get("corpus")  # rebuilt (deleted and written again) after a save: only test_corpus_cases… folders
+    if corpus is not None and not (isinstance(corpus, str) and re.fullmatch(r"test_corpus_cases[A-Za-z0-9_-]*", corpus)):
+        errs.append("'corpus' must be a folder name starting with test_corpus_cases (letters, digits, _ -)")
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
+        return ["'cases' must be a non-empty list"]
+    seen = set()
+    for i, c in enumerate(cases, 1):
+        where = f"case {i}"
+        if not isinstance(c, dict):
+            errs.append(f"{where}: not an object")
+            continue
+        cid = c.get("id")
+        if not isinstance(cid, str) or not cid.strip():
+            errs.append(f"{where}: id is empty")
+        elif cid in seen:
+            errs.append(f"{where}: id '{cid}' is used twice")
+        else:
+            seen.add(cid)
+            where = f"case '{cid}'"
+        for k in ("group", "title"):
+            if not isinstance(c.get(k), str) or not c[k].strip():
+                errs.append(f"{where}: {k} is empty")
+        texts = c.get("texts")
+        if not isinstance(texts, list) or not texts:
+            errs.append(f"{where}: needs at least one text")
+            continue
+        for k, t in enumerate(texts, 1):
+            tw = f"{where}, text {k}"
+            if not isinstance(t, dict):
+                errs.append(f"{tw}: not an object")
+                continue
+            if not isinstance(t.get("text"), str) or not t["text"].strip():
+                errs.append(f"{tw}: the text is empty")
+            elif len(t["text"]) > 20000:
+                errs.append(f"{tw}: longer than 20,000 characters")
+            exp = t.get("expected_action")
+            if not isinstance(exp, str) or any(x.strip() not in CASE_ACTIONS for x in exp.split(" or ")):
+                errs.append(f"{tw}: expected_action must be one of {', '.join(CASE_ACTIONS)}")
+            if any(a not in CASE_ACTIONS for a in (t.get("acceptable") or [])):
+                errs.append(f"{tw}: acceptable actions must be among {', '.join(CASE_ACTIONS)}")
+            if not isinstance(t.get("labels_yes", []), list):
+                errs.append(f"{tw}: labels_yes must be a list")
+    return errs
 
 
 class LabelLinesBody(BaseModel):
@@ -593,9 +654,51 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         else:
             main = [f for f in files if f.stem.startswith("cases_v")]
             pick = main[-1] if main else files[0]
-        data = json.loads(pick.read_text(encoding="utf-8"))
+        raw = pick.read_bytes()
+        data = json.loads(raw.decode("utf-8"))
         data["file"] = f"labels/{pick.name}"
+        data["sha"] = hashlib.sha1(raw).hexdigest()  # sent back on save: refused if the file changed meanwhile
         return data
+
+    @app.post("/api/labels/cases/save", tags=["labels"])
+    def label_cases_save(body: SaveCasesBody, request: Request):
+        """Save an edited case set (the Try page's "Edit cases"); the old file is kept in labels/.backup/. Then the
+        case corpus is rebuilt (the set's "corpus" folder, or test_corpus_cases for the newest cases_vN.json)."""
+        save_guard(request)
+        files = _case_files()
+        pick = next((f for f in files if f"labels/{f.name}" == body.file.replace("\\", "/")), None)
+        if pick is None:
+            raise HTTPException(404, f"unknown case file {body.file}")
+        if body.base_sha and hashlib.sha1(pick.read_bytes()).hexdigest() != body.base_sha:
+            raise HTTPException(409, f"{body.file} was changed by someone else since you loaded it: reload the page "
+                                     "(your edits are still on the page; copy what you need first)")
+        data = {k: v for k, v in body.data.items() if k not in ("file", "sha")}
+        errs = check_cases(data)
+        if errs:
+            raise HTTPException(400, "; ".join(errs[:12]) + (f" (and {len(errs) - 12} more)" if len(errs) > 12 else ""))
+        data["edited"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        bdir = pick.parent / ".backup"
+        bdir.mkdir(exist_ok=True)
+        backup = bdir / f"{pick.stem}.{time.strftime('%Y%m%d-%H%M%S')}.json"
+        shutil.copy2(pick, backup)
+        tmp = pick.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        tmp.replace(pick)
+        # the corpus the case set belongs to (not for an older cases_vN.json: test_corpus_cases holds the newest)
+        main = [f for f in files if f.stem.startswith("cases_v")]
+        corpus = None
+        builder = project / "tools" / "build_cases_corpus.py"
+        if builder.is_file() and (data.get("corpus") or (main and pick == main[-1])):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("build_cases_corpus", builder)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            out = project / (data.get("corpus") or "test_corpus_cases")
+            n_files, n_lines = mod.build(data, out)
+            corpus = {"path": out.name, "files": n_files, "lines": n_lines}
+        texts = sum(len(c["texts"]) for c in data["cases"])
+        return {"file": body.file, "sha": hashlib.sha1(pick.read_bytes()).hexdigest(), "backup": f"labels/.backup/{backup.name}",
+                "cases": len(data["cases"]), "texts": texts, "corpus": corpus}
 
     @app.post("/api/labels/try", tags=["labels"])
     def label_try(body: TryLabelBody):

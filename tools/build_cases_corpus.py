@@ -26,17 +26,36 @@ GROUP_DIRS = {"Level 0 · gate": "level0_gate", "Level 1 · subject": "level1_su
               "Level 2 · framing": "level2_framing", "Edge cases": "edge_cases"}
 
 
+def default_out(cases: Path, data: dict) -> Path:
+    """The case set's corpus folder: its "corpus" field, else test_corpus_cases (A's cases_vN.json). The folder is
+    deleted and written again, so only test_corpus_cases… names in the project folder are accepted."""
+    name = data.get("corpus") or "test_corpus_cases"
+    if not re.fullmatch(r"test_corpus_cases[A-Za-z0-9_-]*", str(name)):
+        raise SystemExit(f"{cases}: \"corpus\" must be a folder name starting with test_corpus_cases, not {name!r}")
+    return HERE / name
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="cases_v1.json -> one .jsonl.zst per case")
     ap.add_argument("--cases", default=None, help="default: the newest labels/cases_v*.json")
-    ap.add_argument("--out", default=str(HERE / "test_corpus_cases"))
+    ap.add_argument("--out", default=None, help="default: the cases file's \"corpus\" field, else test_corpus_cases")
     args = ap.parse_args()
     found = sorted((p for p in (HERE / "labels").glob("cases_v*.json") if re.fullmatch(r"cases_v\d+\.json", p.name)),
                    key=lambda p: int(p.stem[7:]))
     cases = args.cases or str(found[-1])
     data = json.loads(Path(cases).read_text(encoding="utf-8"))
     print(f"cases: {cases} (policy {data.get('policy')})")
-    out = Path(args.out)
+    out = Path(args.out) if args.out else default_out(Path(cases), data)
+    n_files, n_lines = build(data, out)
+    print(f"{n_files} files ({n_lines} lines) -> {out}")
+    for g in sorted({p.parent.name for p in out.rglob('*.zst')}):
+        print(f"  {g}: {len(list((out / g).glob('*.zst')))} files")
+    return 0
+
+
+def build(data: dict, out: Path):
+    """Write the cases as a corpus: one .jsonl.zst per case, one folder per group. -> (files, lines)"""
+    out = Path(out)
     if out.exists():
         shutil.rmtree(out)
     n_files = n_lines = 0
@@ -57,10 +76,7 @@ def main() -> int:
         path.write_bytes(cctx.compress(("\n".join(lines) + "\n").encode("utf-8")))
         n_files += 1
         n_lines += len(lines)
-    print(f"{n_files} files ({n_lines} lines) -> {out}")
-    for g in sorted({p.parent.name for p in out.rglob('*.zst')}):
-        print(f"  {g}: {len(list((out / g).glob('*.zst')))} files")
-    return 0
+    return n_files, n_lines
 
 
 if __name__ == "__main__":

@@ -314,6 +314,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Build the policy Try page's case list.")
     ap.add_argument("--policy", default="policy/russia_policy.json")
     ap.add_argument("--out", default="labels/cases_v1.json")
+    ap.add_argument("--reset", action="store_true", help="overwrite an existing cases file (a .bak is kept)")
     args = ap.parse_args()
     policy = nli_label.Policy.load(str(HERE / args.policy))
     if "narr_leader_illegitimate" in policy.labels:  # v5+: the split smear labels use their own texts
@@ -378,6 +379,13 @@ def main() -> int:
                     "unchecked draft labels; benchmark and new texts carry labels written with the text.",
            "policy": args.policy.replace("\\", "/"), "cases": cases}
     path = HERE / args.out
+    if path.exists() and not args.reset:
+        print(f"{path} exists and is the master copy (edit it on the viewer's Try page). Use a new --out, or --reset "
+              f"to overwrite it (a .bak is kept).")
+        return 1
+    if path.exists():
+        import shutil
+        shutil.copy2(path, path.with_suffix(".json.bak"))
     path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     n_texts = sum(len(c["texts"]) for c in cases)
     srcs = {"seed": 0, "benchmark": 0, "new": 0}

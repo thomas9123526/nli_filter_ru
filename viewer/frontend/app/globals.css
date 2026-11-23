@@ -427,6 +427,12 @@ tr.active td { background: var(--accent-soft); }
 .case-group { padding: 8px 12px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .case-item { display: flex; justify-content: space-between; gap: 6px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--text); padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .case-item.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.case-editor { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: 8px; display: grid; gap: 6px; }
+.case-editor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 12px; align-items: end; }
+.case-editor-grid > label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.case-editor-grid > label input, .case-editor-grid > label select { font-size: 13px; }
+.case-editor-grid .wide label { display: inline-flex; align-items: center; gap: 3px; }
+.case-editor-grid .wide { grid-column: 1 / -1; font-size: 13px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--border); margin-left: 3px; }
 .dot.ok { background: var(--keep); } .dot.bad { background: var(--filter); }
 .try-text { width: 100%; min-height: 130px; margin: 8px 0; padding: 8px; font-size: 13px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }

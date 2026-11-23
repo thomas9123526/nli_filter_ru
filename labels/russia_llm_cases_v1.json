@@ -3,6 +3,7 @@
  "created": "2026-11-23 12:48:03",
  "about": "Cases for the Russia-side policy (tools/build_russia_llm_cases.py).",
  "policy": "policy/russia_llm_policy_v2.json",
+ "corpus": "test_corpus_cases_ru",
  "cases": [
   {
    "id": "yours:01",

@@ -483,7 +483,10 @@ export type LabelCase = {
   id: string; group: string; label: string | null; title: string; what: string;
   hypothesis?: string; decision?: string; texts: LabelCaseText[];
 };
-export type LabelCasesResp = { version: number; created: string; about: string; policy: string; file: string; cases: LabelCase[] };
+export type LabelCasesResp = { version: number; created: string; about: string; policy: string; file: string; cases: LabelCase[];
+  sha?: string; corpus?: string; edited?: string };
+export type SaveCasesResp = { file: string; sha: string; backup: string; cases: number; texts: number;
+  corpus: { path: string; files: number; lines: number } | null };
 export type LabelLineResult = { line: number; text: string; row: LabelDocResp["row"]; clean: string | null;
   rewrites: { start: number; old: string; new: string }[] };
 export type LabelLinesResp = { results: LabelLineResult[]; skipped: { line: number; why: string }[]; seconds: number;

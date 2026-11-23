@@ -236,3 +236,45 @@ def test_runs_progress_renders(edit_server, tmp_path):
         assert "gpu-box" in page and "shard 0/8" in page and "37.5%" in page and "3/8 files" in page
     finally:
         (prog / "ui.json").unlink()
+
+
+@pytest.fixture(scope="module")
+def cases_server(tmp_path_factory):
+    """A viewer whose project folder holds the Russia-side case set (for the Try page's case editor)."""
+    import json as _json
+    import uvicorn
+    proj = tmp_path_factory.mktemp("uiproj")
+    (proj / "labels").mkdir()
+    (proj / "policy").mkdir()
+    real = Path(__file__).resolve().parents[3] / "labels" / "russia_llm_cases_v1.json"
+    (proj / "labels" / "russia_llm_cases_v1.json").write_text(real.read_text(encoding="utf-8"), encoding="utf-8")
+    (proj / "labels" / "cases_v1.json").write_text(_json.dumps({"version": 1, "cases": [
+        {"id": "a:1", "group": "G", "title": "a one", "what": "w", "texts": [
+            {"text": "Moscow.", "from": "x", "labels_yes": [], "expected_action": "keep", "note": ""}]}]}),
+        encoding="utf-8")
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    cfg = ViewerConfig(datasets=[], cache_dir=str(tmp_path_factory.mktemp("uicache2")), project_dir=str(proj),
+                       playground_url="http://127.0.0.1:9")
+    srv = uvicorn.Server(uvicorn.Config(create_app(cfg), host="127.0.0.1", port=port, log_level="warning"))
+    t = threading.Thread(target=srv.run, daemon=True)
+    t.start()
+    for _ in range(100):
+        if srv.started:
+            break
+        time.sleep(0.1)
+    yield f"http://127.0.0.1:{port}"
+    srv.should_exit = True
+    t.join(timeout=10)
+
+
+def test_case_editor_renders(cases_server, tmp_path):
+    page = dom(cases_server + "/labeltry/?cases=labels/russia_llm_cases_v1.json&edit=1", tmp_path)
+    assert 'data-testid="case-editor"' in page and 'data-testid="edit-cases"' in page
+    assert "Russia was under Mongol rule" in page          # the first case's text, in the box
+    assert "+ Text (from the box)" in page and "Delete case" in page and "labels that should be yes" in page
+    assert 'data-testid="save-cases"' not in page            # nothing changed yet: no save button
+    plain = dom(cases_server + "/labeltry/?cases=labels/russia_llm_cases_v1.json", tmp_path)
+    assert 'data-testid="case-editor"' not in plain and 'data-testid="edit-cases"' in plain

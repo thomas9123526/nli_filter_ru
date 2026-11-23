@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
-import type { LabelCase, LabelTryResp } from "@/lib/types";
+import type { LabelCase, LabelCaseText, LabelCasesResp, LabelTryResp } from "@/lib/types";
+import { CaseEditor, newCaseId, newText } from "./CaseEditor";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
 import { readTryHandoff } from "./LabelPagePanel";
@@ -32,7 +33,14 @@ export function LabelTryView() {
   const [caseFile, setCaseFile] = useState(sp.get("cases") || "");
   const cases = useApi(`labelcases:${caseFile}`, (s) => api.labelCases(caseFile || undefined, s));
   const policies = useApi("labelpolicies", (s) => api.labelPolicies(s));
-  const list = cases.data?.cases || [];
+  const [draft, setDraft] = useState<LabelCasesResp | null>(null);  // edited case set, not saved yet
+  const [changes, setChanges] = useState(0);
+  const [editing, setEditing] = useState(sp.get("edit") === "1");  // ?edit=1 opens the editor
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const data = draft ?? cases.data;
+  const list = data?.cases || [];
   const [ci, setCi] = useState(0);
   const [ti, setTi] = useState(0);
   const [text, setText] = useState("");
@@ -83,6 +91,55 @@ export function LabelTryView() {
   useEffect(() => { setTi(pendingTi.current ?? 0); pendingTi.current = null; }, [ci]);
   const pick = (i: number) => { setExtText(null); setFromCorpus(null); setCi(i); };
 
+  // ---- editing the case set (kept on the page until Save) ----
+  useEffect(() => {
+    if (!draft) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [draft]);
+  const edit = (fn: (cs: LabelCase[]) => LabelCase[]) => {
+    const base = draft ?? cases.data;
+    if (!base) return;
+    setDraft({ ...base, cases: fn(base.cases.map((x) => ({ ...x, texts: x.texts.map((y) => ({ ...y })) }))) });
+    setChanges((n) => n + 1); setSaveMsg(null); setSaveErr(null);
+  };
+  const editCase = (patch: Partial<LabelCase>) => edit((cs) => cs.map((x, i) => (i === ci ? { ...x, ...patch } : x)));
+  const editText = (patch: Partial<LabelCaseText>) =>
+    edit((cs) => cs.map((x, i) => (i === ci ? { ...x, texts: x.texts.map((y, k) => (k === ti ? { ...y, ...patch } : y)) } : x)));
+  const addText = () => {
+    const n = list[ci]?.texts.length || 0;
+    edit((cs) => cs.map((x, i) => (i === ci ? { ...x, texts: [...x.texts, newText(text || "New text.")] } : x)));
+    setExtText(null); setTi(n);
+  };
+  const deleteText = () => {
+    edit((cs) => cs.map((x, i) => (i === ci ? { ...x, texts: x.texts.filter((_, k) => k !== ti) } : x)));
+    setTi(Math.max(0, ti - 1));
+  };
+  const addCase = (group: string) => {
+    edit((cs) => {
+      const nc: LabelCase = { id: newCaseId(cs, group), group, label: null, title: `${group.split(" (")[0]} (new)`,
+        what: "", texts: [newText(text || "New text.")] };
+      const at = group === cs[ci]?.group ? ci + 1 : cs.length;
+      return [...cs.slice(0, at), nc, ...cs.slice(at)];
+    });
+    setExtText(null); setFromCorpus(null);
+    setCi(group === list[ci]?.group ? ci + 1 : list.length);
+  };
+  const deleteCase = () => { edit((cs) => cs.filter((_, i) => i !== ci)); setCi(Math.max(0, ci - 1)); };
+  const saveDraft = async () => {
+    if (!draft || !cases.data) return;
+    setSaving(true); setSaveErr(null);
+    try {
+      const r = await api.saveCases({ file: cases.data.file, data: draft, base_sha: cases.data.sha });
+      setSaveMsg(`Saved ${r.cases} cases (${r.texts} texts) to ${r.file}; the old file is in ${r.backup}` +
+        (r.corpus ? `; ${r.corpus.path} rebuilt (${r.corpus.files} files)` : ""));
+      setDraft(null); setChanges(0); cases.reload();
+    } catch (e) { setSaveErr((e as Error).message); }
+    setSaving(false);
+  };
+  const discard = () => { if (window.confirm(`Discard ${changes} unsaved change${changes === 1 ? "" : "s"}?`)) { setDraft(null); setChanges(0); setSaveErr(null); } };
+
   const groups = useMemo(() => {
     const g: [string, { c: LabelCase; i: number }[]][] = [];
     list.forEach((x, i) => {
@@ -124,9 +181,22 @@ export function LabelTryView() {
             Run a text, then compare the flow with what is expected. Needs the model service with models: <code className="mono">python nli_playground.py</code>.</div>
           {(caseFiles.data?.files || []).length > 1 ? (
             <label className="faint" style={{ fontSize: 13 }}>cases&nbsp;
-              <select value={caseFile || cases.data.file} data-testid="case-file" onChange={(e) => { setCaseFile(e.target.value); setCi(0); setTi(0); setResults({}); setPolicy(""); setExtText(null); }}>
+              <select value={caseFile || cases.data.file} data-testid="case-file" onChange={(e) => {
+                if (draft && !window.confirm("Unsaved case changes will be lost. Switch anyway?")) return;
+                setDraft(null); setChanges(0); setSaveMsg(null);
+                setCaseFile(e.target.value); setCi(0); setTi(0); setResults({}); setPolicy(""); setExtText(null); }}>
                 {(caseFiles.data?.files || []).map((f) => <option key={f} value={f}>{f}</option>)}
               </select></label>) : null}
+          <div className="row" style={{ marginTop: 6 }}>
+            <label className="faint" style={{ fontSize: 13 }}><input type="checkbox" checked={editing} onChange={(e) => setEditing(e.target.checked)} data-testid="edit-cases" /> Edit cases</label>
+            {draft ? (<>
+              <span className="badge warn">{changes} unsaved change{changes === 1 ? "" : "s"}</span>
+              <button className="btn small primary" onClick={saveDraft} disabled={saving} data-testid="save-cases">{saving ? "Saving…" : `Save to ${cases.data.file}`}</button>
+              <button className="btn small ghost" onClick={discard}>Discard</button>
+            </>) : null}
+            {saveMsg ? <span className="faint" style={{ fontSize: 12 }}>{saveMsg}</span> : null}
+          </div>
+          {saveErr ? <div className="alert warn" style={{ marginTop: 6 }}>{saveErr}</div> : null}
         </div>
       </div>
       <div className="try-grid">
@@ -194,6 +264,12 @@ export function LabelTryView() {
                   </select></label>
                 {edited ? <button className="btn small" onClick={() => setText(t?.text || "")}>reset text</button> : null}
               </div>
+              {editing ? (
+                <CaseEditor c={c} t={t} ti={ti} boxText={text}
+                  groups={Array.from(new Set(list.map((x) => x.group)))}
+                  labelKeys={Array.from(new Set([...Object.keys(res?.policy?.labels || {}), ...list.flatMap((x) => x.texts.flatMap((y) => y.labels_yes))])).sort()}
+                  onCase={editCase} onText={editText} onAddText={addText} onDeleteText={deleteText} onAddCase={addCase} onDeleteCase={deleteCase} />
+              ) : null}
               <ErrorBox error={err} />
             </div>
           ) : null}

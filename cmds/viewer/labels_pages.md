@@ -76,3 +76,29 @@ On a dataset's corpus page (`/corpus/?ds=…&file=…`), the panel **Label with 
   variable, never in the arguments. A member of a .zip / .rar cannot be saved on its own.
 
 The **Try settings** panel above it is unchanged: that one is `nli_filter.py` (keep / filter).
+
+## Edit the cases on the Try page
+
+On `/labeltry/`, tick **Edit cases** (or open `/labeltry/?cases=labels/russia_llm_cases_v1.json&edit=1`). Under the
+case, an editor shows its fields:
+
+| Change | How |
+|---|---|
+| **Update** a text | Edit it in the box (and try it), then **Store the box text in text N**. Expected action, "also fine" actions, the labels that should be yes and the note are edited right there |
+| **Update** a case | id, group, title, "what it tests" (changing the id breaks links from old runs to this case) |
+| **Insert** | **+ Text (from the box)** adds the box text to this case; **+ Case in "group"** / **+ Case in a new group** add a case with the box text |
+| **Remove** | **Delete text N** (not the last one) and **Delete case**, both after a confirmation |
+
+Edits stay on the page (a badge counts them) until **Save to labels/…json**; **Discard** drops them, and leaving the
+page asks first. Save:
+
+- checks the set (unique ids, no empty text, known actions) and refuses it with the reason otherwise;
+- refuses if the file was changed elsewhere since the page loaded it (reload, then edit again);
+- keeps the old file in `labels\.backup\<name>.<date-time>.json`;
+- rebuilds the case corpus: the set's `"corpus"` folder (`test_corpus_cases_ru` for the Russia-side set), or
+  `test_corpus_cases` for the newest `cases_vN.json`. Rerun `nli_label.py run` on that folder for fresh results.
+- works only from this PC, like the other save buttons.
+
+**The JSON files are the master copy now.** `tools\build_russia_llm_cases.py` and `tools\build_cases.py` refuse to
+overwrite an existing cases file; `--reset` rebuilds it from the script's lists (your edits are then lost; a `.bak`
+copy is kept).

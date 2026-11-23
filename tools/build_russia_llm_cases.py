@@ -1,7 +1,11 @@
 """
 build_russia_llm_cases.py - the test cases for policy/russia_llm_policy_v1.json (the Russia-side project).
 
-    python tools/build_russia_llm_cases.py        ->  labels/russia_llm_cases_v1.json
+    python tools/build_russia_llm_cases.py           ->  labels/russia_llm_cases_v1.json (only if it does not exist)
+    python tools/build_russia_llm_cases.py --reset   ->  rebuild it from the lists below (edits made in the viewer
+                                                        are lost; the old file is kept as .bak)
+
+Once the file exists it is the master copy: edit the cases on the viewer's Try page (Edit cases), not here.
 
 Same format as labels/cases_v*.json, so the viewer's Try page and tools/build_cases_corpus.py read it:
     python tools/build_cases_corpus.py --cases labels/russia_llm_cases_v1.json --out test_corpus_cases_ru
@@ -12,7 +16,9 @@ answer. The other groups were written for this file. "acceptable" lists other ac
 """
 from __future__ import annotations
 
+import argparse
 import json
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -135,6 +141,14 @@ def case(cid, group, title, what, texts, src):
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="write labels/russia_llm_cases_v1.json from the lists in this file")
+    ap.add_argument("--reset", action="store_true", help="overwrite an existing file (edits are lost; a .bak is kept)")
+    args = ap.parse_args()
+    out = HERE / "labels" / "russia_llm_cases_v1.json"
+    if out.exists() and not args.reset:
+        print(f"{out} exists and is the master copy (edit it on the viewer's Try page). --reset rebuilds it from the "
+              f"lists in this script; your edits are then lost.")
+        return 1
     cases = []
     for i in range(0, len(YOURS), 2):  # two texts per case (the Try page shows text 1 / text 2)
         part = YOURS[i:i + 2]
@@ -149,8 +163,9 @@ def main() -> int:
                               group, part, "written for russia_llm_cases_v1"))
     data = {"version": 1, "created": time.strftime("%Y-%m-%d %H:%M:%S"),
             "about": "Cases for the Russia-side policy (tools/build_russia_llm_cases.py).", "policy": POLICY,
-            "cases": cases}
-    out = HERE / "labels" / "russia_llm_cases_v1.json"
+            "corpus": "test_corpus_cases_ru", "cases": cases}
+    if out.exists():
+        shutil.copy2(out, out.with_suffix(".json.bak"))
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     n = sum(len(c["texts"]) for c in cases)
     print(f"{len(cases)} cases, {n} texts -> {out}")

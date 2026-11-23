@@ -1,0 +1,86 @@
+"use client";
+// Try page, "Edit cases": change the case set (labels/*cases*.json) in place. Edits stay on the page until Save; Save
+// writes the file (the old one goes to labels/.backup/) and rebuilds the case corpus.
+import type { LabelCase, LabelCaseText } from "@/lib/types";
+import { actionClass } from "./LabelRunView";
+
+export const ACTIONS = ["remove", "review", "keep", "pass", "untouched"];
+
+export function newText(text: string): LabelCaseText {
+  return { text, from: "added in the viewer", labels_yes: [], expected_action: "keep", note: "" };
+}
+
+export function newCaseId(cases: LabelCase[], group: string): string {
+  const slug = group.split(" (")[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "case";
+  const ids = new Set(cases.map((c) => c.id));
+  let n = 1;
+  while (ids.has(`${slug}:${String(n).padStart(2, "0")}`)) n++;
+  return `${slug}:${String(n).padStart(2, "0")}`;
+}
+
+export function CaseEditor({ c, t, ti, groups, labelKeys, boxText, onCase, onText, onAddText, onDeleteText, onAddCase,
+  onDeleteCase }: {
+  c: LabelCase; t: LabelCaseText | undefined; ti: number; groups: string[]; labelKeys: string[]; boxText: string;
+  onCase: (patch: Partial<LabelCase>) => void; onText: (patch: Partial<LabelCaseText>) => void;
+  onAddText: () => void; onDeleteText: () => void; onAddCase: (group: string) => void; onDeleteCase: () => void;
+}) {
+  const acc = t?.acceptable || [];
+  const yes = t?.labels_yes || [];
+  return (
+    <div className="case-editor" data-testid="case-editor">
+      <div className="row"><strong>Case</strong>
+        <span className="faint" style={{ fontSize: 12 }}>changing the id breaks links to old runs of this case</span></div>
+      <div className="case-editor-grid">
+        <label>id<input className="mono" value={c.id} onChange={(e) => onCase({ id: e.target.value })} /></label>
+        <label>group<input list="case-groups" value={c.group} onChange={(e) => onCase({ group: e.target.value })} />
+          <datalist id="case-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist></label>
+        <label>title<input value={c.title} onChange={(e) => onCase({ title: e.target.value })} /></label>
+        <label className="wide">what it tests<input value={c.what} onChange={(e) => onCase({ what: e.target.value })} /></label>
+      </div>
+      {t ? (
+        <>
+          <div className="row" style={{ marginTop: 8 }}><strong>Text {ti + 1}</strong>
+            {boxText !== t.text ? (
+              <button className="btn small primary" onClick={() => onText({ text: boxText })} data-testid="store-box"
+                title="the text in the box above becomes this case text">Store the box text in text {ti + 1}</button>
+            ) : <span className="faint" style={{ fontSize: 12 }}>edit the text in the box above, then store it here</span>}
+          </div>
+          <div className="case-editor-grid">
+            <label>expected
+              <select value={t.expected_action || "keep"} onChange={(e) => onText({ expected_action: e.target.value })} data-testid="edit-expected">
+                {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select></label>
+            <div className="wide">also fine:{" "}
+              {ACTIONS.filter((a) => a !== t.expected_action).map((a) => (
+                <label key={a} className="faint" style={{ fontSize: 13, marginRight: 8 }}>
+                  <input type="checkbox" checked={acc.includes(a)}
+                    onChange={(e) => onText({ acceptable: e.target.checked ? [...acc, a] : acc.filter((x) => x !== a) })} /> {a}
+                </label>))}
+            </div>
+            <div className="wide">labels that should be yes:{" "}
+              {yes.map((l) => (
+                <span key={l} className="chip">{l} <button className="linklike" title="remove" onClick={() => onText({ labels_yes: yes.filter((x) => x !== l) })}>×</button></span>))}
+              <select value="" onChange={(e) => e.target.value && onText({ labels_yes: [...yes, e.target.value] })} data-testid="edit-add-label">
+                <option value="">+ add a label</option>
+                {labelKeys.filter((k) => !yes.includes(k)).map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <label className="wide">note<input value={t.note || ""} onChange={(e) => onText({ note: e.target.value })} /></label>
+            <div className="wide faint" style={{ fontSize: 12 }}>from: {t.from}{t.your_decision ? ` · your first decision: ${t.your_decision}` : ""}</div>
+          </div>
+        </>
+      ) : null}
+      <div className="row" style={{ marginTop: 8, flexWrap: "wrap" }}>
+        <button className="btn small" onClick={onAddText} data-testid="add-text" title="a new text in this case, from the box above">+ Text (from the box)</button>
+        <button className="btn small" onClick={() => onAddCase(c.group)} data-testid="add-case" title="a new case in this group, with the box text">+ Case in “{c.group.split(" (")[0]}”</button>
+        <button className="btn small" onClick={() => { const g = window.prompt("Name of the new group"); if (g && g.trim()) onAddCase(g.trim()); }}>+ Case in a new group</button>
+        <span className="spacer" />
+        <button className="btn small danger" disabled={c.texts.length < 2} onClick={() => window.confirm(`Delete text ${ti + 1} of ${c.id}?`) && onDeleteText()}
+          title={c.texts.length < 2 ? "the last text: delete the case instead" : "delete this text"}>Delete text {ti + 1}</button>
+        <button className="btn small danger" onClick={() => window.confirm(`Delete the whole case ${c.id} (${c.texts.length} text${c.texts.length > 1 ? "s" : ""})?`) && onDeleteCase()}
+          data-testid="delete-case">Delete case</button>
+      </div>
+      {t ? <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>Expected now: <span className={`badge ${actionClass(t.expected_action || "")}`}>{t.expected_action}</span>{acc.length ? ` (also fine: ${acc.join(", ")})` : ""}</div> : null}
+    </div>
+  );
+}
