@@ -59,6 +59,10 @@
 | | `policy_cases_results_2026-11-20.md` | Appendix: every case text, expected vs actual action, gate score, labels (policy v2) |
 | | `policy_cases_results_v3_2026-11-20.md` | The same with policy v3 (102 / 125, section 10 of the report) |
 | | `labeling_report_2026-11-20.md` | What was built on 2026-11-20 for the labelling project, results, open decisions, next steps |
+| `presentations/` | `01_project_overview.pptx` | Slides: the project overview (why, the two policies, pipeline, repository, scale, human loop, status) |
+| | `02_core_ideas_and_methods.pptx` | Slides: zero-shot NLI, principles, the cascade, decision rules, hypotheses, guard, thresholds / CRC, exceptions |
+| | `03_test_results.pptx` | Slides: case texts, A's policy v1–v5, nli_label vs nli_filter, sample results, Russia-side results |
+| | `README.md`, `build_decks.js` | How to rebuild the slides after changing a number |
 | `explain/` | `models.md` | Which model runs when (fast, judge, bge-m3) |
 | | `long_texts.md` | How long texts are cut into windows |
 | | `chunk_lines.md` | What `--chunk-lines` means |
