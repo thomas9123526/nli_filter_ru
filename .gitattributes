@@ -1,0 +1,2 @@
+# shell scripts run on Linux (the H200 machine): always LF, also in a Windows checkout that is copied there
+*.sh text eol=lf
