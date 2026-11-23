@@ -4,18 +4,21 @@ Per input file (`<name>` = the file name without extensions), in `--output-dir`:
 
 | File | Content |
 |---|---|
-| `<name>.labels.jsonl` | **The labels as columns**: one row per input line |
-| `<name>.clean.jsonl` | With `--write-clean`: the original line with removed paragraphs cut out and place names rewritten. Documents left shorter than `--min-doc-chars` (50) are dropped, and so are lines that are not JSON |
-| `<name>.rewrites.jsonl` | Every place-name replacement |
+| `<name>.labels.jsonl.zst` | **The labels as columns**: one row per input line |
+| `<name>.clean.jsonl.zst` | With `--write-clean`: the original line with removed paragraphs cut out and place names rewritten. Documents left shorter than `--min-doc-chars` (50) are dropped, and so are lines that are not JSON |
+| `<name>.rewrites.jsonl.zst` | Every place-name replacement |
 | `<name>.summary.json` | The file's counts. Its presence marks the file done (a rerun skips it) |
 | `summary.json` | The whole run: command, policy, settings, timing, counts, composition |
 
-**Plain or compressed.** By default the three `.jsonl` outputs are plain JSON lines. With `--compress zst` (on `run`
-and `redecide`) **all three** are written as `.jsonl.zst` instead: `<name>.labels.jsonl.zst`,
-`<name>.rewrites.jsonl.zst`, `<name>.clean.jsonl.zst` (about 5–10 times smaller). Everything that reads a run accepts
-both forms: `redecide`, `review`, `sample`, `tools\compare_cases.py` and the viewer's labelling pages. When a file is
-labelled again in the other format, the old file is removed, so a run never holds both. The summaries stay plain
-JSON.
+**Compressed by default.** The three outputs are written as `.jsonl.zst` (zstandard, about 5–10 times smaller).
+`--compress none` (on `run` and `redecide`) writes plain `.jsonl` instead, e.g. to open a file in an editor. Without
+the `zstandard` package the default falls back to plain `.jsonl` with a warning (an explicit `--compress zst` is an
+error then). Everything that reads a run accepts both forms: `redecide`, `review`, `sample`, `tools\compare_cases.py`
+and the viewer's labelling pages. When a file is labelled again in the other format, the old file is removed, so a run
+never holds both. The summaries stay plain JSON. Elsewhere in these notes, `labels.jsonl` means either form.
+
+To read a `.zst` file by hand: `python -c "import sys,zstandard; sys.stdout.buffer.write(zstandard.ZstdDecompressor().decompressobj().decompress(open(sys.argv[1],'rb').read()))" out_x\a.labels.jsonl.zst`
+or open it in the viewer.
 
 The input files are never changed.
 

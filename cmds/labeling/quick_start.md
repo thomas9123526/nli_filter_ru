@@ -98,7 +98,8 @@ python nli_label.py run "s3://bucket/corpus/**/*.jsonl.zst?endpoint=http://minio
 | Option | Default | Meaning |
 |---|---|---|
 | `--policy FILE` | `policy\russia_policy.json` | Another policy file (copy it to try changes) |
-| `--write-clean` | off | Also write `<name>.clean.jsonl` (removed paragraphs cut out, names rewritten) |
+| `--write-clean` | off | Also write `<name>.clean.jsonl.zst` (removed paragraphs cut out, names rewritten) |
+| `--compress` | `zst` | `none` = plain `.jsonl` outputs (labels, rewrites, clean) instead of `.jsonl.zst` |
 | `--compress zst` | none | Compress the clean output |
 | `--review-as remove` | keep | What the clean output does with "review" paragraphs |
 | `--all-labels` | off | Score every label on every paragraph (for sampling; slower) |

@@ -1,4 +1,4 @@
-"""nli_label.py outputs as plain .jsonl or .jsonl.zst (--compress zst); everything that reads a run accepts both."""
+"""nli_label.py outputs as .jsonl.zst (the default) or plain .jsonl (--compress none); every reader accepts both."""
 import json
 
 import pytest
@@ -36,10 +36,11 @@ def rows(path):
         return [json.loads(x) for x in fh.read().splitlines() if x.strip()]
 
 
-def test_compress_zst_writes_every_output_compressed(setup):
+def test_default_is_zst_and_none_writes_plain(setup):
     tmp, pol, inp = setup
-    plain = run(tmp, pol, inp, "plain")
-    zst = run(tmp, pol, inp, "zst", "--compress", "zst")
+    plain = run(tmp, pol, inp, "plain", "--compress", "none")
+    zst = run(tmp, pol, inp, "zst")  # the default
+    assert json.loads((zst / "summary.json").read_text(encoding="utf-8"))["files"][0]["status"] == "done"
     for kind in ("labels", "rewrites", "clean"):
         assert (plain / f"in.{kind}.jsonl").is_file() and not (plain / f"in.{kind}.jsonl.zst").exists()
         assert (zst / f"in.{kind}.jsonl.zst").is_file() and not (zst / f"in.{kind}.jsonl").exists()
@@ -51,14 +52,14 @@ def test_compress_zst_writes_every_output_compressed(setup):
 
 def test_rerun_in_the_other_format_removes_the_old_files(setup):
     tmp, pol, inp = setup
-    out = run(tmp, pol, inp, "o")
-    run(tmp, pol, inp, "o", "--compress", "zst", "--overwrite")
-    assert not (out / "in.labels.jsonl").exists() and (out / "in.labels.jsonl.zst").is_file()
+    out = run(tmp, pol, inp, "o", "--compress", "none")
     run(tmp, pol, inp, "o", "--overwrite")
+    assert not (out / "in.labels.jsonl").exists() and (out / "in.labels.jsonl.zst").is_file()
+    run(tmp, pol, inp, "o", "--overwrite", "--compress", "none")
     assert (out / "in.labels.jsonl").is_file() and not (out / "in.labels.jsonl.zst").exists()
 
 
-@pytest.mark.parametrize("fmt", [[], ["--compress", "zst"]])
+@pytest.mark.parametrize("fmt", [["--compress", "none"], []])
 def test_redecide_review_sample_read_both(setup, fmt):
     tmp, pol, inp = setup
     out = run(tmp, pol, inp, "r", *fmt)
@@ -71,3 +72,12 @@ def test_redecide_review_sample_read_both(setup, fmt):
     s = tmp / "sample.jsonl"
     assert nli_label.main(["sample", str(out), "--out", str(s), "--policy", str(pol), "--random", "2"]) == 0
     assert s.is_file()
+
+
+def test_without_zstandard_the_default_falls_back_to_plain(setup, monkeypatch):
+    tmp, pol, inp = setup
+    monkeypatch.setattr(nli_label, "zstd_available", lambda: False)
+    out = run(tmp, pol, inp, "nozst")
+    assert (out / "in.labels.jsonl").is_file() and not (out / "in.labels.jsonl.zst").exists()
+    assert nli_label.main(["run", str(inp), "--output-dir", str(tmp / "x"), "--policy", str(pol),
+                           "--compress", "zst"]) == 2  # asked for explicitly: an error

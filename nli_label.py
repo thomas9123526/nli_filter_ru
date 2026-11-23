@@ -24,7 +24,7 @@ Commands
                                                    (changed thresholds / decisions from stored scores, no models)
 
 Outputs of run, per input file (in --output-dir):
-  (with --compress zst every output below ends in .jsonl.zst; everything that reads a run accepts both)
+  (by default every output below ends in .jsonl.zst; --compress none writes plain .jsonl; readers accept both)
   <name>.labels.jsonl      one row per input line: gate, paragraphs (span, scores, labels, action), doc action
   <name>.clean.jsonl[.zst] the line with removed paragraphs cut out and names rewritten (with --write-clean);
                            documents left empty are dropped
@@ -1080,6 +1080,11 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
     if any(str(f).lower().endswith((".zst", ".zstd")) for f in files) and not zstd_available():
         print("error: .zst input needs the 'zstandard' package", file=sys.stderr)
         return 2
+    if args.compress is None:  # default: .jsonl.zst; plain .jsonl when the zstandard package is missing
+        args.compress = "zst" if zstd_available() else "none"
+        if args.compress == "none":
+            log.warning("the 'zstandard' package is missing: outputs are written as plain .jsonl "
+                        "(pip install zstandard for .jsonl.zst, or --compress none to silence this)")
     if args.compress == "zst" and not zstd_available():
         print("error: --compress zst needs the 'zstandard' package", file=sys.stderr)
         return 2
@@ -1888,10 +1893,10 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("inputs", nargs="+", help="files / folders / globs (.jsonl .jsonl.zst .parquet ...)")
     r.add_argument("--output-dir", required=True)
     r.add_argument("--policy", default=str(DEFAULT_POLICY))
-    r.add_argument("--write-clean", action="store_true", help="also write <name>.clean.jsonl (removed paragraphs "
+    r.add_argument("--write-clean", action="store_true", help="also write <name>.clean.jsonl.zst (removed paragraphs "
                    "cut out, place names rewritten, empty documents dropped)")
-    r.add_argument("--compress", choices=["none", "zst"], default="none",
-                   help="zst: write every output as .jsonl.zst (labels, rewrites, clean); default plain .jsonl")
+    r.add_argument("--compress", choices=["none", "zst"], default=None,
+                   help="zst (default): every output as .jsonl.zst (labels, rewrites, clean); none: plain .jsonl")
     r.add_argument("--all-labels", action="store_true",
                    help="score every label on every gated paragraph (no level cascade): slower; for sampling")
     r.add_argument("--review-as", choices=["keep", "remove"], default="keep",
@@ -1966,7 +1971,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--output-dir", required=True, help="a new folder")
     d.add_argument("--policy", default=str(DEFAULT_POLICY))
     d.add_argument("--write-clean", action="store_true")
-    d.add_argument("--compress", choices=["none", "zst"], default="none", help="zst: every output as .jsonl.zst")
+    d.add_argument("--compress", choices=["none", "zst"], default=None,
+                   help="zst (default): every output as .jsonl.zst; none: plain .jsonl")
     d.add_argument("--review-as", choices=["keep", "remove"], default="keep")
     d.add_argument("--no-rules", action="store_true")
     d.add_argument("--no-rewrite", action="store_true")

@@ -384,7 +384,7 @@ def test_run_sample_eval_end_to_end(tmp_path, monkeypatch):
     fake = FakeScorer()
     monkeypatch.setattr(nli_label, "build_scorer", lambda args: (fake, None, None))
     out = tmp_path / "out"
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol_path),
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol_path),
                            "--write-clean", "--group-field", "source", "--all-labels"]) == 0
     rows = [json.loads(x) for x in (out / "in.labels.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [r["action"] for r in rows] == ["edited", "untouched", "review"]
@@ -394,7 +394,7 @@ def test_run_sample_eval_end_to_end(tmp_path, monkeypatch):
     assert summ["stats"]["lines"] == 3 and summ["stats"]["groups"]["web"]["docs"] == 2
     assert nli_label.main(["report", str(out)]) == 0
     # rerun skips the finished file
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol_path)]) == 0
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol_path)]) == 0
 
     # review queue: doc c's paragraph (narrative softened by the debunk label) goes to human review
     rq = tmp_path / "review.jsonl"
@@ -415,7 +415,7 @@ def test_run_sample_eval_end_to_end(tmp_path, monkeypatch):
     pol2 = tmp_path / "policy2.json"
     pol2.write_text(json.dumps(data2), encoding="utf-8")
     out2 = tmp_path / "out2"
-    assert nli_label.main(["redecide", str(out), "--policy", str(pol2), "--output-dir", str(out2),
+    assert nli_label.main(["redecide", "--compress", "none", str(out), "--policy", str(pol2), "--output-dir", str(out2),
                            "--write-clean"]) == 0
     rows2 = [json.loads(x) for x in (out2 / "in.labels.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [r["action"] for r in rows2] == ["kept", "untouched", "review"]
@@ -463,7 +463,7 @@ def test_inflight_gives_the_same_output_in_the_same_order(tmp_path, monkeypatch)
     outs = {}
     for n in ("1", "3"):
         out = tmp_path / f"out{n}"
-        assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol_path), "--write-clean",
+        assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol_path), "--write-clean",
                                "--chunk-lines", "1", "--inflight", n]) == 0
         outs[n] = [(out / f).read_text(encoding="utf-8") for f in ("in.labels.jsonl", "in.clean.jsonl")]
         assert json.loads((out / "summary.json").read_text(encoding="utf-8"))["settings"]["inflight"] == int(n)

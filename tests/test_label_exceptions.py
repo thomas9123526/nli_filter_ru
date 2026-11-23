@@ -131,14 +131,14 @@ def test_exceptions_in_summary_and_stats(tmp_path, monkeypatch):
     inp.write_text(json.dumps({"id": "a", "text": "Moscow wants talks with our country."}) + "\n", encoding="utf-8")
     monkeypatch.setattr(nli_label, "build_scorer", lambda args: (Scorer(), None, None))
     out = tmp_path / "out"
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol)]) == 0
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol)]) == 0
     summ = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     assert summ["policy"]["exceptions"][0]["key"] == "ambiguous_our_country"
     assert summ["stats"]["exceptions"] == {"ambiguous_our_country": 1}
     assert summ["stats"]["reasons"] == {"exception": 1}
     # redecide keeps the exception (phrases need no stored score)
     out2 = tmp_path / "out2"
-    assert nli_label.main(["redecide", str(out), "--output-dir", str(out2), "--policy", str(pol)]) == 0
+    assert nli_label.main(["redecide", "--compress", "none", str(out), "--output-dir", str(out2), "--policy", str(pol)]) == 0
     row = json.loads((out2 / "in.labels.jsonl").read_text(encoding="utf-8"))
     assert para(row)["exception"] == "ambiguous_our_country"
 
@@ -215,7 +215,7 @@ def test_topic_cli_override_and_validation(tmp_path, monkeypatch):
     inp.write_text(json.dumps({"id": "a", "text": "Moscow hockey night.", "cat": "Sports"}) + "\n", encoding="utf-8")
     monkeypatch.setattr(nli_label, "build_scorer", lambda args: (Scorer(), None, None))
     out = tmp_path / "out"
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol),
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol),
                            "--topic-field", "cat", "--topic-mode", "off"]) == 0
     summ = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     assert summ["settings"]["topic_field"] == "cat" and summ["settings"]["topic_mode"] == "off"
@@ -243,7 +243,7 @@ def test_rewrite_place_names_false(tmp_path, monkeypatch):
     inp.write_text(json.dumps({"id": "a", "text": "Moscow and Kiev talks."}) + "\n", encoding="utf-8")
     monkeypatch.setattr(nli_label, "build_scorer", lambda args: (Scorer(), None, None))
     out = tmp_path / "out"
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol), "--write-clean"]) == 0
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol), "--write-clean"]) == 0
     assert "Kiev" in (out / "in.clean.jsonl").read_text(encoding="utf-8")
     assert json.loads((out / "summary.json").read_text(encoding="utf-8"))["settings"]["rewrite"] is False
 
@@ -307,9 +307,9 @@ def test_place_names_file_must_exist_and_cli_wins(tmp_path, monkeypatch):
     inp.write_text(json.dumps({"id": "a", "text": "Moscow and Kyiv talks; Kiev too."}) + "\n", encoding="utf-8")
     monkeypatch.setattr(nli_label, "build_scorer", lambda args: (Scorer(), None, None))
     out = tmp_path / "out"
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out), "--policy", str(pol), "--write-clean"]) == 0
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out), "--policy", str(pol), "--write-clean"]) == 0
     assert "Moscow and Kiev talks; Kiev too." in (out / "in.clean.jsonl").read_text(encoding="utf-8")
     out2 = tmp_path / "out2"  # --place-names on the command line wins over the policy's table
-    assert nli_label.main(["run", str(inp), "--output-dir", str(out2), "--policy", str(pol), "--write-clean",
+    assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out2), "--policy", str(pol), "--write-clean",
                            "--place-names", str(ROOT_TABLE)]) == 0
     assert "Moscow and Kyiv talks; Kyiv too." in (out2 / "in.clean.jsonl").read_text(encoding="utf-8")

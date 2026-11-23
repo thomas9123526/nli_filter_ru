@@ -15,7 +15,7 @@ decision. It removes only the paragraphs the policy says to remove, and rewrites
 | Level 2 framing (~10 narratives) | 10 narrative / hostility labels + `hostility_russians` (flag only) + `reports_or_debunks` (near-miss guard) |
 | Place-name rewrite | `policy/place_names.csv` + `policy/place_name_exceptions.txt` (`nli_names.py`) |
 | Label at paragraph level | the documents are split into paragraphs; only paragraphs with a keyword / marker are labelled |
-| Labels as columns, never delete raw data | `<name>.labels.jsonl` per input file; `--write-clean` writes a separate cleaned copy |
+| Labels as columns, never delete raw data | `<name>.labels.jsonl.zst` per input file (`--compress none`: plain `.jsonl`); `--write-clean` writes a separate cleaned copy |
 | Count tokens, not documents | composition report in tokens (estimated: ~4 characters per token) |
 | Hand-label ~200 first, a threshold per label | `nli_label.py sample` → `tools/label_tool.html` → `nli_label.py eval` |
 
