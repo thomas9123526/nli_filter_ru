@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
 import type { LabelCase, LabelCaseText, LabelCasesResp, LabelTryResp } from "@/lib/types";
-import { CaseEditor, CaseInsertForm, newCaseId, newText } from "./CaseEditor";
+import { CaseEditor, CaseInsertForm, TopicSelect, newCaseId, newText } from "./CaseEditor";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
 import { readTryHandoff } from "./LabelPagePanel";
@@ -37,6 +37,7 @@ export function LabelTryView() {
   const topics = topicList.data?.topics || [];
   const addTopic = async (t: string) => { await api.addTopic(t); topicList.reload(); };
   const [topicMode, setTopicMode] = useState("");  // "" = the policy's
+  const [tryTopic, setTryTopic] = useState<string | undefined>(undefined);  // the topic sent with Try (from the case text)
   const [draft, setDraft] = useState<LabelCasesResp | null>(null);  // edited case set, not saved yet
   const [changes, setChanges] = useState(0);
   const [editing, setEditing] = useState(sp.get("edit") === "1");  // ?edit=1 opens the editor
@@ -91,6 +92,9 @@ export function LabelTryView() {
   }, [sp, list.length, policies.data]);
   const c: LabelCase | undefined = list[ci];
   const t = c?.texts[ti];
+  useEffect(() => { setTryTopic(extText === null ? t?.topic : undefined); }, [t?.topic, extText, ci, ti]);
+  const activePolicy = policy || cases.data?.policy || "";
+  const polInfo = useApi(activePolicy ? `labelpolicy:${activePolicy}` : null, (s) => api.labelPolicy(activePolicy, s));
   useEffect(() => { setText(extText ?? t?.text ?? ""); setRes(null); setSel(0); setErr(null); }, [ci, ti, t?.text, extText]);
   useEffect(() => { setTi(pendingTi.current ?? 0); pendingTi.current = null; }, [ci]);
   const pick = (i: number) => { setExtText(null); setFromCorpus(null); setCi(i); };
@@ -171,7 +175,7 @@ export function LabelTryView() {
     setBusy(true); setErr(null); setRes(null);
     try {
       const r = await api.labelTry({ texts: [text], policy: policy || cases.data?.policy || undefined, all_labels: true,
-        force_gate: forceGate, use_judge: useJudge, topics: [t?.topic && extText === null ? t.topic : null],
+        force_gate: forceGate, use_judge: useJudge, topics: [tryTopic || null],
         topic_mode: topicMode || undefined });
       setRes(r); setSel(0);
       if (c && t && text === t.text) {
@@ -291,14 +295,15 @@ export function LabelTryView() {
                 <button className="btn primary" onClick={run} disabled={busy} data-testid="try-run">{busy ? "Scoring… (~1 s per label on a CPU)" : "Try"}</button>
                 <label className="faint" style={{ fontSize: 13 }}><input type="checkbox" checked={forceGate} onChange={(e) => setForceGate(e.target.checked)} /> label without a keyword</label>
                 <label className="faint" style={{ fontSize: 13 }}><input type="checkbox" checked={useJudge} onChange={(e) => setUseJudge(e.target.checked)} /> use the judge</label>
-                {t?.topic ? (
-                  <label className="faint" style={{ fontSize: 13 }} title="how the text's topic is used (the policy's topic_map decides which subject it stands for)">topic mode&nbsp;
-                    <select value={topicMode} onChange={(e) => setTopicMode(e.target.value)} data-testid="topic-mode">
-                      <option value="">policy default</option>
-                      <option value="hint">hint</option>
-                      <option value="trust">trust</option>
-                      <option value="off">off</option>
-                    </select></label>) : null}
+                <label className="faint" style={{ fontSize: 13 }} title="the corpus' topic field for this try (the case text's topic, or another one)">topic&nbsp;
+                  <TopicSelect value={tryTopic} topics={topics} onChange={setTryTopic} onAdd={addTopic} /></label>
+                <label className="faint" style={{ fontSize: 13 }} title="how the topic is used: hint, trust or off">mode&nbsp;
+                  <select value={topicMode} onChange={(e) => setTopicMode(e.target.value)} data-testid="topic-mode">
+                    <option value="">policy default ({polInfo.data?.topic.mode || "hint"})</option>
+                    <option value="hint">hint</option>
+                    <option value="trust">trust</option>
+                    <option value="off">off</option>
+                  </select></label>
                 <label className="faint" style={{ fontSize: 13 }}>policy&nbsp;
                   <select value={policy} onChange={(e) => setPolicy(e.target.value)}>
                     <option value="">{cases.data?.policy ? `${cases.data.policy} (of the cases)` : "default"}</option>
@@ -306,6 +311,7 @@ export function LabelTryView() {
                   </select></label>
                 {edited ? <button className="btn small" onClick={() => setText(t?.text || "")}>reset text</button> : null}
               </div>
+              <TopicHelp info={polInfo.data?.topic} topic={tryTopic} mode={topicMode || polInfo.data?.topic.mode || "hint"} />
               {editing ? (
                 <CaseEditor c={c} t={t} ti={ti} boxText={text}
                   groups={Array.from(new Set(list.map((x) => x.group)))}
@@ -344,5 +350,40 @@ export function LabelTryView() {
         </div>
       </div>
     </>
+  );
+}
+
+
+/** What the topic does with this policy and mode: which subjects it decides, which it never touches. */
+function TopicHelp({ info, topic, mode }: {
+  info?: { field: string | null; mode: string; map: Record<string, string[]>; subjects: string[] }; topic?: string; mode: string;
+}) {
+  if (!info) return null;
+  const entries = Object.entries(info.map || {});
+  const mapped = Array.from(new Set(entries.flatMap(([, ks]) => ks)));
+  const never = info.subjects.filter((k) => !mapped.includes(k));
+  const target = topic ? (info.map[topic.toLowerCase()] || []) : [];
+  let effect: string;
+  if (!entries.length) effect = "This policy has no topic_map: a topic changes nothing, in any mode.";
+  else if (!topic) effect = "No topic for this try: the models decide every subject (as without a topic field).";
+  else if (!target.length) effect = `“${topic}” is not in this policy's topic_map: it changes nothing; the models decide every subject.`;
+  else if (mode === "off") effect = `off: “${topic}” is recorded only; the models decide every subject.`;
+  else if (mode === "trust") effect = `trust: ${target.join(", ")} = yes from the topic; ${mapped.filter((k) => !target.includes(k)).join(", ") || "no other mapped subject"} = no from the topic (no model); ${never.join(", ") || "no other subject"}: the model.`;
+  else effect = `hint: ${target.join(", ")} = yes from the topic (no model); every other subject: the model.`;
+  return (
+    <details className="topic-help" data-testid="topic-help">
+      <summary><span className="faint">topic → subject:</span> {effect}</summary>
+      <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>
+        Subjects (level 1) of this policy: {info.subjects.map((k) => <span key={k} className="chip">{k}</span>)}.
+        The topic only answers level-1 subjects listed in the policy&apos;s <code>topic_map</code>; the gate (level 0) and every
+        level-2 label (opinions, hate, false claims, the guard) are always scored by the models.
+      </div>
+      {entries.length ? (
+        <table className="flow-table" style={{ marginTop: 6 }}><tbody>
+          {entries.map(([v, ks]) => (
+            <tr key={v} className={topic && v === topic.toLowerCase() ? "yes" : ""}><td className="mono" style={{ fontSize: 12 }}>{v}</td><td>→ {ks.join(", ")}</td></tr>))}
+          {never.length ? <tr><td className="faint" style={{ fontSize: 12 }}>(no topic)</td><td className="faint">{never.join(", ")}: never decided by a topic (the model, in every mode)</td></tr> : null}
+        </tbody></table>) : null}
+    </details>
   );
 }

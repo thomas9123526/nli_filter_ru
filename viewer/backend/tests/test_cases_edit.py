@@ -123,3 +123,14 @@ def test_case_topic_saved_and_in_the_corpus(client, project):
     d["cases"][0]["texts"][0]["topic"] = 5
     r = client.post("/api/labels/cases/save", json={"file": d["file"], "data": d, "base_sha": d["sha"]}, headers=H)
     assert r.status_code == 400 and "topic" in r.json()["detail"]
+
+
+def test_policy_settings_for_the_try_page(client, project):
+    import shutil as _sh
+    (project / "policy").mkdir(exist_ok=True)
+    _sh.copy(REAL_TOOLS.parent / "policy" / "russia_llm_policy_v2.json", project / "policy")
+    d = client.get("/api/labels/policy", params={"path": "policy/russia_llm_policy_v2.json"}).json()
+    assert d["topic"]["map"]["history"] == ["history"] and d["topic"]["mode"] == "hint"
+    assert set(d["topic"]["subjects"]) == {"history", "politics", "war", "economy", "culture"}
+    assert client.get("/api/labels/policy", params={"path": "../secret.json"}).status_code == 404
+    assert client.get("/api/labels/policy", params={"path": "policy/none.json"}).status_code == 404

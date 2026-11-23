@@ -440,3 +440,6 @@ tr.active td { background: var(--accent-soft); }
 .try-text { width: 100%; min-height: 130px; margin: 8px 0; padding: 8px; font-size: 13px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
 .try-clean { white-space: pre-wrap; font-size: 12px; background: var(--panel-2); padding: 8px; border-radius: 6px; }
 .flow-step.unused { opacity: 0.6; border-style: dashed; }
+
+.topic-help { margin-top: 8px; padding: 6px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
+.topic-help summary { cursor: pointer; }

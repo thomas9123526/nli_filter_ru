@@ -124,7 +124,22 @@ file can also be edited by hand; the dropdown reads it each time the page loads.
 
 - **Saved with the case** (`"topic": "History"` on the text) and written into the case corpus line, so
   `nli_label.py run dataset\test_corpus_cases_ru --topic-field topic --topic-mode trust …` tests the modes on the cases.
-- **On the Try page**, a text with a topic shows `topic: History` and a **topic mode** dropdown (policy default, hint,
-  trust, off). **Try** sends the topic along: with the Russia-side policy, `History` stands for the subject `history`
-  (its `topic_map`), so in hint mode `history` is yes without the model and the flow marks it **topic field**.
+- **On the Try page**, next to **Try**: a **topic** dropdown (pre-filled with the case text's topic; change it for a
+  try without saving) and a **mode** dropdown (policy default, hint, trust, off). **Try** sends both along.
+- Below them, **topic → subject** says in one line what the chosen topic and mode do with this policy, e.g. with the
+  Russia-side policy, `Entertainment` + trust: "culture = yes from the topic; history, politics, economy = no from the
+  topic (no model); war: the model". Opened, it lists the policy's subjects and its whole `topic_map`.
+
+**Where it is configured** (all in the policy file, e.g. `policyussia_llm_policy_v2.json`):
+
+| Setting | What |
+|---|---|
+| `"labels"` with `"level": 1` | The subjects (`history`, `politics`, `war`, `economy`, `culture`) |
+| `"topic_map"` | Which topic value stands for which subject (`"Entertainment": "culture"`); values are matched without case |
+| `"topic_mode"` | The default mode (`hint`); `--topic-mode` / the Try page's mode overrides it |
+| `"topic_field"` | The corpus field to read (`--topic-field` overrides it); the Try page always uses the text's topic |
+
+What a topic never changes: a subject that is not in `topic_map` (Russia side: `war`) is decided by the model in every
+mode, and the gate (level 0) and every level-2 label (opinions, hate, false claims, the guard) are always scored by the
+models. An empty `topic_map`, a text without a topic, or a topic that is not in `topic_map` change nothing at all.
 - A value that is not in the policy's `topic_map` changes nothing (the models decide, as without a topic).

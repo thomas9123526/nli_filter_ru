@@ -654,6 +654,22 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         """nli_label.py output folders in the project folder (finished, or running with progress.json)."""
         return labels.list()
 
+    @app.get("/api/labels/policy", tags=["labels"])
+    def label_policy(path: str):
+        """One policy's settings (labels by level, topic field / mode / map) for the Try page."""
+        rel = (path or "").replace("\\", "/")
+        if not re.fullmatch(r"policy/[A-Za-z0-9_.-]+\.json", rel) or not (project / rel).is_file():
+            raise HTTPException(404, f"no policy {path}")
+        import nli_label  # the project folder is on sys.path (labels.py)
+        try:
+            pol = nli_label.Policy.load(str(project / rel))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        out = pol.summary()
+        out["topic"] = {"field": pol.topic_field, "mode": pol.topic_mode, "map": pol.topic_map,
+                        "subjects": [k for k, lab in pol.labels.items() if lab.level == 1]}
+        return out
+
     @app.get("/api/labels/policies", tags=["labels"])
     def label_policies():
         """policy/*.json files of the project (for the start form)."""
