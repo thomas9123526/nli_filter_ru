@@ -4,6 +4,33 @@ Both commands use the Russia-side policy and write into `dataset\`, so the viewe
 them in `D:\hkc\nli_filter2` (`py -3.12 …` on the development PC; `python …` inside a venv, see
 `cmds\setup\python_launcher.md`).
 
+## In one command, from the JSON file
+
+`nli_label.py` reads JSON-lines corpora (one document per line). A test-set file such as
+`labelsussia_llm_docs_v1.json` or `labelsussia_llm_cases_v1.json` is one JSON object with everything inside, so
+it cannot be given to `nli_label.py` directly. `tools\label_test_set.py` does all three steps in one go: builds the
+file's corpus in `dataset\` (as the builders and the viewer's Save do), runs `nli_label.py` with the policy named in
+the file, then prints expected vs result.
+
+```powershell
+py -3.12 tools\label_test_set.py labelsussia_llm_docs_v1.json
+py -3.12 tools\label_test_set.py labelsussia_llm_cases_v1.json --output-dir dataset\out_label_ru_v2_judge
+py -3.12 tools\label_test_set.py labelsussia_llm_cases_v1.json --fresh -- --judge-model none
+```
+
+| Option | Meaning |
+|---|---|
+| `--output-dir` | Default `dataset\out_label_<file name>` (e.g. `dataset\out_label_russia_llm_docs_v1`) |
+| `--policy` | Default: the policy named in the file (`"policy"`) |
+| `--fresh` | Delete the output folder first (no leftovers of deleted or renamed cases); without it, `--overwrite` is used |
+| `--no-clean` | No clean copy (`--write-clean` is the default) |
+| `--details` | Every text / paragraph in the comparison, not only the misses |
+| `-- …` | Everything after `--` goes to `nli_label.py run` unchanged: `--judge-model none`, `--topic-field topic --topic-mode trust`, … |
+
+The run lands in `dataset\` like any other: the viewer's run page and "Expected vs result" work on it.
+
+The step-by-step commands below do the same by hand.
+
 ## 1. The multi-paragraph test documents (`dataset\test_corpus_docs_ru`)
 
 ```powershell
