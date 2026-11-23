@@ -46,6 +46,7 @@
 | `design/` | `overnight_2026-11-18.md` | Overnight report: Keywords / Review pages, golden set, `--audit-strict`, `nli_compare.py`, `nli_replay.py`; how to try them, test results |
 | | `keyword_lexicon_plan.md` | Plan: keyword lexicon (level A strict / B models, type, gloss, other meanings, exclude), templated hypotheses, review tools; build order |
 | `labeling/` | `README.md` | **Start here for A's policy labelling**: `nli_label.py` (paragraph labels per policy, place-name rewrite, token composition), files, how a document is processed |
+| | `run_russia_tests.md` | The `nli_label.py` commands for the Russia-side test data (the cases and the multi-paragraph documents), the options, and how to see the results (viewer, `compare_cases.py` / `compare_docs.py`) |
 | | `actions_and_topics.md` | The pipeline order (keywords → paragraphs → gate → levels → decision); what remove / review / keep / pass / untouched mean and why keep, pass and untouched are kept apart; topics and the topic mode on the Try page, where subjects and `topic_map` are configured |
 | | `overview_diagram.md` | The whole project in one diagram (settings → run → outputs, human loop, viewer) |
 | | `quick_start.md` | The commands step by step: sample → score → hand-label → eval → label a corpus |
