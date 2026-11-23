@@ -19,6 +19,7 @@
 | | `offline_wheels.md` | Which wheels each machine needs (`pkgs/`), offline install, transformers 4.x vs 5.x |
 | | `venv_py312.md` | Create `.venv` in the project folder on Windows + Python 3.12 and install offline from `pkgs\windows-py312` + `pkgs\p2000-windows-torch-cu126`, then run the tests |
 | | `wheels_check.md` | Are the `pkgs` wheels enough for another computer with torch (Python 3.10 / 3.12, Windows / Ubuntu): checked, install command |
+| | `python_launcher.md` | What `py -3.12` is, why some notes use it, where it does not work (Linux, Store / Anaconda Python), and the venv way that works everywhere |
 | | `pycharm.md` | PyCharm: `nli_viewer` imports shown as errors (mark `viewer\backend` as Sources Root) |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
 | | `h200_readiness.md` | Review of the scripts for multi-GPU runs |
