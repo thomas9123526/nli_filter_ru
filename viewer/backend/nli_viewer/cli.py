@@ -2,7 +2,7 @@
 cli.py - command line for the viewer.
 
     python -m nli_viewer serve --config viewer_config.json            # web UI + API on http://127.0.0.1:8000
-    python -m nli_viewer serve --corpus ../test_corpus --output ../out_test_corpus
+    python -m nli_viewer serve --corpus ../dataset/test_corpus --output ../dataset/out_test_corpus
     python -m nli_viewer datasets  --config viewer_config.json
     python -m nli_viewer files     --config viewer_config.json test
     python -m nli_viewer decisions --config viewer_config.json test books/part-00/shard-00000 --decision filter

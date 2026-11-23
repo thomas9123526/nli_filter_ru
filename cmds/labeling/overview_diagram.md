@@ -47,7 +47,7 @@ The labelling project for A's LLM (`nli_label.py`) from settings to training dat
                                                                                         └──────────────────────────────────┘
 
  TEST DATA: labels/seed.jsonl (182 real, drafts to check) · labels/bench_synthetic_v1.jsonl (170 written)
-            labels/cases_v3.json → test_corpus_cases/ (66 files, one per case)
+            labels/cases_v3.json → dataset/test_corpus_cases/ (66 files, one per case)
  OLDER TOOL: nli_filter.py — one question per line ("about Russia?"), whole line filter/keep; same models & keywords code
 ```
 

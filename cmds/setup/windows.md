@@ -92,25 +92,25 @@ Because the test file has an `expect` field, the summary at the end shows accura
 
 ## 5. Nested test corpus of `.zst` files
 
-`make_test_corpus.py` builds `test_corpus\` from `test_russia.jsonl`: 5 folders × 3 sub folders, each with 1–2 `.jsonl.zst` files of 20–40 lines. The lines are copied unchanged, so the evaluation (`expect`, `category`) still works. It needs `zstandard`.
+`make_test_corpus.py` builds `dataset\test_corpus\` from `test_russia.jsonl`: 5 folders × 3 sub folders, each with 1–2 `.jsonl.zst` files of 20–40 lines. The lines are copied unchanged, so the evaluation (`expect`, `category`) still works. It needs `zstandard`.
 
 ```powershell
 python .\make_test_corpus.py
 python .\make_test_corpus.py --force --folders 5 --subfolders 3 --files 1-2 --lines 20-40 --seed 7
-python .\nli_filter.py test_corpus --device cpu --judge-model none --output-dir out_test_corpus
+python .\nli_filter.py dataset/test_corpus --device cpu --judge-model none --output-dir dataset/out_test_corpus
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
 | `--source` | `test_russia.jsonl` | JSONL to sample lines from |
-| `--out` | `test_corpus` | Output folder |
+| `--out` | `dataset/test_corpus` | Output folder |
 | `--folders` / `--subfolders` | 5 / 3 | Folder tree size (up to 10 named top folders) |
 | `--files` | `1-2` | `.zst` files per sub folder (N or MIN-MAX) |
 | `--lines` | `20-40` | Lines per file (N or MIN-MAX) |
 | `--seed` | 42 | Same seed = same corpus |
 | `--force` | off | Replace an existing output folder |
 
-The list of files, line counts and line ids is written to `test_corpus.manifest.json`, next to the folder (not inside, or the filter would read it as input). The default corpus has about 800 lines: about 5 minutes with ModernBERT only on CPU; use `--limit` for a quicker trial.
+The list of files, line counts and line ids is written to `dataset/test_corpus.manifest.json`, next to the folder (not inside, or the filter would read it as input). The default corpus has about 800 lines: about 5 minutes with ModernBERT only on CPU; use `--limit` for a quicker trial.
 
 ## 6. `nli_filter.py`: your own files
 

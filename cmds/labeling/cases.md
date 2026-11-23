@@ -60,7 +60,7 @@ Level 2 also runs after `values_mindset`. A general "socialist vs capitalist val
 topic is discussed everywhere (economics, other countries, history) and a label for it would remove far more than
 A's policy asks.
 
-## The cases as a corpus: `test_corpus_cases\` (viewer dataset "cases")
+## The cases as a corpus: `dataset\test_corpus_cases\` (viewer dataset "cases")
 
 One `.jsonl.zst` per case (66 files, the case's 1–2 texts as lines) in `level0_gate\`, `level1_subject\`,
 `level2_framing\`, `edge_cases\`; made by `python tools\build_cases_corpus.py` from the newest cases file. Each

@@ -46,7 +46,7 @@ cd ..\frontend; npm install; npm run build; cd ..\backend
 .venv\Scripts\python.exe -m nli_viewer serve --config ..\viewer_config.json
 ```
 
-Without a config file: `python -m nli_viewer serve --corpus ../../test_corpus --output ../../out_test_corpus`.
+Without a config file: `python -m nli_viewer serve --corpus ../../dataset/test_corpus --output ../../dataset/out_test_corpus`.
 
 ## Configure datasets: `viewer_config.json`
 
@@ -57,7 +57,7 @@ A dataset = one `nli_filter.py` output folder + the corpus folder it was made fr
   "cache_dir": ".viewer_cache",
   "cache_max_gb": 20,
   "datasets": [
-    {"name": "test_corpus", "title": "Test corpus", "corpus": "../test_corpus", "output": "../out_test_corpus"},
+    {"name": "test_corpus", "title": "Test corpus", "corpus": "../dataset/test_corpus", "output": "../dataset/out_test_corpus"},
     {"name": "ftp_run", "corpus": "ftp://reader:${FTP_PASSWORD}@ftp.lan/corpus", "output": "ftp://reader:${FTP_PASSWORD}@ftp.lan/nli_out"},
     {"name": "minio_run", "corpus": "minio://minio.lan:9000/corpus/cc", "output": "minio://minio.lan:9000/nli-out/run1",
      "corpus_options": {"access_key": "${MINIO_ACCESS_KEY}", "secret_key": "${MINIO_SECRET_KEY}"},
@@ -128,7 +128,7 @@ The text field of a corpus line can be changed in the viewer, also inside `.zst`
 by default: turn it on per dataset in `viewer_config.json` and restart the viewer.
 
 ```json
-{"name": "test_corpus_de", "corpus": "../test_corpus_de", "output": "../out_test_corpus_de", "editable": true}
+{"name": "test_corpus_de", "corpus": "../dataset/test_corpus_de", "output": "../dataset/out_test_corpus_de", "editable": true}
 ```
 
 Then use **Edit text** on a record page, or **Edit** on any line of the Corpus page (also lines without a
@@ -247,5 +247,5 @@ cd viewer\frontend; npm run typecheck; npm run build
 | `backend/nli_viewer/api.py` | FastAPI app |
 | `backend/nli_viewer/cli.py` | command line |
 | `frontend/app`, `frontend/components`, `frontend/lib` | Next.js pages, UI components, API client and types |
-| `viewer_config.json` | datasets of this project (test_corpus) |
+| `viewer_config.json` | datasets of this project (dataset/test_corpus) |
 | `start_viewer.ps1`, `start_viewer.sh` | one-command start |

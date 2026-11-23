@@ -11,16 +11,16 @@ unsure scores. `--fast-model` picks the one model, and `--judge-model none` turn
 
 ```powershell
 # ModernBERT only
-python .\nli_filter.py test_corpus --fast-model modernbert --judge-model none --output-dir out_modernbert
+python .\nli_filter.py dataset/test_corpus --fast-model modernbert --judge-model none --output-dir out_modernbert
 
 # DeBERTa only
-python .\nli_filter.py test_corpus --fast-model deberta --judge-model none --output-dir out_deberta
+python .\nli_filter.py dataset/test_corpus --fast-model deberta --judge-model none --output-dir out_deberta
 
 # bge-m3 only
-python .\nli_filter.py test_corpus --fast-model bge-m3 --judge-model none --output-dir out_bgem3
+python .\nli_filter.py dataset/test_corpus --fast-model bge-m3 --judge-model none --output-dir out_bgem3
 ```
 
-- To test on the single file, use `test_russia.jsonl` instead of `test_corpus`. Leaving the input out
+- To test on the single file, use `test_russia.jsonl` instead of `dataset/test_corpus`. Leaving the input out
   also works, because `test_russia.jsonl` is the default.
 - Give each model its own `--output-dir` so the results can be compared side by side. Each run prints
   its summary, with accuracy when lines have an `expect` label.

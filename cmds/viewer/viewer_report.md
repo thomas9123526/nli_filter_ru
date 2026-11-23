@@ -12,7 +12,7 @@ cd D:\hkc\nli_filter2\viewer
 ```
 
 Open http://127.0.0.1:8000 (API docs: http://127.0.0.1:8000/docs).
-The `test_corpus` / `out_test_corpus` pair is already configured in `viewer\viewer_config.json`.
+The `dataset/test_corpus` / `dataset/out_test_corpus` pair is already configured in `viewer\viewer_config.json`.
 
 ## Pages
 
@@ -42,7 +42,7 @@ line exists, the ids match, and every hit's characters really contain its keywor
 |---|---|
 | Viewer tests (storages with real local FTP + S3 servers, file formats, API, UI in headless Chrome) | 45 pass |
 | New tests for `nli_filter.py` / `nli_models.py` (one loads ModernBERT for real) | 59 pass |
-| `verify` on `out_test_corpus`, read from local disk, FTP and S3 | 568 / 568 consistent each |
+| `verify` on `dataset/out_test_corpus`, read from local disk, FTP and S3 | 568 / 568 consistent each |
 | Scale: 100,000-line file | first open 1.4 s, then 10 ms per record |
 
 ## Fixed along the way
@@ -55,11 +55,11 @@ line exists, the ids match, and every hit's characters really contain its keywor
 
 ## Notes
 
-- `out_test_corpus` was regenerated: the earlier `--limit 60` run covered only 3 of 20 files. It now holds
+- `dataset/out_test_corpus` was regenerated: the earlier `--limit 60` run covered only 3 of 20 files. It now holds
   full results for all 20 files with the default ModernBERT + DeBERTa cascade
   (accuracy 0.930, precision 1.000, recall 0.851).
 - S3 was tested with a local stand-in (moto), not a real MinIO server; FTPS was not tested.
-- Thresholds on `test_corpus`: check 1 at 0.7 changes nothing; at 0.6 it adds 8 filtered lines, all the
+- Thresholds on `dataset/test_corpus`: check 1 at 0.7 changes nothing; at 0.6 it adds 8 filtered lines, all the
   same false positive ("A Moscow mule is served...").
 - Nothing is committed. Changes: `.gitignore`, `nli_filter.py`, `tests/`, `viewer/`, `cmds/`.
 

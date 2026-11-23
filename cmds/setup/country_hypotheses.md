@@ -12,13 +12,13 @@ the top of `nli_filter.py` to make the change permanent.
 **A built-in country** (`russia`, `china`) only needs its name:
 
 ```powershell
-python .\nli_filter.py test_corpus --country China
+python .\nli_filter.py dataset/test_corpus --country China
 ```
 
 **Any other country** needs the adjective and the keywords:
 
 ```powershell
-python .\nli_filter.py test_corpus --country Japan --country-adj Japanese `
+python .\nli_filter.py dataset/test_corpus --country Japan --country-adj Japanese `
   --keyword Japan --keyword Japanese --keyword Tokyo --keyword 日本 --keyword ニッポン
 ```
 
@@ -60,7 +60,7 @@ replaced with the country name and adjective, for example "Russia" and "Russian"
 **Replace or extend them with `--check1-hyp` / `--check2-hyp KEY=TEXT`**, which you can repeat:
 
 ```powershell
-python .\nli_filter.py test_corpus `
+python .\nli_filter.py dataset/test_corpus `
   --check1-hyp "topic=This text is about {country} or {country_adj} people." `
   --check1-hyp "politics=This text is about the politics or government of {country}." `
   --check1-hyp "food=This text is about {country_adj} food or cuisine." `

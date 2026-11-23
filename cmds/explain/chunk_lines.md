@@ -30,5 +30,5 @@ The number of input lines read and processed together as one unit of work. It do
 | Big runs, GPU | default `512`, or higher, e.g. `--chunk-lines 2048` on the H200 |
 
 ```powershell
-python .\nli_filter.py test_corpus --device cpu --judge-model none --limit 60 --chunk-lines 16 --output-dir out_test_corpus
+python .\nli_filter.py dataset/test_corpus --device cpu --judge-model none --limit 60 --chunk-lines 16 --output-dir dataset/out_test_corpus
 ```

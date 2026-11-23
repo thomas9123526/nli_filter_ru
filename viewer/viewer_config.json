@@ -10,28 +10,28 @@
   "datasets": [
     {
       "name": "test_corpus",
-      "corpus": "../test_corpus",
-      "output": "../out_test_corpus",
+      "corpus": "../dataset/test_corpus",
+      "output": "../dataset/out_test_corpus",
       "editable": true
     },
     {
       "name": "cases",
       "title": "Policy cases: one file per case (Level 0 / 1 / 2 + edge cases)",
       "description": "labels/cases_v1.json as a corpus (tools/build_cases_corpus.py). Labels: out_label_cases on the Labels pages; try one by one on /labeltry.",
-      "corpus": "../test_corpus_cases",
+      "corpus": "../dataset/test_corpus_cases",
       "editable": true
     },
     {
       "name": "germany",
       "title": "Germany test",
-      "corpus": "../test_corpus_de",
-      "output": "../out_test_corpus_de"
+      "corpus": "../dataset/test_corpus_de",
+      "output": "../dataset/out_test_corpus_de"
     },
     {
       "name": "longtest",
       "title": "Russia Long test",
-      "corpus": "../test_corpus_long",
-      "output": "../out_test_corpus_long",
+      "corpus": "../dataset/test_corpus_long",
+      "output": "../dataset/out_test_corpus_long",
       "editable": true
     },
     {
@@ -51,7 +51,13 @@
       "title": "test_russia: russian_kw.json",
       "corpus": "sftp://download:download@192.168.170.200/home/download/hkc_test/test_corpus",
       "output": "D:/hkc/sftp_run/out_test_corpus",
-      "editable":true
+      "editable": true
+    },
+    {
+      "name": "cases_ru",
+      "title": "Russia-side policy cases",
+      "corpus": "../dataset/test_corpus_cases_ru",
+      "editable": true
     }
   ]
 }

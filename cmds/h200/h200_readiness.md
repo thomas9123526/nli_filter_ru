@@ -43,7 +43,7 @@ One run on all 8 GPUs would be limited by its single CPU process. Use `run_shard
 ```bash
 python nli_models.py --check all --device cuda:0                                # all three models load and score on GPU
 python nli_filter.py test_russia.jsonl --device cuda --mode process --output-dir out_test   # accuracy should be close to 0.938
-./run_shards.sh test_corpus out_tc 2                                            # copies side by side + report
+./run_shards.sh dataset/test_corpus out_tc 2                                            # copies side by side + report
 ```
 
 If all three pass, start the full corpus. Details: `linux_h200.md`.

@@ -24,7 +24,7 @@
 | | `h200_readiness.md` | Review of the scripts for multi-GPU runs |
 | | `batch_size_and_vllm.md` | Batch sizes on 8 x H200 and on one RTX 5090 (start values, how to tune, copies per GPU) and why vLLM is not used |
 | | `../shard_commands.py` | Writes the `nli_filter.py` commands for N copies over chosen GPUs to a file (`shard_run_<N>copies.sh` / `.bat`) and checks the options first: `python shard_commands.py --help` |
-| `testing/` | `test_corpus.md` | Make and filter `test_corpus` (`make_test_corpus.py`); long texts in every file (`--long-lines`) |
+| `testing/` | `test_corpus.md` | Make and filter `dataset/test_corpus` (`make_test_corpus.py`); long texts in every file (`--long-lines`) |
 | | `tests.md` | Run the pytest suites |
 | | `testing_step.md` | Testing step by step: the order (unit tests, slow test, smoke test, server input, viewer) and a log of each session's results |
 | | `compare_and_replay.md` | `nli_compare.py` (two runs line by line: better / worse lines, what differs), `nli_replay.py` (other thresholds / fewer hypotheses from stored scores, no models), regression with the golden set |
@@ -51,7 +51,7 @@
 | | `thresholds.md` | `nli_label.py eval` output, choosing thresholds, the CRC guarantee |
 | | `place_names.md` | `policy\place_names.csv` + exceptions, `nli_names.py`, open codebook questions |
 | | `outputs.md` | What `run` / `redecide` write; the composition report |
-| | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 76 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v4.json`; as a corpus: `test_corpus_cases\` (viewer dataset "cases"); policies v2 (values / style), v3 (cascade fixes), v4 (Kremlin accusations, narrative keywords) |
+| | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 76 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v4.json`; as a corpus: `dataset\test_corpus_cases\` (viewer dataset "cases"); policies v2 (values / style), v3 (cascade fixes), v4 (Kremlin accusations, narrative keywords) |
 | | `russia_llm.md` | **The Russia-side project** (Russia's LLM): the agreed principles, `policy\russia_llm_policy_v2.json`, exceptions ("our country"), the optional topic field (`--topic-field`, hint / trust / off), the 43 test cases and their results |
 | | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
 | `design/` | `work_log_2026-11-21.md` | **What changed while you were away** (v4, v5, the judge, nli_filter vs nli_label), what waits for you |

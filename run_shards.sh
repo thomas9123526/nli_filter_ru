@@ -11,7 +11,7 @@
 # Examples:
 #   ./run_shards.sh "/data/corpus/**/*.zst" /data/nli_out
 #   ./run_shards.sh /data/corpus /data/nli_out 2 --write-split --batch-size 256 --judge-batch-size 128
-#   ./run_shards.sh test_corpus out_test 1 --judge-model none
+#   ./run_shards.sh dataset/test_corpus dataset/out_test_corpus 1 --judge-model none
 #
 # Environment:
 #   PYTHON=python3            interpreter (default: python)

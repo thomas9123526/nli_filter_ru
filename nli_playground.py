@@ -28,7 +28,7 @@ API (JSON):
                   "seconds": ...}
 Every setting left out has nli_filter.py's default. One request at a time (the models are shared).
 
-  POST /jobs     {"args": ["test_corpus", "--output-dir", "out", ...], "env": {"NLI_CORPUS_PASSWORD": "..."},
+  POST /jobs     {"args": ["dataset/test_corpus", "--output-dir", "out", ...], "env": {"NLI_CORPUS_PASSWORD": "..."},
                   "label": "dataset name"} -> {"id": ...}   (python nli_filter.py <args>, cwd = project folder)
   GET  /jobs     -> {"jobs": [...]}          GET /jobs/<id> -> state, return code, the last output lines
   POST /jobs/<id>/stop

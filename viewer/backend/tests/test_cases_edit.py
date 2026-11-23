@@ -54,12 +54,12 @@ def test_save_backup_and_corpus(client, project):
     r = client.post("/api/labels/cases/save", json={"file": d["file"], "data": d, "base_sha": d["sha"]}, headers=H)
     assert r.status_code == 200, r.text
     res = r.json()
-    assert res["cases"] == 2 and res["texts"] == 2 and res["corpus"] == {"path": "test_corpus_cases_ru", "files": 2, "lines": 2}
+    assert res["cases"] == 2 and res["texts"] == 2 and res["corpus"] == {"path": "dataset/test_corpus_cases_ru", "files": 2, "lines": 2}
     saved = json.loads((project / "labels" / "russia_llm_cases_v1.json").read_text(encoding="utf-8"))
     assert saved["cases"][0]["texts"][0]["note"] == "edited" and "file" not in saved and "sha" not in saved
     assert saved["corpus"] == "test_corpus_cases_ru" and saved["edited"]
     assert (project / res["backup"]).is_file()
-    assert len(list((project / "test_corpus_cases_ru").rglob("*.jsonl.zst"))) == 2
+    assert len(list((project / "dataset" / "test_corpus_cases_ru").rglob("*.jsonl.zst"))) == 2
     # the old sha is stale now: a second save from the old page is refused
     r = client.post("/api/labels/cases/save", json={"file": d["file"], "data": d, "base_sha": d["sha"]}, headers=H)
     assert r.status_code == 409
@@ -72,7 +72,7 @@ def test_corpus_rebuilt_only_for_the_newest_cases_vN(client, project):
     assert r.status_code == 200 and r.json()["corpus"] is None
     new = load(client, "labels/cases_v2.json")
     r = client.post("/api/labels/cases/save", json={"file": new["file"], "data": new, "base_sha": new["sha"]}, headers=H)
-    assert r.json()["corpus"]["path"] == "test_corpus_cases"
+    assert r.json()["corpus"]["path"] == "dataset/test_corpus_cases"
 
 
 @pytest.mark.parametrize("bad, msg", [

@@ -26,14 +26,14 @@ python .\nli_filter.py D:\hkc\nli_filter2\test_russia.jsonl --device cpu --outpu
 
 # ---- nested test corpus of .zst files (make_test_corpus.py) -------------------------------------
 
-# Build test_corpus\ : 5 folders x 3 sub folders x 1-2 .zst files, 20-40 lines each, from test_russia.jsonl
+# Build dataset\test_corpus\ : 5 folders x 3 sub folders x 1-2 .zst files, 20-40 lines each, from test_russia.jsonl
 python .\make_test_corpus.py
 # Rebuild it (replace the old one), other sizes, other seed
 python .\make_test_corpus.py --force --folders 5 --subfolders 3 --files 1-2 --lines 20-40 --seed 7
 # Filter it (all .zst files under the folder are found automatically)
-python .\nli_filter.py test_corpus --device cpu --judge-model none --output-dir out_test_corpus
+python .\nli_filter.py dataset/test_corpus --device cpu --judge-model none --output-dir dataset/out_test_corpus
 # Quick trial: first 60 lines only
-python .\nli_filter.py test_corpus --device cpu --judge-model none --limit 60 --output-dir out_test_corpus
+python .\nli_filter.py dataset/test_corpus --device cpu --judge-model none --limit 60 --output-dir dataset/out_test_corpus
 
 # ---- other files (replace the example paths) ---------------------------------------------------
 

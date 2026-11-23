@@ -8,7 +8,7 @@ viewer_config.json:
   "cors_origins": ["http://localhost:3000"],
   "datasets": [
     {"name": "test", "title": "Test corpus (Russia)",
-     "corpus": "../test_corpus", "output": "../out_test_corpus",
+     "corpus": "../dataset/test_corpus", "output": "../dataset/out_test_corpus",
      "editable": true},                   // allow editing the text of corpus lines (local corpus only)
     {"name": "s3run", "corpus": "minio://minio:9000/corpus", "output": "minio://minio:9000/nli-out",
      "corpus_options": {"access_key": "${MINIO_USER}", "secret_key": "${MINIO_PASSWORD}"},

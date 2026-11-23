@@ -1,12 +1,12 @@
 """
 build_cases_corpus.py - labels/cases_v1.json as a test corpus for the viewer: one .jsonl.zst per case, the case's
-1-2 texts as lines, in one folder per group (like test_corpus).
+1-2 texts as lines, in one folder per group (like dataset/test_corpus).
 
-    python tools/build_cases_corpus.py                 ->  test_corpus_cases/<group>/<case>.jsonl.zst
+    python tools/build_cases_corpus.py                 ->  dataset/test_corpus_cases/<group>/<case>.jsonl.zst
     (from the newest labels/cases_v*.json; --cases labels/cases_v1.json for another one)
 
 Each line: {"id", "text", "case", "group", "expected_action", "labels_yes", "source", "note"}. The viewer dataset
-"cases" (viewer/viewer_config.json) shows it; `python nli_label.py run test_corpus_cases --output-dir
+"cases" (viewer/viewer_config.json) shows it; `python nli_label.py run dataset/test_corpus_cases --output-dir
 out_label_cases --all-labels` labels it for the Labels pages. The folder is not in git (like every test corpus):
 rebuild it from labels/cases_v1.json with this script.
 """
@@ -27,18 +27,18 @@ GROUP_DIRS = {"Level 0 · gate": "level0_gate", "Level 1 · subject": "level1_su
 
 
 def default_out(cases: Path, data: dict) -> Path:
-    """The case set's corpus folder: its "corpus" field, else test_corpus_cases (A's cases_vN.json). The folder is
-    deleted and written again, so only test_corpus_cases… names in the project folder are accepted."""
+    """The case set's corpus folder in dataset/: its "corpus" field, else test_corpus_cases (A's cases_vN.json). The
+    folder is deleted and written again, so only test_corpus_cases… names are accepted."""
     name = data.get("corpus") or "test_corpus_cases"
     if not re.fullmatch(r"test_corpus_cases[A-Za-z0-9_-]*", str(name)):
         raise SystemExit(f"{cases}: \"corpus\" must be a folder name starting with test_corpus_cases, not {name!r}")
-    return HERE / name
+    return HERE / "dataset" / name
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="cases_v1.json -> one .jsonl.zst per case")
     ap.add_argument("--cases", default=None, help="default: the newest labels/cases_v*.json")
-    ap.add_argument("--out", default=None, help="default: the cases file's \"corpus\" field, else test_corpus_cases")
+    ap.add_argument("--out", default=None, help="default: dataset/<the cases file's \"corpus\" field>, else dataset/test_corpus_cases")
     args = ap.parse_args()
     found = sorted((p for p in (HERE / "labels").glob("cases_v*.json") if re.fullmatch(r"cases_v\d+\.json", p.name)),
                    key=lambda p: int(p.stem[7:]))

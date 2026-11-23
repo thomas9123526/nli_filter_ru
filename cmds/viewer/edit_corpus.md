@@ -14,8 +14,8 @@ local, mapped or UNC drive (`D:\...`, `Z:\...`, `\\server\share\...`) or on an F
 {
   "name": "test_corpus_de",
   "title": "Germany test corpus",
-  "corpus": "../test_corpus_de",
-  "output": "../out_test_corpus_de",
+  "corpus": "../dataset/test_corpus_de",
+  "output": "../dataset/out_test_corpus_de",
   "editable": true
 }
 ```

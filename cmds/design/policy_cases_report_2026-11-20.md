@@ -7,7 +7,7 @@ What this report answers:
 4. how removed content could be turned into content A can keep.
 
 **Basis.** The guide `cmds/history/a-b-filtering-answers.md` and the policy `policy/russia_policy_v2.json`
-(28 labels). Test data: 66 cases, 125 texts (`labels/cases_v2.json`, as a corpus in `test_corpus_cases/`), run with
+(28 labels). Test data: 66 cases, 125 texts (`labels/cases_v2.json`, as a corpus in `dataset/test_corpus_cases/`), run with
 `nli_label.py` into `out_label_cases` (ModernBERT only, no judge, CPU, every label scored). Every text and its result
 is in the appendix [policy_cases_results_2026-11-20.md](policy_cases_results_2026-11-20.md).
 
@@ -183,7 +183,7 @@ Soviet history without "Soviet Union" / "USSR", quoted-to-refute narratives.
 | Belarus, Kazakhstan, other post-Soviet states | near misses for every subject, to keep the filter narrow |
 
 `tools/build_cases.py` has a `NEW_TEXTS` / `NEW_LABEL_TEXTS` table. New cases are a few lines each, then rebuild
-`cases_v3.json` and `test_corpus_cases`.
+`cases_v3.json` and `dataset/test_corpus_cases`.
 
 ## 7. Models to add
 
@@ -381,7 +381,7 @@ expectations on fact-checks, keyword gaps), plus `narr_biolabs` text 2 and the n
 
 ## 12. nli_filter.py vs nli_label.py on the same cases (measured)
 
-Both tools on the 149 case texts of `test_corpus_cases` (ModernBERT only, no judge, CPU): `nli_filter.py` with its
+Both tools on the 149 case texts of `dataset/test_corpus_cases` (ModernBERT only, no judge, CPU): `nli_filter.py` with its
 defaults (`keywords/russia.txt`, its check-1 / check-2 hypotheses) into `out_filter_cases`, `nli_label.py` with
 policy v5 (`out_label_cases_v5`). `nli_filter.py` can only filter or keep a whole text, so the comparison is binary:
 **OK** = removed when the case says remove, kept when it says keep / pass; a case that expects review accepts either.

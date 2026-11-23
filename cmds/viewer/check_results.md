@@ -7,11 +7,11 @@ These notes come from reading the script and the docs; the viewer was not starte
 
 1. **Run the filter**, for example:
    ```powershell
-   python .\nli_filter.py test_corpus_de --country Germany --country-adj German --judge-model none --device cpu --output-dir out_test_corpus_de
+   python .\nli_filter.py dataset/test_corpus_de --country Germany --country-adj German --judge-model none --device cpu --output-dir dataset/out_test_corpus_de
    ```
 2. **Add the run to `viewer\viewer_config.json`.** Each entry pairs a corpus folder with the output folder made
-   from it (paths are relative to the config file). The config already pairs `test_corpus_de` with
-   `out_test_corpus_de`. For a new run, add an entry inside `"datasets"` (comma after the previous `}`):
+   from it (paths are relative to the config file). The config already pairs `dataset/test_corpus_de` with
+   `dataset/out_test_corpus_de`. For a new run, add an entry inside `"datasets"` (comma after the previous `}`):
    ```json
    {"name": "de_run2", "title": "Germany, run 2", "corpus": "../my_corpus", "output": "../out_my_run"}
    ```

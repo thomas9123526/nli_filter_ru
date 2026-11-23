@@ -50,8 +50,8 @@ python .\nli_filter.py --judge-model bge-m3 --device cpu --chunk-lines 16 --outp
 python .\nli_filter.py --fast-model bge-m3 --judge-model deberta --device cpu --chunk-lines 16 --output-dir out_bge_deberta
 # bge-m3 scores only (no filter logic)
 python .\nli_models.py --model bge-m3 --input test_russia.jsonl --hypothesis "This text is about Russia." --device cpu --out out_bge\scores.jsonl
-# bge-m3 on test_corpus, first 60 lines
-python .\nli_filter.py test_corpus --fast-model bge-m3 --judge-model none --device cpu --limit 60 --chunk-lines 16 --output-dir out_tc_bge
+# bge-m3 on dataset/test_corpus, first 60 lines
+python .\nli_filter.py dataset/test_corpus --fast-model bge-m3 --judge-model none --device cpu --limit 60 --chunk-lines 16 --output-dir out_tc_bge
 ```
 
 ## Tips

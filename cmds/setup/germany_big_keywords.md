@@ -75,7 +75,7 @@ Japanese) work as they are. Tested results:
 
 ```powershell
 # a) Quick check on 200 lines: does everything load, are the hits sensible?
-python .\nli_filter.py test_corpus --country Germany --country-adj German --limit 200 --output-dir out_de_try -v
+python .\nli_filter.py dataset/test_corpus --country Germany --country-adj German --limit 200 --output-dir out_de_try -v
 
 # b) Measure accuracy on a labelled sample (lines with "expect": "filter"/"keep" and optional "category")
 python .\nli_filter.py germany_sample.jsonl --country Germany --country-adj German --output-dir out_de_eval

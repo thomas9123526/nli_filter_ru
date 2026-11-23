@@ -465,7 +465,7 @@ async function deck3() {
     { x: M, y: 1.55, w: 6.4, h: 3.6, margin: 0, valign: "top", isTextBox: true });
   stat(s, C, { x: 7.4, y: 1.5, w: 2.6, big: "149", label: "texts in 78 cases\nA's policy" });
   stat(s, C, { x: 10.2, y: 1.5, w: 2.5, big: "43", label: "texts in 23 cases\nRussia side", color: C.accent6 });
-  s.addText("python tools\\compare_cases.py out_label_ru_v2 --corpus test_corpus_cases_ru", { x: M, y: 4.3, w: W - 2 * M, h: 0.6, fontSize: 13, fontFace: "Courier New", color: C.text1, fill: { color: C.background2 }, margin: 12, valign: "middle", isTextBox: true });
+  s.addText("python tools\\compare_cases.py out_label_ru_v2 --corpus dataset/test_corpus_cases_ru", { x: M, y: 4.3, w: W - 2 * M, h: 0.6, fontSize: 13, fontFace: "Courier New", color: C.text1, fill: { color: C.background2 }, margin: 12, valign: "middle", isTextBox: true });
 
   pres.addSection({ title: "A's policy" });
   s = content(pres, "A's policy improved version by version",

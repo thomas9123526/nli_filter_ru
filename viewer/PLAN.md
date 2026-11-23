@@ -41,7 +41,7 @@ gives the same answers in a terminal.
 - [x] 6. `config.py` + `api.py` (FastAPI) + `cli.py` + API tests
 - [x] 7. Next.js frontend: datasets, dataset overview, file decisions table, record detail
 - [x] 8. Static export served by the backend; one-command start scripts; README; cmds/viewer/viewer.md
-- [x] 9. End-to-end on test_corpus / out_test_corpus over local disk, FTP and S3 (`verify`: 568/568
+- [x] 9. End-to-end on dataset/test_corpus / dataset/out_test_corpus over local disk, FTP and S3 (`verify`: 568/568
       consistent on each), browser screenshots (light, dark, narrow)
 - [x] 10. Extras:
   - tests for nli_filter.py / nli_models.py (59, `tests/`), automated UI test in headless Chrome

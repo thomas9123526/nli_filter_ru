@@ -10,11 +10,11 @@ The corpus folder on the server must have the **same sub folders and file names*
 `nli_filter.py`, because results are matched to corpus files by their path:
 
 ```
-out_test_corpus_de\wikipedia\part-01\shard-00002.decisions.jsonl.zst
+dataset\out_test_corpus_de\wikipedia\part-01\shard-00002.decisions.jsonl.zst
   -> <corpus>/wikipedia/part-01/shard-00002.jsonl.zst
 ```
 
-E.g. upload `test_corpus_de` as a whole to `/data/test_corpus_de` (WinSCP, FileZilla, or `scp -r`).
+E.g. upload `dataset/test_corpus_de` as a whole to `/data/test_corpus_de` (WinSCP, FileZilla, or `scp -r`).
 
 ## Step 2: add the dataset to `viewer\viewer_config.json`
 
@@ -25,7 +25,7 @@ With a password (kept out of the file with `${SFTP_PASSWORD}`):
       "name": "test_corpus_de_sftp",
       "title": "Test corpus (Germany) - corpus on SFTP",
       "corpus": "sftp://USER@HOST:22/data/test_corpus_de",
-      "output": "../out_test_corpus_de",
+      "output": "../dataset/out_test_corpus_de",
       "corpus_options": {"password": "${SFTP_PASSWORD}"}
     }
 ```

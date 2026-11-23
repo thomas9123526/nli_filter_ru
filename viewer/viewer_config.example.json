@@ -8,8 +8,8 @@
       // local disk (Windows or Linux path)
       "name": "test_corpus",
       "title": "Test corpus (local disk)",
-      "corpus": "../test_corpus",
-      "output": "../out_test_corpus",
+      "corpus": "../dataset/test_corpus",
+      "output": "../dataset/out_test_corpus",
       "editable": true                    // allow editing the text of corpus lines (local corpus only; see README)
     },
     {

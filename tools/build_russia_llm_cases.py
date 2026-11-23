@@ -8,7 +8,7 @@ build_russia_llm_cases.py - the test cases for policy/russia_llm_policy_v1.json 
 Once the file exists it is the master copy: edit the cases on the viewer's Try page (Edit cases), not here.
 
 Same format as labels/cases_v*.json, so the viewer's Try page and tools/build_cases_corpus.py read it:
-    python tools/build_cases_corpus.py --cases labels/russia_llm_cases_v1.json --out test_corpus_cases_ru
+    python tools/build_cases_corpus.py --cases labels/russia_llm_cases_v1.json --out dataset/test_corpus_cases_ru
 
 Group "Your examples" are the user's 17 sample texts (2026-11-23). Their expected action follows the agreed plan
 (opinions in both directions -> review, history -> review, facts -> keep); "your_decision" keeps the user's first

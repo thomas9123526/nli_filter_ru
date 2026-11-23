@@ -45,7 +45,7 @@ version in `viewer\.viewer_edits\_project\`. Saving works only from this PC (lik
 Hypothesis files are shared with `nli_filter.py`:
 
 ```powershell
-python nli_filter.py test_corpus --hypotheses-file hypotheses\weather.json --output-dir out_weather
+python nli_filter.py dataset/test_corpus --hypotheses-file hypotheses\weather.json --output-dir out_weather
 ```
 
 Without `--hypotheses-file`, `nli_filter.py` uses `hypotheses\<country>.json` if it exists (e.g.

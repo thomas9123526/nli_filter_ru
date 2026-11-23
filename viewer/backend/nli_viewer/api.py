@@ -663,7 +663,8 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     @app.post("/api/labels/cases/save", tags=["labels"])
     def label_cases_save(body: SaveCasesBody, request: Request):
         """Save an edited case set (the Try page's "Edit cases"); the old file is kept in labels/.backup/. Then the
-        case corpus is rebuilt (the set's "corpus" folder, or test_corpus_cases for the newest cases_vN.json)."""
+        case corpus is rebuilt (dataset/<the set's "corpus" folder>, or dataset/test_corpus_cases for the newest
+        cases_vN.json)."""
         save_guard(request)
         files = _case_files()
         pick = next((f for f in files if f"labels/{f.name}" == body.file.replace("\\", "/")), None)
@@ -693,9 +694,9 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             spec = importlib.util.spec_from_file_location("build_cases_corpus", builder)
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
-            out = project / (data.get("corpus") or "test_corpus_cases")
+            out = project / "dataset" / (data.get("corpus") or "test_corpus_cases")
             n_files, n_lines = mod.build(data, out)
-            corpus = {"path": out.name, "files": n_files, "lines": n_lines}
+            corpus = {"path": f"dataset/{out.name}", "files": n_files, "lines": n_lines}
         texts = sum(len(c["texts"]) for c in data["cases"])
         return {"file": body.file, "sha": hashlib.sha1(pick.read_bytes()).hexdigest(), "backup": f"labels/.backup/{backup.name}",
                 "cases": len(data["cases"]), "texts": texts, "corpus": corpus}

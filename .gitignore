@@ -1,11 +1,9 @@
 models/**
+# test corpora and their results (make_test_corpus.py, tools/build_cases_corpus.py, runs on them)
+dataset/**
 __pycache__
 *.pyc
 out_test/**
-out_test_corpus/**
-out_test_corpus2/**
-test_corpus/**
-test_corpus2/**
 test_ru/**
 .venv/**
 *.zst
@@ -21,8 +19,6 @@ viewer/.viewer_cache/
 # corpus edits made in the viewer: backups of the original corpus files + edit log
 viewer/.viewer_edits/
 .viewer_edits/
-/test_corpus*
-out_test_corpus**
 out**
 !cmds/labeling/outputs.md
 pkgs/**

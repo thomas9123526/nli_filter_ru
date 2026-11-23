@@ -1,7 +1,7 @@
 """
 compare_cases.py - a nli_label.py run on a cases corpus vs the cases' expected actions.
 
-    python tools/compare_cases.py out_label_ru_v1 --corpus test_corpus_cases_ru [--details]
+    python tools/compare_cases.py out_label_ru_v1 --corpus dataset/test_corpus_cases_ru [--details]
 
 The corpus is the one tools/build_cases_corpus.py wrote (each line has expected_action, acceptable, case, note).
 A text is OK when its action is the expected one or one of its "acceptable" actions. The action of a text is its

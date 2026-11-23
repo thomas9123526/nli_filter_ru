@@ -4,14 +4,14 @@ make_test_corpus.py - build a small nested corpus of .zst files for testing nli_
 
 Layout (defaults):
 
-    test_corpus/
+    dataset/test_corpus/
         common-crawl-news/          5 top folders
             part-00/                3 sub folders each
                 shard-00000.jsonl.zst     1-2 files per sub folder
                 shard-00001.jsonl.zst
             part-01/ ...
         common-crawl-games/ ...
-    test_corpus.manifest.json       every file with its line count and the line ids (outside the folder,
+    dataset/test_corpus.manifest.json   every file with its line count and the line ids (outside the folder,
                                     so nli_filter.py does not read it as input)
 
 Each .zst file is zstd-compressed JSONL: lines sampled from the source file (default test_russia.jsonl),
@@ -28,10 +28,10 @@ Examples
     python make_test_corpus.py --folders 5 --subfolders 3 --files 1-2 --lines 20-40 --seed 7
     python make_test_corpus.py --source my.jsonl --out D:\\data\\test_corpus --force
     python make_test_corpus.py --long-lines                      # + 1-2 long texts (~12,000 chars) per file
-    python make_test_corpus.py --long-lines 1 --lines 0 --folders 200 --out test_corpus_long --force
+    python make_test_corpus.py --long-lines 1 --lines 0 --folders 200 --out dataset/test_corpus_long --force
                                                                  # 200 folders, every file = 1 long text only
     python make_test_corpus.py --long-lines 2 --long-chars 20000 --long-categories long_about_last,long_about_middle
-    python nli_filter.py test_corpus --device cpu --judge-model none
+    python nli_filter.py dataset/test_corpus --device cpu --judge-model none
 """
 from __future__ import annotations
 
@@ -91,7 +91,8 @@ def main() -> int:
                                 epilog=__doc__.split("Examples\n--------\n", 1)[1])
     p.add_argument("--source", default=str(HERE / "test_russia.jsonl"), help="JSONL to sample lines from "
                                                                               "(default test_russia.jsonl)")
-    p.add_argument("--out", default=str(HERE / "test_corpus"), help="output folder (default ./test_corpus)")
+    p.add_argument("--out", default=str(HERE / "dataset" / "test_corpus"),
+                   help="output folder (default ./dataset/test_corpus)")
     p.add_argument("--folders", type=int, default=5, help="top-level folders (default 5; the first 10 have names "
                                                           "like 'books', then folder-010, folder-011, ...)")
     p.add_argument("--subfolders", type=int, default=3, help="sub folders in each folder (default 3)")

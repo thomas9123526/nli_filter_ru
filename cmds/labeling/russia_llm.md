@@ -33,16 +33,16 @@ review just like "Ukraine's economy is developed"). Reporting on the war, includ
 | `labels\russia_llm_cases_v1.json` | 43 test texts in 23 cases: your 17 examples + exceptions, hate, history, opinions, false claims, facts |
 | `tools\build_russia_llm_cases.py` | Writes the cases file (edit the texts there, then rerun) |
 | `tools\compare_cases.py` | A run on a cases corpus vs the expected actions |
-| `test_corpus_cases_ru\` | The cases as a corpus (not in git; rebuild with the command below) |
+| `dataset\test_corpus_cases_ru\` | The cases as a corpus (not in git; rebuild with the command below) |
 
 ## Commands
 
 ```powershell
 # the cases as a corpus, label them, compare with what is expected
 python tools\build_russia_llm_cases.py
-python tools\build_cases_corpus.py --cases labels\russia_llm_cases_v1.json --out test_corpus_cases_ru
-python nli_label.py run test_corpus_cases_ru --policy policy\russia_llm_policy_v2.json --output-dir out_label_ru_v2
-python tools\compare_cases.py out_label_ru_v2 --corpus test_corpus_cases_ru          # --details: every text
+python tools\build_cases_corpus.py --cases labels\russia_llm_cases_v1.json --out dataset/test_corpus_cases_ru
+python nli_label.py run dataset/test_corpus_cases_ru --policy policy\russia_llm_policy_v2.json --output-dir out_label_ru_v2
+python tools\compare_cases.py out_label_ru_v2 --corpus dataset/test_corpus_cases_ru          # --details: every text
 
 # a real corpus (local folder or a server address, as for A's project)
 python nli_label.py run <corpus> --policy policy\russia_llm_policy_v2.json --output-dir out_label_ru_xxx --write-clean
