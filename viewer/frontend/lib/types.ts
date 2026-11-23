@@ -1,6 +1,7 @@
 // Shapes of the nli_viewer API responses (see viewer/backend/nli_viewer/api.py, /docs).
 
 export type DatasetInfo = {
+  label_run?: string;  // the output is an nli_label.py run: its name on the Labels pages
   name: string;
   title: string;
   description: string;
@@ -50,6 +51,7 @@ export type RunInfo = {
 };
 
 export type Overview = {
+  label_run?: string;
   name: string;
   title: string;
   description: string;

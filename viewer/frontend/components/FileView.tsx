@@ -20,7 +20,13 @@ export function FileView() {
   const desc = sp.get("desc") === "1";
   const offset = Number(sp.get("offset") || 0);
   const params = { file: f, ...filters, sort, desc, offset, limit: PAGE };
-  const key = ds && f ? `dec:${ds}:${JSON.stringify(params)}` : null;
+  // a dataset whose output is an nli_label.py run has no decisions files: show this file on the labelling pages
+  const ov = useApi(ds ? `ov:${ds}` : null, (s) => api.overview(ds, s));
+  const labelRun = ov.data?.label_run;
+  useEffect(() => {
+    if (labelRun && f) router.replace(href("/labelrun", { run: labelRun, file: f }));
+  }, [labelRun, f, router]);
+  const key = ds && f && !labelRun ? `dec:${ds}:${JSON.stringify(params)}` : null;
   const res = useApi(key, (s) => api.decisions(ds, params, s));
   const [q, setQ] = useState(filters.q);
   useEffect(() => setQ(filters.q), [filters.q]);
@@ -54,7 +60,7 @@ export function FileView() {
           ) : null}
         </div>
       </div>
-      <ErrorBox error={res.error} onRetry={res.reload} />
+      <ErrorBox error={labelRun ? null : res.error} onRetry={res.reload} />
       <div className="panel flush">
         {facets ? (
           <div className="facets" aria-label="Quick filters">

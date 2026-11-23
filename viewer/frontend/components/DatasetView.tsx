@@ -31,9 +31,16 @@ export function DatasetView() {
         <FindById ds={ds} />
       </div>
       <ErrorBox error={ov.error} onRetry={ov.reload} />
+      {ov.data?.label_run ? (
+        <div className="alert" data-testid="label-run-note">
+          The output of this dataset is an <strong>nli_label.py</strong> run: its labels, actions and the flow of every
+          paragraph are on the labelling pages.{" "}
+          <Link className="btn small" href={href("/labelrun", { run: ov.data.label_run })}>Open the labelling run →</Link>
+          {" "}<span className="faint">Browse corpus, Keywords and Review above are for the corpus and nli_filter.py results.</span>
+        </div>) : null}
       {ov.loading && !ov.data ? <Loading what="Reading summaries" /> : null}
       {ov.data ? <RunsProgress ds={ds} /> : null}
-      {ov.data && ov.data.files === 0 ? <NoResults ds={ds} ov={ov.data} /> : null}
+      {ov.data && ov.data.files === 0 && !ov.data.label_run ? <NoResults ds={ds} ov={ov.data} /> : null}
       {ov.data && ov.data.files > 0 ? <OverviewPanels ds={ds} ov={ov.data} /> : null}
       {ov.data && ov.data.files > 0 ? <FilesTable ds={ds} /> : null}
     </>

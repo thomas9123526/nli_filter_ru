@@ -34,3 +34,27 @@ the run. The run list refreshes by itself while a run goes (from `progress.json`
 ## Exceptions and the topic field in the flow
 
 When the policy has exceptions, the flow shows an **Exceptions** step between level 2 and the decision: every exception with its phrases or hypothesis, which one matched, and "the cascade said X; the exception decides Y". If a protected label (hate, violence) removes the paragraph, the step says the exception was blocked. Subjects answered by the corpus' topic field (`--topic-field`) carry a **topic field** chip instead of a model score. See `cmds\labelingussia_llm.md`.
+
+## An nli_label.py run as a dataset's output (viewer_config.json)
+
+A dataset's `"output"` may also be a **local** `nli_label.py` run folder. Then the corpus and its labelling results
+belong together like a filter run:
+
+```json
+{
+  "name": "cases_ru",
+  "title": "Russia-side policy cases",
+  "corpus": "../test_corpus_cases_ru",
+  "output": "../out_label_ru_check",
+  "editable": true
+}
+```
+
+- The dataset card on the start page has a **labels** badge and opens the run's labelling pages (files, lines,
+  actions, the flow of every paragraph).
+- The dataset page (Browse corpus, Keywords …) shows a note with a link to the labelling run.
+- A file link of the dataset (`/file/?ds=cases_ru&f=exceptions__01`) goes straight to that file on the labelling pages.
+- A run folder inside the project folder keeps its folder name on the Labels pages (`out_label_ru_check`); a run
+  folder elsewhere is listed under the dataset's name.
+- Server outputs (FTP / SFTP / S3) are not supported for label runs yet; copy the run folder to a local disk.
+- Restart the viewer after editing the config.

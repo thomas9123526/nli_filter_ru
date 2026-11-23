@@ -146,3 +146,28 @@ def test_server_input_without_reopen_and_shard_progress(client, project):
             encoding="utf-8")
     p = client.get("/api/labels").json()["runs"][0]["progress"]
     assert p["shards"] == 2 and p["files_done"] == 3 and p["files_total"] == 6 and p["state"] in ("running", "stale")
+
+
+def test_dataset_output_can_be_a_label_run(tmp_path, project):
+    """viewer_config "output" pointing at an nli_label.py run: the dataset links to the labelling pages."""
+    import shutil
+    tree = build_tree(tmp_path / "tree")
+    outside = tmp_path / "elsewhere" / "label_run"  # a run folder outside the project folder
+    shutil.copytree(project / "out_label_t", outside)
+    cfg = ViewerConfig(datasets=[DatasetConfig(name="filt", corpus=str(tree / "corpus"), output=str(tree / "out")),
+                                 DatasetConfig(name="lab_in", corpus=str(project), output=str(project / "out_label_t")),
+                                 DatasetConfig(name="lab_out", corpus=str(project), output=str(outside))],
+                       cache_dir=str(tmp_path / "cache"), edits_dir=str(tmp_path / "edits"),
+                       frontend_dir=str(tmp_path / "nofrontend"), base_dir=str(tmp_path), project_dir=str(project),
+                       playground_url="http://127.0.0.1:9")
+    with TestClient(create_app(cfg), client=("127.0.0.1", 50000)) as c:
+        rows = {r["name"]: r for r in c.get("/api/datasets").json()["datasets"]}
+        assert "label_run" not in rows["filt"]
+        assert rows["lab_in"]["label_run"] == "out_label_t" and rows["lab_in"]["error"] is None
+        assert rows["lab_out"]["label_run"] == "lab_out"
+        assert c.get("/api/datasets/lab_out").json()["label_run"] == "lab_out"
+        runs = {r["name"] for r in c.get("/api/labels").json()["runs"]}
+        assert {"out_label_t", "lab_out"} <= runs
+        assert c.get("/api/labels/lab_out").json()["files"][0]["name"] == "in"
+        d = c.get("/api/labels/lab_out/doc", params={"file": "in", "line": 1}).json()
+        assert d["row"]["action"] == "edited"

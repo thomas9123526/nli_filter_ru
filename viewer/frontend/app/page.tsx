@@ -31,8 +31,9 @@ export default function Home() {
               <div className="uri">output {d.output}</div>
             </div>
           ) : (
-            <Link className="card" key={d.name} href={href("/dataset", { ds: d.name })}>
-              <div className="row"><strong>{d.title}</strong><span className="badge neutral">{d.name}</span></div>
+            <Link className="card" key={d.name} href={d.label_run ? href("/labelrun", { run: d.label_run }) : href("/dataset", { ds: d.name })}>
+              <div className="row"><strong>{d.title}</strong><span className="badge neutral">{d.name}</span>
+                {d.label_run ? <span className="badge review" title="the output is an nli_label.py run: opens its labelling pages">labels</span> : null}</div>
               {d.description ? <p className="muted" style={{ margin: "6px 0" }}>{d.description}</p> : null}
               <div className="uri">corpus {d.corpus}</div>
               <div className="uri">output {d.output}</div>

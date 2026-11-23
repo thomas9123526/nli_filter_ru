@@ -181,13 +181,37 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     def health():
         return {"status": "ok", "version": __version__, "datasets": len(reg.names())}
 
+    def label_run_of(name: str) -> Optional[str]:
+        """A dataset whose "output" is a local nli_label.py run folder: the run's name on the Labels pages."""
+        try:
+            c = reg.config(name)
+        except Exception:  # noqa: BLE001
+            return None
+        out = (c.output or "").strip()
+        if not out or "://" in out:
+            return None
+        p = Path(out)
+        if not p.is_absolute():
+            p = Path(cfg.base_dir) / p
+        return labels.register(name, p)
+
     @app.get("/api/datasets", tags=["datasets"])
     def datasets():
-        return {"datasets": reg.describe()}
+        rows = reg.describe()
+        for r in rows:
+            lr = label_run_of(r["name"])
+            if lr:
+                r["label_run"] = lr
+                r["error"] = None  # a label run has no decisions files: not an error
+        return {"datasets": rows}
 
     @app.get("/api/datasets/{name}", tags=["datasets"])
     def overview(name: str):
-        return ds(name).overview()
+        res = ds(name).overview()
+        lr = label_run_of(name)
+        if lr:
+            res["label_run"] = lr
+        return res
 
     @app.post("/api/datasets/{name}/refresh", tags=["datasets"])
     def refresh(name: str):

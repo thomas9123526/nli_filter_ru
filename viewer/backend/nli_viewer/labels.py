@@ -29,6 +29,7 @@ class LabelRuns:
     def __init__(self, project: Path, stale_seconds: float = 300.0):
         self.project = Path(project)
         self.stale = stale_seconds
+        self.extra: Dict[str, Path] = {}  # runs outside the project folder, named after their dataset
         if str(self.project) not in sys.path:
             sys.path.insert(0, str(self.project))
 
@@ -47,9 +48,31 @@ class LabelRuns:
         one = d / "progress.json"
         return [one] if one.is_file() else sorted(d.glob("progress.shard*.json"))
 
+    def is_run_folder(self, d: Path) -> bool:
+        try:
+            return d.is_dir() and self._is_run(d)
+        except OSError:
+            return False
+
+    def register(self, dataset: str, d: Path) -> Optional[str]:
+        """A dataset's local output folder that is an nli_label.py run -> the run's name on the Labels pages (the
+        folder name inside the project folder, else the dataset name); None when it is not a label run."""
+        d = Path(d)
+        if not self.is_run_folder(d):
+            return None
+        try:
+            if d.resolve().parent == self.project.resolve():
+                return d.name
+        except OSError:
+            pass
+        self.extra[dataset] = d
+        return dataset
+
     def folder(self, name: str) -> Path:
         if not name or "/" in name or "\\" in name or name.startswith("."):
             raise ValueError(f"bad run name '{name}'")
+        if name in self.extra:
+            return self.extra[name]
         d = self.project / name
         if not d.is_dir() or not self._is_run(d):
             raise KeyError(f"no nli_label.py run '{name}' in {self.project}")
@@ -103,6 +126,16 @@ class LabelRuns:
                          "tokens": st.get("tokens"), "tokens_removed": st.get("tokens_removed"),
                          "docs": st.get("docs") or {}, "redecided": bool(s.get("redecide")),
                          "progress": self.progress(d)})
+        for name, d in self.extra.items():  # dataset outputs outside the project folder
+            if any(r["name"] == name for r in runs) or not self.is_run_folder(d):
+                continue
+            s = _read_json(d / "summary.json") or {}
+            st = s.get("stats") or {}
+            runs.append({"name": name, "finished": s.get("finished"), "command": s.get("command"),
+                         "policy": (s.get("policy") or {}).get("path"), "lines": st.get("lines"),
+                         "tokens": st.get("tokens"), "tokens_removed": st.get("tokens_removed"),
+                         "docs": st.get("docs") or {}, "redecided": bool(s.get("redecide")),
+                         "progress": self.progress(d), "folder": str(d)})
         runs.sort(key=lambda r: (r["progress"] or {}).get("updated") or r["finished"] or "", reverse=True)
         return {"project": str(self.project), "runs": runs}
 
