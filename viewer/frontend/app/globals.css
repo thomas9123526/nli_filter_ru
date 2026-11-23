@@ -443,3 +443,7 @@ tr.active td { background: var(--accent-soft); }
 
 .topic-help { margin-top: 8px; padding: 6px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
 .topic-help summary { cursor: pointer; }
+
+del.cut { text-decoration: line-through; text-decoration-color: var(--filter); background: color-mix(in srgb, var(--filter) 14%, transparent); }
+.kept-review { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }

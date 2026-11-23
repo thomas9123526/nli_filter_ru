@@ -151,11 +151,52 @@ function ExpectBox({ e, sel }: { e: NonNullable<LabelDocResp["expect"]>; sel?: [
   );
 }
 
+/** The original text with what the clean copy leaves out struck through (removed paragraphs; review paragraphs too
+ * when the run used --review-as remove). */
+function CutText({ d }: { d: LabelDocResp }) {
+  const text = d.text || "";
+  const reviewCut = d.clean?.review_as === "remove";
+  const out: ReactElement[] = [];
+  let pos = 0;
+  (d.row.paragraphs || []).forEach((p, i) => {
+    if (p.span[0] > pos) out.push(<span key={`g${i}`}>{text.slice(pos, p.span[0])}</span>);
+    const cut = p.action === "remove" || (reviewCut && p.action === "review");
+    out.push(cut
+      ? <del key={`p${i}`} className="cut" title={`cut: ${p.action} (${p.labels.join(", ") || p.reason})`}>{text.slice(p.span[0], p.span[1])}</del>
+      : <span key={`p${i}`} className={p.action === "review" ? "kept-review" : ""} title={p.action === "review" ? "review: kept in the clean copy (--review-as keep)" : p.action}>
+          {text.slice(p.span[0], p.span[1])}</span>);
+    pos = p.span[1];
+  });
+  if (pos < text.length) out.push(<span key="tail">{text.slice(pos)}</span>);
+  return <div className="doc" data-testid="cut-text">{out}</div>;
+}
+
+/** The document as written to <file>.clean.jsonl[.zst], with the rewritten place names marked. */
+function CleanText({ c }: { c: NonNullable<LabelDocResp["clean"]> }) {
+  if (!c.available) return (
+    <div className="empty" data-testid="clean-text">This run has no clean copy. Make one without the models:
+      <pre className="json">python nli_label.py redecide &lt;this run&gt; --output-dir &lt;new folder&gt; --write-clean</pre>
+      (or run with <code>--write-clean</code>).</div>);
+  if (c.dropped) return <div className="empty" data-testid="clean-text">The whole document was <strong>dropped</strong>: less than <code>--min-doc-chars</code> (50) characters were left after cutting, so it is not in the clean copy.</div>;
+  if (c.problem || c.text == null) return <div className="alert warn" data-testid="clean-text">{c.problem || "the clean copy has no text for this document"}</div>;
+  const t = c.text;
+  const out: ReactElement[] = [];
+  let pos = 0;
+  (c.rewrites || []).forEach((r, i) => {
+    if (r.start > pos) out.push(<span key={`t${i}`}>{t.slice(pos, r.start)}</span>);
+    out.push(<mark key={`r${i}`} className="rewritten" title={`${r.old} → ${r.new}`}>{t.slice(r.start, r.end)}</mark>);
+    pos = r.end;
+  });
+  if (pos < t.length) out.push(<span key="tail">{t.slice(pos)}</span>);
+  return <div className="doc" data-testid="clean-text">{out}</div>;
+}
+
 export function LabelDocView() {
   const sp = useSearchParams();
   const run = sp.get("run") || "", file = sp.get("file") || "", line = Number(sp.get("line") || 0);
   const res = useApi(run && file && line ? `labeldoc:${run}:${file}:${line}` : null, (s) => api.labelDoc(run, { file, line }, s));
   const [sel, setSel] = useState(0);
+  const [view, setView] = useState<"labels" | "cut" | "clean">("labels");
   if (!run || !file || !line) return <div className="alert error">Missing ?run=, ?file= or ?line=</div>;
   const d = res.data;
   const paras = d?.row.paragraphs || [];
@@ -175,10 +216,21 @@ export function LabelDocView() {
         <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 1fr)", alignItems: "start" }}>
           <div className="panel flush">
             <div className="panel-head"><h2>Text</h2>
-              <span className="legend"><span><i className="swatch lpara remove" />remove</span><span><i className="swatch lpara review" />review</span>
-                <span><i className="swatch lpara keep" />keep</span><span><i className="swatch lpara pass" />pass</span></span></div>
+              <span className="seg" data-testid="text-view">
+                <button className={view === "labels" ? "on" : ""} onClick={() => setView("labels")}>Labels</button>
+                <button className={view === "cut" ? "on" : ""} onClick={() => setView("cut")} title="the original, with what the clean copy leaves out struck through">What is cut</button>
+                <button className={view === "clean" ? "on" : ""} onClick={() => setView("clean")} title="the text in the clean copy (<file>.clean.jsonl.zst)">Clean copy</button>
+              </span>
+              {view === "labels" ? (
+                <span className="legend"><span><i className="swatch lpara remove" />remove</span><span><i className="swatch lpara review" />review</span>
+                  <span><i className="swatch lpara keep" />keep</span><span><i className="swatch lpara pass" />pass</span></span>) : null}
+              {view === "cut" ? <span className="faint" style={{ fontSize: 12 }}>struck through = not in the clean copy{d.clean?.review_as === "remove" ? " (review paragraphs too: --review-as remove)" : "; review paragraphs stay (--review-as keep)"}</span> : null}
+              {view === "clean" && d.clean?.rewrites?.length ? <span className="faint" style={{ fontSize: 12 }}>marked = place name rewritten (hover: old → new)</span> : null}
+            </div>
             {d.problem ? <div className="alert" style={{ margin: 12 }}>{d.problem}</div> : null}
-            {d.text !== null ? <DocText d={d} sel={sel} onSel={setSel} /> : null}
+            {view === "labels" && d.text !== null ? <DocText d={d} sel={sel} onSel={setSel} /> : null}
+            {view === "cut" && d.text !== null ? <CutText d={d} /> : null}
+            {view === "clean" && d.clean ? <CleanText c={d.clean} /> : null}
             {paras.length === 0 ? <div className="empty">No paragraph was labelled: {d.row.gate ? "" : "no keyword or marker hit (untouched)."}</div> : null}
           </div>
           <div className="panel">

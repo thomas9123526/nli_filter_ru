@@ -327,6 +327,52 @@ class LabelRuns:
         return {"rows": out, "total": total, "counts": counts, "offset": offset, "limit": limit,
                 **({"expected": {"n": exp_n, "ok": exp_ok}} if exp else {})}
 
+    def clean_view(self, d: Path, file: str, row: Dict[str, Any], text_field: str,
+                   settings: Dict[str, Any]) -> Dict[str, Any]:
+        """The document as it is in <file>.clean.jsonl[.zst]: its text, the place names rewritten in it (positions in
+        that text), or "dropped". The clean file has no line numbers: a document's place in it is its line number minus
+        the documents before it that were dropped (removed / error), checked against the id when there is one."""
+        found = [q for q in (d / f"{file}.clean.jsonl", d / f"{file}.clean.jsonl.zst") if q.is_file()]
+        out: Dict[str, Any] = {"available": bool(found), "review_as": settings.get("review_as") or "keep"}
+        if not found:
+            return out
+        line = row.get("line")
+        if row.get("action") in ("removed", "error"):
+            return dict(out, dropped=True)
+        index = 0
+        for r in self._rows(d, file):
+            if r.get("line") == line:
+                break
+            if r.get("action") not in ("removed", "error"):
+                index += 1
+        from nli_models import JsonlSource
+        clean_path = max(found, key=lambda q: q.stat().st_mtime)
+        rec = None
+        for k, rr in enumerate(JsonlSource(str(clean_path)).records()):
+            if k == index:
+                rec = rr
+                break
+        if rec is None:
+            return dict(out, problem="the clean copy has fewer documents than expected")
+        if row.get("id") is not None and rec.get("id") is not None and rec.get("id") != row.get("id"):
+            return dict(out, problem=f"the clean copy's document {index + 1} has id {rec.get('id')}, not {row.get('id')}")
+        t = rec.get(text_field)
+        changes = []
+        rw = [q for q in (d / f"{file}.rewrites.jsonl", d / f"{file}.rewrites.jsonl.zst") if q.is_file()]
+        if rw and row.get("rewrites"):
+            from nli_models import open_text
+            with open_text(max(rw, key=lambda q: q.stat().st_mtime)) as fh:
+                for raw in fh:
+                    c = json.loads(raw) if raw.strip() else {}
+                    if c.get("line") == line:
+                        changes.append(c)
+        spans, shift = [], 0
+        for c in sorted(changes, key=lambda c: c["start"]):  # "start" is before the renaming: shift onto the result
+            s0 = c["start"] + shift
+            spans.append({"start": s0, "end": s0 + len(c["new"]), "old": c["old"], "new": c["new"]})
+            shift += len(c["new"]) - len(c["old"])
+        return dict(out, dropped=False, text=t if isinstance(t, str) else None, rewrites=spans)
+
     def doc(self, name: str, file: str, line: int) -> Dict[str, Any]:
         d = self.folder(name)
         row = next((r for r in self._rows(d, file) if r.get("line") == line), None)
@@ -367,10 +413,12 @@ class LabelRuns:
                 problem = "the source text changed since the run (spans do not fit): the text is not shown"
                 text = None
         pol = s.get("policy") or {}
+        clean = self.clean_view(d, file, row, tf, s.get("settings") or {})
         e = self.expected(d, file).get(line)
         expect = self.verdict(row, e, pol.get("paragraphs") or {}) if e is not None else None
         return {"name": name, "file": file, "input": src, "row": row, "text": text, "problem": problem,
                 **({"expect": expect} if expect is not None else {}),
+                "clean": clean,
                 "policy": {"labels": pol.get("labels") or {}, "run_if": pol.get("run_if") or {},
                            "conflict": pol.get("conflict")},
                 "policy_path": pol.get("path"),

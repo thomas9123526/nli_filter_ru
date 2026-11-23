@@ -224,3 +224,29 @@ def test_no_expected_results_on_real_data(client):
     assert "expected" not in d and "expect" not in d["rows"][0]
     assert client.get("/api/labels/out_label_t/expected").json()["expected"] is None
     assert "expect" not in client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+
+
+def test_clean_copy_view(client, project):
+    """The document page's "Clean copy": the text from <file>.clean.jsonl, rewrites marked in it, dropped documents."""
+    run = project / "out_label_t"
+    doc = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()
+    assert doc["clean"] == {"available": False, "review_as": "keep"}            # run without --write-clean
+    s1 = TEXT.index("The Russian")
+    cut = TEXT[:s1] + "Moscow scientists explain the algorithm."               # the removed paragraph is gone
+    renamed = cut.replace("Moscow", "Moskva")                                    # a rewrite, as the log describes
+    (run / "in.clean.jsonl").write_text(json.dumps({"id": "d1", "text": renamed}) + "\n" +
+                                        json.dumps({"id": "d2", "text": "Nothing here."}) + "\n", encoding="utf-8")
+    start = cut.index("Moscow")
+    (run / "in.rewrites.jsonl").write_text(json.dumps({"start": start, "old": "Moscow", "new": "Moskva", "line": 1,
+                                                       "id": "d1"}) + "\n", encoding="utf-8")
+    rows = (run / "in.labels.jsonl").read_text(encoding="utf-8").splitlines()
+    r1 = json.loads(rows[0]); r1["rewrites"] = 1
+    (run / "in.labels.jsonl").write_text(json.dumps(r1) + "\n" + rows[1] + "\n", encoding="utf-8")
+    c = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()["clean"]
+    assert c["available"] and c["dropped"] is False and c["text"] == renamed
+    assert [c["text"][x["start"]:x["end"]] for x in c["rewrites"]] == ["Moskva"]
+    c2 = client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 2}).json()["clean"]
+    assert c2["text"] == "Nothing here."                                          # 2nd document of the clean file
+    r1["action"] = "removed"                                                     # dropped: not in the clean copy
+    (run / "in.labels.jsonl").write_text(json.dumps(r1) + "\n" + rows[1] + "\n", encoding="utf-8")
+    assert client.get("/api/labels/out_label_t/doc", params={"file": "in", "line": 1}).json()["clean"]["dropped"] is True

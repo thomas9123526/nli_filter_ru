@@ -167,3 +167,28 @@ none, and these pages look as before.
 Click **▾ Labels** to fold the panel away (▸ opens it again); this browser remembers the choice. While it is open,
 the search box filters the labels as you type: by name, hypothesis text, decision (`remove`, `review` …) or level
 (`level 2`, or just `2`); "2 of 13 labels" shows how many match. Clicking a label still lists its documents below.
+
+## What the clean copy looks like (document page)
+
+On a document page (a run → a file → a line), the **Text** panel has three views:
+
+| View | Shows |
+|---|---|
+| **Labels** | The original text, paragraphs coloured by their action (as before); click a paragraph for its flow |
+| **What is cut** | The original text with everything the clean copy leaves out **struck through in red**: `remove` paragraphs, and `review` paragraphs too when the run used `--review-as remove` (otherwise they stay, shaded yellow) |
+| **Clean copy** | The text exactly as written to `<file>.clean.jsonl.zst` (the training data), with the rewritten place names marked (hover: Kyiv → Kiev) |
+
+A document that was dropped (less than `--min-doc-chars` left) says so. A run made without `--write-clean` has no
+clean copy; the page shows how to make one from the stored scores, without the models:
+
+```powershell
+py -3.12 nli_label.py redecide dataset\out_label_docs_ru_judge --output-dir dataset\out_label_docs_ru_clean --write-clean
+```
+
+To see a clean copy with the `review` paragraphs cut out as well:
+
+```powershell
+py -3.12 nli_label.py redecide dataset\out_label_docs_ru_judge --output-dir dataset\out_label_docs_ru_reviewcut --write-clean --review-as remove
+```
+
+(`redecide` writes a new folder; the viewer shows it as the newest run for that corpus.)

@@ -478,6 +478,8 @@ export type LabelDocResp = {
   policy_path?: string | null;
   settings: Record<string, unknown>;
   expect?: ExpectVerdict;
+  clean?: { available: boolean; review_as: string; dropped?: boolean; text?: string | null; problem?: string;
+    rewrites?: { start: number; end: number; old: string; new: string }[] };
 };
 
 export type PolicyExceptionInfo = { key: string; decision: string; priority: number; scope: string; phrases?: string[];
