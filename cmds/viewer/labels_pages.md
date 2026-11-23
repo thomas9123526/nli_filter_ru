@@ -130,7 +130,8 @@ file can also be edited by hand; the dropdown reads it each time the page loads.
   Russia-side policy, `Entertainment` + trust: "culture = yes from the topic; history, politics, economy = no from the
   topic (no model); war: the model". Opened, it lists the policy's subjects and its whole `topic_map`.
 
-**Where it is configured** (all in the policy file, e.g. `policyussia_llm_policy_v2.json`):
+**Where it is configured** (all in the policy file, e.g. `policy
+ussia_llm_policy_v2.json`):
 
 | Setting | What |
 |---|---|
@@ -160,3 +161,9 @@ none, and these pages look as before.
   document action, the selected paragraph's expected vs got, and every paragraph as ¶1 keep → keep ✓ …
 - Matching rules (as in `tools\compare_cases.py` / `compare_docs.py`): the "also fine" actions count; pass, untouched
   and "none" (a paragraph that was never labelled) count as the same, because all three leave the text as it is.
+
+## The Labels panel on the run page
+
+Click **▾ Labels** to fold the panel away (▸ opens it again); this browser remembers the choice. While it is open,
+the search box filters the labels as you type: by name, hypothesis text, decision (`remove`, `review` …) or level
+(`level 2`, or just `2`); "2 of 13 labels" shows how many match. Clicking a label still lists its documents below.

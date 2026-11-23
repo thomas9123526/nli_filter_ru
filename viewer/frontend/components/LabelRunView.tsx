@@ -2,7 +2,7 @@
 // One nli_label.py run: token composition, labels, and the documents (filter by action / label) → a document's flow.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href, num, pct } from "@/lib/format";
 import { Bars, Crumbs, ErrorBox, Loading, Stat } from "./ui";
@@ -24,6 +24,13 @@ export function LabelRunView() {
   const [paraAction, setParaAction] = useState("");
   const [offset, setOffset] = useState(0);
   const [expect, setExpect] = useState("");  // "" | "wrong" | "right" (test corpora with expected results)
+  const [labelsOpen, setLabelsOpen] = useState(true);  // the Labels panel (folded state kept in this browser)
+  const [labelQuery, setLabelQuery] = useState("");
+  useEffect(() => { try { setLabelsOpen(localStorage.getItem("nli.labelrun.labelsOpen") !== "0"); } catch { /* no storage */ } }, []);
+  const toggleLabels = () => setLabelsOpen((o) => {
+    try { localStorage.setItem("nli.labelrun.labelsOpen", o ? "0" : "1"); } catch { /* no storage */ }
+    return !o;
+  });
   const f = file || res.data?.files[0]?.name || "";
   const docs = useApi(run && f ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}` : null,
     (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}) }, s));
@@ -87,11 +94,25 @@ export function LabelRunView() {
               <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>reasons: {Object.entries(st.reasons).map(([k, v]) => `${k} ${v}`).join(", ")}</div>
             </div>
           </div>
-          <div className="panel flush" style={{ marginBottom: 16 }}>
-            <div className="panel-head"><h2>Labels</h2><span className="faint" style={{ fontSize: 12 }}>positive paragraphs; click to list their documents</span></div>
+          <div className="panel flush" style={{ marginBottom: 16 }} data-testid="labels-panel">
+            <div className="panel-head">
+              <button className="linklike" onClick={toggleLabels} aria-expanded={labelsOpen} data-testid="labels-toggle"
+                title={labelsOpen ? "fold the labels away" : "show the labels"}>
+                <h2 style={{ margin: 0 }}>{labelsOpen ? "▾" : "▸"} Labels</h2></button>
+              <span className="faint" style={{ fontSize: 12 }}>{Object.keys(pol).length} labels; positive paragraphs; click a label to list its documents</span>
+              <span className="spacer" />
+              {labelsOpen ? (
+                <input type="search" value={labelQuery} onChange={(e) => setLabelQuery(e.target.value)} data-testid="labels-search"
+                  placeholder="search label, hypothesis, decision, level…" style={{ minWidth: 260 }} />) : null}
+            </div>
+            {labelsOpen ? (() => {
+              const q = labelQuery.trim().toLowerCase();
+              const rows = Object.entries(pol).filter(([k, l]) => !q ||
+                [k, l.hypothesis, l.decision, `level ${l.level}`, String(l.level)].some((x) => String(x || "").toLowerCase().includes(q)));
+              return (<>
             <div className="table-wrap"><table>
               <thead><tr><th>Label</th><th>Level</th><th>Decision</th><th className="right">Threshold</th><th className="right">Paragraphs</th><th className="right">Tokens</th></tr></thead>
-              <tbody>{Object.entries(pol).map(([k, l]) => (
+              <tbody>{rows.map(([k, l]) => (
                 <tr key={k} className={label === k ? "active" : ""}>
                   <td><button className="linklike" onClick={() => { setLabel(label === k ? "" : k); reset(); }}><strong>{k}</strong></button>
                     <div className="hyp">{l.hypothesis}</div></td>
@@ -100,6 +121,10 @@ export function LabelRunView() {
                   <td className="right">{num(st.label_paragraphs[k] || 0)}</td><td className="right">{num(st.label_tokens[k] || 0)}</td>
                 </tr>))}</tbody>
             </table></div>
+            {q && !rows.length ? <div className="panel-body faint">No label matches “{labelQuery}”.</div> : null}
+            {q && rows.length ? <div className="panel-body faint" style={{ fontSize: 12 }}>{rows.length} of {Object.keys(pol).length} labels</div> : null}
+              </>);
+            })() : null}
           </div>
         </>
       ) : null}
