@@ -447,3 +447,5 @@ tr.active td { background: var(--accent-soft); }
 del.cut { text-decoration: line-through; text-decoration-color: var(--filter); background: color-mix(in srgb, var(--filter) 14%, transparent); }
 .kept-review { background: color-mix(in srgb, var(--warn) 14%, transparent); }
 mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+.case-file-name { font-size: 11px; margin-left: 4px; }

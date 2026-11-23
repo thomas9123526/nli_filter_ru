@@ -1,7 +1,7 @@
 "use client";
 // Policy Try page: step through the cases (labels/cases_v1.json) one by one, run the policy's labels on a case's
 // text with the model service, and compare the flow (gate → level 1 → level 2 → decision) with what is expected.
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
@@ -19,6 +19,11 @@ function docAction(r: LabelTryResp["rows"][number]): string {
   return order.find((a) => ps.some((p) => p.action === a)) || r.action;
 }
 
+/** The corpus file a case is written to (tools/build_cases_corpus.py): "yours:03" -> "yours__03". */
+export function caseFileName(id: string): string {
+  return id.replace(/[^A-Za-z0-9_.-]+/g, "__");
+}
+
 function matches(expected: string | null, got: string, acceptable?: string[]): boolean | null {
   if (!expected) return null;
   const ok = [...expected.split(" or ").map((x) => x.trim()), ...(acceptable || [])];
@@ -29,6 +34,7 @@ function matches(expected: string | null, got: string, acceptable?: string[]): b
 
 export function LabelTryView() {
   const sp = useSearchParams();
+  const router = useRouter();
   const caseFiles = useApi("labelcasefiles", (s) => api.labelCaseFiles(s));
   const [caseFile, setCaseFile] = useState(sp.get("cases") || "");
   const cases = useApi(`labelcases:${caseFile}`, (s) => api.labelCases(caseFile || undefined, s));
@@ -70,9 +76,23 @@ export function LabelTryView() {
     const want = sp.get("case");
     if (want && list.length) { const i = list.findIndex((c) => c.id === want); if (i >= 0) setCi(i); }
   }, [list.length, sp]);
+  // opened from a run: the case set whose corpus the run labelled (e.g. dataset/test_corpus_cases_ru ->
+  // labels/russia_llm_cases_v1.json), unless ?cases= names one
+  const runCaseFile = (() => {
+    const input = src.data?.input;
+    if (!input || sp.get("cases")) return null;
+    const parts = input.replace(/\\/g, "/").split("/").filter(Boolean);
+    const folder = parts.length > 1 ? parts[parts.length - 2] : "";
+    const corpora = caseFiles.data?.corpora || {};
+    return Object.keys(corpora).find((f) => corpora[f] === folder || parts.includes(corpora[f])) || null;
+  })();
+  useEffect(() => {
+    if (runCaseFile && runCaseFile !== caseFile) { setDraft(null); setCaseFile(runCaseFile); }
+  }, [runCaseFile]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {  // open ?run=…: the paragraph's text; its case (if the corpus is the case corpus); the run's policy
     const d = src.data;
     if (!d || !list.length) return;
+    if (runCaseFile && cases.data?.file !== runCaseFile) return;  // wait for the run's case set
     const ps = d.row.paragraphs || [];
     const p = ps[fromPara] || ps[0];
     setExtText(d.text ? (p ? d.text.slice(p.span[0], p.span[1]) : d.text) : "");
@@ -81,7 +101,7 @@ export function LabelTryView() {
     if (i >= 0) { pendingTi.current = Number(m![2]) - 1; setCi(i); setTi(Number(m![2]) - 1); }
     const base = d.policy_path ? `policy/${d.policy_path.split(/[\\/]/).pop()}` : "";
     if (base && (policies.data?.policies || []).includes(base)) setPolicy(base);
-  }, [src.data, list.length, policies.data, fromPara]);
+  }, [src.data, list.length, policies.data, fromPara, cases.data?.file, runCaseFile]);
   useEffect(() => {  // opened from the corpus page's "flow →" (?from=corpus): that line's text and policy
     if (sp.get("from") !== "corpus" || !list.length) return;
     const h = readTryHandoff();
@@ -97,7 +117,26 @@ export function LabelTryView() {
   const polInfo = useApi(activePolicy ? `labelpolicy:${activePolicy}` : null, (s) => api.labelPolicy(activePolicy, s));
   useEffect(() => { setText(extText ?? t?.text ?? ""); setRes(null); setSel(0); setErr(null); }, [ci, ti, t?.text, extText]);
   useEffect(() => { setTi(pendingTi.current ?? 0); pendingTi.current = null; }, [ci]);
-  const pick = (i: number) => { setExtText(null); setFromCorpus(null); setCi(i); };
+  // linked to a run whose corpus is this case set: every case is a file of the run, text k is its line k + 1
+  const runLinked = !!(fromRun && runCaseFile && cases.data?.file === runCaseFile);
+  const srcCurrent = !!(src.data && src.data.file === fromFile && src.data.row.line === fromLine);
+  const openInRun = (i: number, k: number) => {
+    const x = list[i];
+    if (!x) return;
+    pendingTi.current = k; setExtText(null); setCi(i); setTi(k);
+    router.replace(href("/labeltry", { run: fromRun, file: caseFileName(x.id), line: k + 1, para: 0 }), { scroll: false });
+  };
+  const pick = (i: number) => {
+    if (runLinked && !draft) { openInRun(i, 0); return; }
+    setExtText(null); setFromCorpus(null); setCi(i);
+  };
+  const pickText = (k: number) => {
+    if (runLinked && !draft) { openInRun(ci, k); return; }
+    setExtText(null); setTi(k);
+  };
+  useEffect(() => {  // the run has no such file / line (a case added after the run): the case's own text
+    if (runLinked && src.error) setExtText(null);
+  }, [runLinked, src.error]);
 
   // ---- editing the case set (kept on the page until Save) ----
   useEffect(() => {
@@ -184,7 +223,7 @@ export function LabelTryView() {
     } catch (e) { setErr(e as Error); }
     setBusy(false);
   };
-  const go = (d: number) => { setExtText(null); setCi((i) => Math.max(0, Math.min(list.length - 1, i + d))); };
+  const go = (d: number) => pick(Math.max(0, Math.min(list.length - 1, ci + d)));
 
   if (cases.error) return <ErrorBox error={cases.error} onRetry={cases.reload} />;
   if (!cases.data) return <Loading what="Loading cases" />;
@@ -207,9 +246,21 @@ export function LabelTryView() {
               <select value={caseFile || cases.data.file} data-testid="case-file" onChange={(e) => {
                 if (draft && !window.confirm("Unsaved case changes will be lost. Switch anyway?")) return;
                 setDraft(null); setChanges(0); setSaveMsg(null);
+                if (fromRun && e.target.value !== runCaseFile) {  // not the run's corpus: leave the run
+                  router.replace(href("/labeltry", { cases: e.target.value }), { scroll: false });
+                }
                 setCaseFile(e.target.value); setCi(0); setTi(0); setResults({}); setPolicy(""); setExtText(null); }}>
-                {(caseFiles.data?.files || []).map((f) => <option key={f} value={f}>{f}</option>)}
+                {(caseFiles.data?.files || []).map((f) => <option key={f} value={f}>{f}{fromRun && f === runCaseFile ? `  (run ${fromRun})` : ""}</option>)}
               </select></label>) : null}
+          {runLinked ? (
+            <div className="row" style={{ marginTop: 6, fontSize: 13 }} data-testid="run-link">
+              <span className="badge review">run</span>
+              <span>Linked to run <a href={href("/labelrun", { run: fromRun, file: fromFile })}><strong>{fromRun}</strong></a>:
+                picking a case opens that file of the run (<code className="mono">{caseFileName(c?.id || "")}</code>), its text the run&apos;s line.</span>
+              <a className="faint" href={href("/labeltry", { cases: runCaseFile })}>leave the run</a>
+            </div>) : null}
+          {fromRun && !runLinked && caseFiles.data && cases.data && !runCaseFile ? (
+            <div className="faint" style={{ marginTop: 6, fontSize: 12 }}>Run {fromRun}: its corpus is not made from a case set, so the cases below are not its files.</div>) : null}
           <div className="row" style={{ marginTop: 6 }}>
             <label className="faint" style={{ fontSize: 13 }}><input type="checkbox" checked={editing} onChange={(e) => setEditing(e.target.checked)} data-testid="edit-cases" /> Edit cases</label>
             {draft ? (<>
@@ -233,7 +284,7 @@ export function LabelTryView() {
                 return (
                   <div key={x.id}>
                     <button className={`case-item${i === ci && insertAt === null ? " on" : ""}`} onClick={() => { setInsertAt(null); pick(i); }}>
-                      <span>{x.title}</span>
+                      <span>{x.title}{cases.data?.corpus ? <span className="faint mono case-file-name" title={`file ${caseFileName(x.id)} in dataset/${cases.data.corpus}`}> {caseFileName(x.id)}</span> : null}</span>
                       <span>{marks.map((m, k) => <span key={k} className={`dot ${m === true ? "ok" : m === false ? "bad" : ""}`} />)}</span>
                     </button>
                     {editing ? <button className={`case-insert${insertAt === i + 1 ? " on" : ""}`} onClick={() => setInsertAt(i + 1)}
@@ -277,13 +328,23 @@ export function LabelTryView() {
               <div style={{ marginTop: 6 }}>{c.what}</div>
               {c.hypothesis ? <div className="hyp" style={{ marginTop: 4 }}>Hypothesis: “{c.hypothesis}” <span className={`badge ${actionClass(c.decision || "")}`}>{c.decision}</span></div> : null}
               <div className="row" style={{ marginTop: 10 }}>
-                {c.texts.length > 1 ? <span className="seg">{c.texts.map((_, k) => <button key={k} className={k === ti ? "on" : ""} onClick={() => { setExtText(null); setTi(k); }}>text {k + 1}</button>)}</span> : null}
+                {c.texts.length > 1 ? <span className="seg">{c.texts.map((_, k) => <button key={k} className={k === ti ? "on" : ""} onClick={() => pickText(k)} title={runLinked ? `line ${k + 1} of ${caseFileName(c.id)}` : undefined}>text {k + 1}</button>)}</span> : null}
                 <span className="faint" style={{ fontSize: 12 }}>{t?.from}</span>
               </div>
               <textarea className="mono try-text" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} data-testid="try-text" />
               <div className="row" style={{ fontSize: 13 }}>
                 <span>Expected: <span className={`badge ${actionClass(t?.expected_action || "")}`}>{t?.expected_action || "?"}</span>
                   {t?.acceptable?.length ? <span className="faint"> (also fine: {t.acceptable.join(", ")})</span> : null}</span>
+                {runLinked && srcCurrent && extText !== null && src.data ? (() => {
+                  const ps = src.data.row.paragraphs || [];
+                  const runGot = ps.length ? (["remove", "review", "keep", "pass"].find((a) => ps.some((q) => q.action === a)) || src.data.row.action) : src.data.row.action;
+                  const okRun = t ? matches(t.expected_action, runGot, t.acceptable) : null;
+                  return (
+                    <span data-testid="run-got">run got <span className={`badge ${actionClass(runGot)}`}>{runGot}</span>
+                      {okRun === true ? <span className="faint"> ✓</span> : okRun === false ? <span style={{ color: "var(--filter)" }}> ✗ not as expected</span> : null}
+                      <span className="faint"> (document: {src.data.row.action})</span></span>);
+                })() : null}
+                {runLinked && src.error ? <span className="faint" data-testid="run-missing">not in run {fromRun} (added after the run?)</span> : null}
                 {t?.your_decision && t.your_decision !== t.expected_action ? <span className="faint">your first decision: <span className={`badge ${actionClass(t.your_decision)}`}>{t.your_decision}</span></span> : null}
                 <span className="faint">yes: {t?.labels_yes.length ? t.labels_yes.map((l) => <span key={l} className="chip">{l}</span>) : "none"}</span>
                 {t?.topic ? <span className="faint" title="the corpus' topic field of this text">topic: <span className="chip">{t.topic}</span></span> : null}

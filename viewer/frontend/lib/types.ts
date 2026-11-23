@@ -3,6 +3,7 @@
 export type DatasetInfo = {
   auto?: boolean;      // found in auto_datasets (the most recent run for its corpus), not written in the config
   label_run?: string;  // the output is an nli_label.py run: its name on the Labels pages
+  modified?: number | null;  // when a local output folder last changed (unix seconds); null for remote outputs
   name: string;
   title: string;
   description: string;

@@ -309,6 +309,32 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
                 "remove_invalid": discover.removal_commands(runs, project, discover.INVALID),
                 "remove_unused": discover.removal_commands(runs, project, discover.UNUSED)}
 
+    def output_modified(name: str) -> Optional[float]:
+        """When a local output folder last changed: the newest mtime of the folder and the files directly in it
+        (one level, cheap). None for remote outputs or a missing folder."""
+        try:
+            out = (reg.config(name).output or "").strip()
+        except Exception:  # noqa: BLE001
+            return None
+        if not out or "://" in out:
+            return None
+        p = Path(out)
+        if not p.is_absolute():
+            p = Path(cfg.base_dir) / p
+        try:
+            if not p.exists():
+                return None
+            newest = p.stat().st_mtime
+            if p.is_dir():
+                for q in p.iterdir():
+                    try:
+                        newest = max(newest, q.stat().st_mtime)
+                    except OSError:
+                        pass
+            return newest
+        except OSError:
+            return None
+
     @app.get("/api/datasets", tags=["datasets"])
     def datasets():
         refresh_auto()
@@ -318,6 +344,7 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             if lr:
                 r["label_run"] = lr
                 r["error"] = None  # a label run has no decisions files: not an error
+            r["modified"] = output_modified(r["name"])
         return {"datasets": rows}
 
     @app.get("/api/datasets/{name}", tags=["datasets"])
@@ -691,7 +718,17 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         """The case sets the Try page can show (newest = the default)."""
         files = _case_files()
         main = [f for f in files if f.stem.startswith("cases_v")]
-        return {"files": [f"labels/{f.name}" for f in files],
+        corpora: Dict[str, str] = {}  # case file -> the dataset/ corpus folder built from it (to open a run's case)
+        for f in files:
+            try:
+                c = json.loads(f.read_text(encoding="utf-8")).get("corpus")
+            except Exception:  # noqa: BLE001 - a broken file just has no corpus
+                c = None
+            if not c and main and f == main[-1]:
+                c = "test_corpus_cases"
+            if c:
+                corpora[f"labels/{f.name}"] = str(c)
+        return {"files": [f"labels/{f.name}" for f in files], "corpora": corpora,
                 "newest": f"labels/{main[-1].name}" if main else (f"labels/{files[0].name}" if files else None)}
 
     @app.get("/api/labels/cases", tags=["labels"])

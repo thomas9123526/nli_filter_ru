@@ -114,7 +114,7 @@ export const api = {
   labelCases: (file?: string, s?: AbortSignal) => getJSON<LabelCasesResp>("/api/labels/cases", file ? { file } : undefined, s),
   saveCases: (body: { file: string; data: LabelCasesResp; base_sha?: string }) =>
     postJSON<SaveCasesResp>("/api/labels/cases/save", body),
-  labelCaseFiles: (s?: AbortSignal) => getJSON<{ files: string[]; newest: string | null }>("/api/labels/case-files", undefined, s),
+  labelCaseFiles: (s?: AbortSignal) => getJSON<{ files: string[]; corpora?: Record<string, string>; newest: string | null }>("/api/labels/case-files", undefined, s),
   labelPolicy: (path: string, s?: AbortSignal) => getJSON<{ labels: Record<string, { level: number; decision: string }>;
     topic: { field: string | null; mode: string; map: Record<string, string[]>; subjects: string[] } }>("/api/labels/policy", { path }, s),
   labelTopics: (s?: AbortSignal) => getJSON<{ file: string; topics: string[]; about: string }>("/api/labels/topics", undefined, s),
