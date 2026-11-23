@@ -134,6 +134,22 @@ def test_label_endpoint_policy_flow(service):
     assert code == 400
 
 
+def test_label_endpoint_topic_and_mode(service):
+    """The case editor's topic travels with the text: the Russia-side policy maps History -> history (hint)."""
+    text = ["Russia was under Mongol rule for about 200 years, from the 13th to the 15th century, a Moscow museum says."]
+    body = {"texts": text, "policy": "policy/russia_llm_policy_v2.json", "topics": ["History"], "all_labels": False}
+    code, r = _post_path(service, "/label", body)
+    assert code == 200, r
+    p = r["rows"][0]["paragraphs"][0]
+    assert r["rows"][0]["topic"] == ["History"] and p["from_field"] == ["history"] and p["scores"]["history"] == 1.0
+    code, r = _post_path(service, "/label", dict(body, topic_mode="off"))
+    assert code == 200 and "from_field" not in r["rows"][0]["paragraphs"][0]   # recorded, not used
+    code, r = _post_path(service, "/label", dict(body, topics=["History", "x"]))
+    assert code == 400                                                          # one topic per text
+    code, r = _post_path(service, "/label", dict(body, topic_mode="maybe"))
+    assert code == 400
+
+
 def test_jobs_only_known_scripts():
     jobs = nli_playground.Jobs()
     with pytest.raises(ValueError):

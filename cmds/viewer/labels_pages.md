@@ -113,3 +113,18 @@ The **Labelling runs** page lists every `nli_label.py` run folder directly in th
 with the same name is in both, the one in the project folder is shown. **Save as a labelling run** on the corpus page
 creates its folder in `dataset/`. For runs from the command line, give `--output-dir dataset/out_label_xxx` to keep
 them there.
+
+## Topics of case texts (testing `--topic-field` on the Try page)
+
+Each case text can have a **topic**: the value a corpus' topic field would carry (see "The corpus' topic field" in
+`cmds\labeling\russia_llm.md`). In **Edit cases** and in the **New case** form, the **topic** dropdown offers the
+values of **`labels\topic_labels.json`** (JSON: `{"about": "...", "topics": ["History", "Politics", ...]}`), plus
+"(no topic)" and **+ new topic…**, which asks for a name, adds it to that file (only from this PC) and selects it. The
+file can also be edited by hand; the dropdown reads it each time the page loads.
+
+- **Saved with the case** (`"topic": "History"` on the text) and written into the case corpus line, so
+  `nli_label.py run dataset\test_corpus_cases_ru --topic-field topic --topic-mode trust …` tests the modes on the cases.
+- **On the Try page**, a text with a topic shows `topic: History` and a **topic mode** dropdown (policy default, hint,
+  trust, off). **Try** sends the topic along: with the Russia-side policy, `History` stands for the subject `history`
+  (its `topic_map`), so in hint mode `history` is yes without the model and the flow marks it **topic field**.
+- A value that is not in the policy's `topic_map` changes nothing (the models decide, as without a topic).

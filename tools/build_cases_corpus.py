@@ -69,6 +69,7 @@ def build(data: dict, out: Path):
                                      "expected_action": t["expected_action"], "labels_yes": t["labels_yes"],
                                      "source": t["from"], "note": t.get("note") or "",
                                      **({"acceptable": t["acceptable"]} if t.get("acceptable") else {}),
+                                     **({"topic": t["topic"]} if t.get("topic") else {}),
                                      **({"your_decision": t["your_decision"]} if t.get("your_decision") else {})},
                                     ensure_ascii=False))
         path = out / group / f"{name}.jsonl.zst"

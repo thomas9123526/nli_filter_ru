@@ -281,7 +281,14 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("'policy' must be a .json file in the project's policy folder")
         policy = nli_label.Policy.load(str(path))
     matcher, rules, markers = nli_label.build_matchers(policy)
-    records = [Record("try", i + 1, {"text": t}, t.encode("utf-8")) for i, t in enumerate(texts)]
+    topics = req.get("topics")  # the corpus' topic field per text (case editor): tests --topic-mode on the Try page
+    if topics is not None and (not isinstance(topics, list) or len(topics) != len(texts)):
+        raise ValueError("'topics' must be a list with one entry per text (null for none)")
+    records = [Record("try", i + 1, {"text": t, **({"topic": topics[i]} if topics and topics[i] else {})},
+                      t.encode("utf-8")) for i, t in enumerate(texts)]
+    topic_mode = req.get("topic_mode") or None
+    if topic_mode is not None and topic_mode not in ("hint", "trust", "off"):
+        raise ValueError("'topic_mode' must be hint, trust or off")
     lo, hi = req.get("uncertain_band") or (0.6, 0.95)
     use_judge = bool(req.get("use_judge", True)) and pg.judge is not None
     t0 = time.perf_counter()
@@ -291,7 +298,8 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
                                  policy.rewriter(),
                                  all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
                                  force_gate=bool(req.get("force_gate", False)),
-                                 narrative_matcher=nli_label.build_narrative_matcher(policy))
+                                 narrative_matcher=nli_label.build_narrative_matcher(policy),
+                                 topic_field="topic" if topics else None, topic_mode=topic_mode)
         outs = lab.process(records)
     return {"rows": [o.row for o in outs], "clean": [(o.clean or {}).get("text") for o in outs],
             "rewrites": [o.rewrites for o in outs], "seconds": round(time.perf_counter() - t0, 3),

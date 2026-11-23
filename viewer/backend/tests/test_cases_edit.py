@@ -93,3 +93,33 @@ def test_save_guarded_and_known_files_only(client):
     d = load(client, "labels/cases_v2.json")
     assert client.post("/api/labels/cases/save", json={"file": d["file"], "data": d}).status_code == 403
     assert client.post("/api/labels/cases/save", json={"file": "labels/x.json", "data": d}, headers=H).status_code == 404
+
+
+def test_topics_list_and_add(client, project):
+    assert client.get("/api/labels/topics").json()["topics"] == []          # no file yet: empty list
+    (project / "labels" / "topic_labels.json").write_text(json.dumps({"about": "x", "topics": ["History", "Politics"]}),
+                                                          encoding="utf-8")
+    assert client.get("/api/labels/topics").json()["topics"] == ["History", "Politics"]
+    assert client.post("/api/labels/topics", json={"topic": "Sport"}).status_code == 403   # no edit header
+    r = client.post("/api/labels/topics", json={"topic": "  Sports &  Fitness "}, headers=H).json()
+    assert r["added"] == "Sports & Fitness" and r["topics"][-1] == "Sports & Fitness"
+    assert client.post("/api/labels/topics", json={"topic": "history"}, headers=H).json()["added"] is None  # known
+    assert client.post("/api/labels/topics", json={"topic": 'bad"one'}, headers=H).status_code == 400
+    saved = json.loads((project / "labels" / "topic_labels.json").read_text(encoding="utf-8"))
+    assert saved["topics"] == ["History", "Politics", "Sports & Fitness"] and saved["about"] == "x"
+
+
+def test_case_topic_saved_and_in_the_corpus(client, project):
+    pytest.importorskip("zstandard")
+    import zstandard
+    d = load(client, "labels/russia_llm_cases_v1.json")
+    d["cases"][0]["texts"][0]["topic"] = "History"
+    r = client.post("/api/labels/cases/save", json={"file": d["file"], "data": d, "base_sha": d["sha"]}, headers=H)
+    assert r.status_code == 200, r.text
+    f = next((project / "dataset" / "test_corpus_cases_ru").rglob("*.jsonl.zst"))
+    line = json.loads(zstandard.ZstdDecompressor().decompressobj().decompress(f.read_bytes()).decode().splitlines()[0])
+    assert line["topic"] == "History"
+    d = load(client, "labels/russia_llm_cases_v1.json")
+    d["cases"][0]["texts"][0]["topic"] = 5
+    r = client.post("/api/labels/cases/save", json={"file": d["file"], "data": d, "base_sha": d["sha"]}, headers=H)
+    assert r.status_code == 400 and "topic" in r.json()["detail"]

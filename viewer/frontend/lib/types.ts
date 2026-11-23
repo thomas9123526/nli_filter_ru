@@ -479,7 +479,7 @@ export type FlowPolicyData = { labels: Record<string, LabelPolicyLabel>; run_if:
 // ---- policy Try page (labels/cases_v1.json, POST /api/labels/try) ----
 
 export type LabelCaseText = { text: string; from: string; labels_yes: string[]; expected_action: string | null; note: string;
-  acceptable?: string[]; your_decision?: string };
+  acceptable?: string[]; your_decision?: string; topic?: string };
 export type LabelCase = {
   id: string; group: string; label: string | null; title: string; what: string;
   hypothesis?: string; decision?: string; texts: LabelCaseText[];

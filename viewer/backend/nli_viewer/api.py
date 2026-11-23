@@ -94,6 +94,12 @@ class TryLabelBody(BaseModel):
     all_labels: bool = True                      # score every label (the decision still follows the cascade)
     force_gate: bool = False                     # label the text even without a keyword hit
     use_judge: bool = True
+    topics: Optional[List[Optional[str]]] = None  # each text's topic (the corpus' topic field), for --topic-mode tests
+    topic_mode: Optional[str] = None             # hint | trust | off (default: the policy's)
+
+
+class AddTopicBody(BaseModel):
+    topic: str
 
 
 class SaveCasesBody(BaseModel):
@@ -151,6 +157,8 @@ def check_cases(data: Dict[str, Any]) -> List[str]:
                 errs.append(f"{tw}: acceptable actions must be among {', '.join(CASE_ACTIONS)}")
             if not isinstance(t.get("labels_yes", []), list):
                 errs.append(f"{tw}: labels_yes must be a list")
+            if t.get("topic") is not None and not (isinstance(t["topic"], str) and len(t["topic"]) <= 80):
+                errs.append(f"{tw}: topic must be a short text (or left out)")
     return errs
 
 
@@ -690,6 +698,38 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         data["sha"] = hashlib.sha1(raw).hexdigest()  # sent back on save: refused if the file changed meanwhile
         return data
 
+    topics_file = project / "labels" / "topic_labels.json"
+
+    def _read_topics() -> Dict[str, Any]:
+        if not topics_file.is_file():
+            return {"about": "", "topics": []}
+        data = json.loads(topics_file.read_text(encoding="utf-8"))
+        data["topics"] = [str(t) for t in (data.get("topics") or []) if str(t).strip()]
+        return data
+
+    @app.get("/api/labels/topics", tags=["labels"])
+    def label_topics():
+        """The topic values of the case editor's dropdown (labels/topic_labels.json)."""
+        data = _read_topics()
+        return {"file": "labels/topic_labels.json", "topics": data["topics"], "about": data.get("about", "")}
+
+    @app.post("/api/labels/topics", tags=["labels"])
+    def label_topics_add(body: AddTopicBody, request: Request):
+        """Add a topic value to labels/topic_labels.json (the dropdown's "+ new topic…")."""
+        save_guard(request)
+        t = " ".join((body.topic or "").split())
+        if not t or len(t) > 80 or any(ch in t for ch in '"\\\n'):
+            raise HTTPException(400, "a topic: 1 to 80 characters, no quotes or backslashes")
+        data = _read_topics()
+        if t.lower() in {x.lower() for x in data["topics"]}:
+            return {"file": "labels/topic_labels.json", "topics": data["topics"], "added": None}
+        data["topics"] = data["topics"] + [t]
+        topics_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = topics_file.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        tmp.replace(topics_file)
+        return {"file": "labels/topic_labels.json", "topics": data["topics"], "added": t}
+
     @app.post("/api/labels/cases/save", tags=["labels"])
     def label_cases_save(body: SaveCasesBody, request: Request):
         """Save an edited case set (the Try page's "Edit cases"); the old file is kept in labels/.backup/. Then the
@@ -738,6 +778,14 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             raise HTTPException(400, "1 to 20 texts")
         req: Dict[str, Any] = {"texts": body.texts, "all_labels": body.all_labels, "force_gate": body.force_gate,
                                "use_judge": body.use_judge}
+        if body.topics is not None:
+            if len(body.topics) != len(body.texts):
+                raise HTTPException(400, "topics: one per text (null for none)")
+            req["topics"] = body.topics
+        if body.topic_mode:
+            if body.topic_mode not in ("hint", "trust", "off"):
+                raise HTTPException(400, "topic_mode must be hint, trust or off")
+            req["topic_mode"] = body.topic_mode
         if body.policy_data is not None:
             req["policy_data"] = body.policy_data
         else:

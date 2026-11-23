@@ -33,6 +33,10 @@ export function LabelTryView() {
   const [caseFile, setCaseFile] = useState(sp.get("cases") || "");
   const cases = useApi(`labelcases:${caseFile}`, (s) => api.labelCases(caseFile || undefined, s));
   const policies = useApi("labelpolicies", (s) => api.labelPolicies(s));
+  const topicList = useApi("labeltopics", (s) => api.labelTopics(s));
+  const topics = topicList.data?.topics || [];
+  const addTopic = async (t: string) => { await api.addTopic(t); topicList.reload(); };
+  const [topicMode, setTopicMode] = useState("");  // "" = the policy's
   const [draft, setDraft] = useState<LabelCasesResp | null>(null);  // edited case set, not saved yet
   const [changes, setChanges] = useState(0);
   const [editing, setEditing] = useState(sp.get("edit") === "1");  // ?edit=1 opens the editor
@@ -166,7 +170,9 @@ export function LabelTryView() {
     if (!text.trim()) return;
     setBusy(true); setErr(null); setRes(null);
     try {
-      const r = await api.labelTry({ texts: [text], policy: policy || cases.data?.policy || undefined, all_labels: true, force_gate: forceGate, use_judge: useJudge });
+      const r = await api.labelTry({ texts: [text], policy: policy || cases.data?.policy || undefined, all_labels: true,
+        force_gate: forceGate, use_judge: useJudge, topics: [t?.topic && extText === null ? t.topic : null],
+        topic_mode: topicMode || undefined });
       setRes(r); setSel(0);
       if (c && t && text === t.text) {
         setResults((m) => ({ ...m, [`${c.id}#${ti}`]: matches(t.expected_action, docAction(r.rows[0]), t.acceptable) }));
@@ -241,7 +247,7 @@ export function LabelTryView() {
               groups={Array.from(new Set(list.map((x) => x.group)))}
               labelKeys={Array.from(new Set([...Object.keys(res?.policy?.labels || {}), ...list.flatMap((x) => x.texts.flatMap((y) => y.labels_yes))])).sort()}
               existingIds={list.map((x) => x.id)} saving={saving}
-              onCancel={() => setInsertAt(null)} onSave={insertCase} />
+              onCancel={() => setInsertAt(null)} onSave={insertCase} topics={topics} onAddTopic={addTopic} />
           ) : null}
           {c && insertAt === null ? (
             <div className="panel">
@@ -276,6 +282,7 @@ export function LabelTryView() {
                   {t?.acceptable?.length ? <span className="faint"> (also fine: {t.acceptable.join(", ")})</span> : null}</span>
                 {t?.your_decision && t.your_decision !== t.expected_action ? <span className="faint">your first decision: <span className={`badge ${actionClass(t.your_decision)}`}>{t.your_decision}</span></span> : null}
                 <span className="faint">yes: {t?.labels_yes.length ? t.labels_yes.map((l) => <span key={l} className="chip">{l}</span>) : "none"}</span>
+                {t?.topic ? <span className="faint" title="the corpus' topic field of this text">topic: <span className="chip">{t.topic}</span></span> : null}
                 {t?.from.startsWith("seed") ? <span className="badge warn" title="Claude's draft labels: not checked yet">draft labels</span> : null}
                 {edited ? <span className="badge neutral">edited: expected no longer applies</span> : null}
               </div>
@@ -284,6 +291,14 @@ export function LabelTryView() {
                 <button className="btn primary" onClick={run} disabled={busy} data-testid="try-run">{busy ? "Scoring… (~1 s per label on a CPU)" : "Try"}</button>
                 <label className="faint" style={{ fontSize: 13 }}><input type="checkbox" checked={forceGate} onChange={(e) => setForceGate(e.target.checked)} /> label without a keyword</label>
                 <label className="faint" style={{ fontSize: 13 }}><input type="checkbox" checked={useJudge} onChange={(e) => setUseJudge(e.target.checked)} /> use the judge</label>
+                {t?.topic ? (
+                  <label className="faint" style={{ fontSize: 13 }} title="how the text's topic is used (the policy's topic_map decides which subject it stands for)">topic mode&nbsp;
+                    <select value={topicMode} onChange={(e) => setTopicMode(e.target.value)} data-testid="topic-mode">
+                      <option value="">policy default</option>
+                      <option value="hint">hint</option>
+                      <option value="trust">trust</option>
+                      <option value="off">off</option>
+                    </select></label>) : null}
                 <label className="faint" style={{ fontSize: 13 }}>policy&nbsp;
                   <select value={policy} onChange={(e) => setPolicy(e.target.value)}>
                     <option value="">{cases.data?.policy ? `${cases.data.policy} (of the cases)` : "default"}</option>
@@ -295,7 +310,8 @@ export function LabelTryView() {
                 <CaseEditor c={c} t={t} ti={ti} boxText={text}
                   groups={Array.from(new Set(list.map((x) => x.group)))}
                   labelKeys={Array.from(new Set([...Object.keys(res?.policy?.labels || {}), ...list.flatMap((x) => x.texts.flatMap((y) => y.labels_yes))])).sort()}
-                  onCase={editCase} onText={editText} onAddText={addText} onDeleteText={deleteText} onAddCase={addCase} onDeleteCase={deleteCase} />
+                  onCase={editCase} onText={editText} onAddText={addText} onDeleteText={deleteText} onAddCase={addCase} onDeleteCase={deleteCase}
+                  topics={topics} onAddTopic={addTopic} />
               ) : null}
               <ErrorBox error={err} />
             </div>

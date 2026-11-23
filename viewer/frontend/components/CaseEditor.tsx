@@ -7,6 +7,30 @@ import { actionClass } from "./LabelRunView";
 
 export const ACTIONS = ["remove", "review", "keep", "pass", "untouched"];
 
+/** The corpus' topic field of a case text: a value from labels/topic_labels.json, or none. "+ new topic…" adds one
+ * to the file (onAdd) and selects it. */
+export function TopicSelect({ value, topics, onChange, onAdd }: {
+  value: string | undefined; topics: string[]; onChange: (t: string | undefined) => void;
+  onAdd: (t: string) => Promise<void>;
+}) {
+  const known = value && !topics.includes(value) ? [value, ...topics] : topics;
+  return (
+    <select value={value || ""} data-testid="topic-select" title="the corpus' topic field of this text (nli_label.py --topic-field topic)"
+      onChange={async (e) => {
+        if (e.target.value === "__new__") {
+          const t = (window.prompt("New topic (it is added to labels/topic_labels.json)") || "").trim();
+          if (t) { await onAdd(t); onChange(t); }
+          return;
+        }
+        onChange(e.target.value || undefined);
+      }}>
+      <option value="">(no topic)</option>
+      {known.map((t) => <option key={t} value={t}>{t}</option>)}
+      <option value="__new__">+ new topic…</option>
+    </select>
+  );
+}
+
 export function newText(text: string): LabelCaseText {
   return { text, from: "added in the viewer", labels_yes: [], expected_action: "keep", note: "" };
 }
@@ -20,8 +44,9 @@ export function newCaseId(cases: LabelCase[], group: string): string {
 }
 
 export function CaseEditor({ c, t, ti, groups, labelKeys, boxText, onCase, onText, onAddText, onDeleteText, onAddCase,
-  onDeleteCase }: {
+  onDeleteCase, topics, onAddTopic }: {
   c: LabelCase; t: LabelCaseText | undefined; ti: number; groups: string[]; labelKeys: string[]; boxText: string;
+  topics: string[]; onAddTopic: (t: string) => Promise<void>;
   onCase: (patch: Partial<LabelCase>) => void; onText: (patch: Partial<LabelCaseText>) => void;
   onAddText: () => void; onDeleteText: () => void; onAddCase: (group: string) => void; onDeleteCase: () => void;
 }) {
@@ -51,6 +76,8 @@ export function CaseEditor({ c, t, ti, groups, labelKeys, boxText, onCase, onTex
               <select value={t.expected_action || "keep"} onChange={(e) => onText({ expected_action: e.target.value })} data-testid="edit-expected">
                 {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
               </select></label>
+            <label>topic
+              <TopicSelect value={t.topic} topics={topics} onChange={(v) => onText({ topic: v })} onAdd={onAddTopic} /></label>
             <div className="wide">also fine:{" "}
               {ACTIONS.filter((a) => a !== t.expected_action).map((a) => (
                 <label key={a} className="faint" style={{ fontSize: 13, marginRight: 8 }}>
@@ -87,8 +114,9 @@ export function CaseEditor({ c, t, ti, groups, labelKeys, boxText, onCase, onTex
 }
 
 /** "+ insert here": a new, empty case with default settings; Save puts it at the chosen place and writes the file. */
-export function CaseInsertForm({ where, group, groups, labelKeys, existingIds, saving, onCancel, onSave }: {
+export function CaseInsertForm({ where, group, groups, labelKeys, existingIds, saving, onCancel, onSave, topics, onAddTopic }: {
   where: string; group: string; groups: string[]; labelKeys: string[]; existingIds: string[]; saving: boolean;
+  topics: string[]; onAddTopic: (t: string) => Promise<void>;
   onCancel: () => void; onSave: (c: LabelCase) => void;
 }) {
   const [g, setG] = useState(group);
@@ -129,6 +157,8 @@ export function CaseInsertForm({ where, group, groups, labelKeys, existingIds, s
               <select value={t.expected_action || "keep"} onChange={(e) => setT(k, { expected_action: e.target.value, acceptable: acc.filter((a) => a !== e.target.value) })}>
                 {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
               </select></label>
+            <label>topic
+              <TopicSelect value={t.topic} topics={topics} onChange={(v) => setT(k, { topic: v })} onAdd={onAddTopic} /></label>
             <div className="wide">also fine:{" "}
               {ACTIONS.filter((a) => a !== t.expected_action).map((a) => (
                 <label key={a} className="faint" style={{ fontSize: 13, marginRight: 8 }}>
