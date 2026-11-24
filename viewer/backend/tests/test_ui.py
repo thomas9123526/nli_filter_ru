@@ -265,6 +265,8 @@ def cases_server(tmp_path_factory):
     (proj / "policy").mkdir()
     real = Path(__file__).resolve().parents[3] / "labels" / "russia_llm_cases_v1.json"
     (proj / "labels" / "russia_llm_cases_v1.json").write_text(real.read_text(encoding="utf-8"), encoding="utf-8")
+    pol = Path(__file__).resolve().parents[3] / "policy" / "russia_llm_policy_v2.json"
+    (proj / "policy" / "russia_llm_policy_v2.json").write_text(pol.read_text(encoding="utf-8"), encoding="utf-8")
     (proj / "labels" / "cases_v1.json").write_text(_json.dumps({"version": 1, "cases": [
         {"id": "a:1", "group": "G", "title": "a one", "what": "w", "texts": [
             {"text": "Moscow.", "from": "x", "labels_yes": [], "expected_action": "keep", "note": ""}]}]}),
@@ -295,3 +297,14 @@ def test_case_editor_renders(cases_server, tmp_path):
     assert 'data-testid="save-cases"' not in page            # nothing changed yet: no save button
     plain = dom(cases_server + "/label/try/?cases=labels/russia_llm_cases_v1.json", tmp_path)
     assert 'data-testid="case-editor"' not in plain and 'data-testid="edit-cases"' in plain
+
+
+def test_policy_editor_renders(cases_server, tmp_path):
+    page = dom(cases_server + "/label/policy/", tmp_path)
+    assert 'data-testid="policy-file"' in page and "russia_llm_policy_v2.json" in page
+    for tid in ("pol-label-involves_russia_ukraine", "pol-label-reports_or_debunks", "pol-label-hostility_russians",
+                "pol-runif-1", "pol-runif-2", "pol-exc-ambiguous_our_country", "pol-no-subject", "policy-ok"):
+        assert f'data-testid="{tid}"' in page, tid
+    assert "keywords_file keywords/russia_v3.txt does not exist" in page  # the test project has no keyword files
+    labels = dom(cases_server + "/label/", tmp_path)
+    assert 'data-testid="policy-link"' in labels

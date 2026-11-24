@@ -10,6 +10,8 @@ import { CaseEditor, CaseInsertForm, TopicSelect, newCaseId, newText } from "./C
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
 import { readTryHandoff } from "./LabelPagePanel";
+import { readPolicyDraft } from "./PolicyEditView";
+import type { PolicyData } from "@/lib/types";
 import { actionClass } from "./LabelRunView";
 
 function docAction(r: LabelTryResp["rows"][number]): string {
@@ -56,6 +58,14 @@ export function LabelTryView() {
   const [ti, setTi] = useState(0);
   const [text, setText] = useState("");
   const [policy, setPolicy] = useState("");
+  // ?policy_draft=1 (the policy editor's "Try these changes"): the unsaved policy, sent with every Try
+  const DRAFT = "__draft__";
+  const [draftPol, setDraftPol] = useState<{ path: string; data: PolicyData } | null>(null);
+  useEffect(() => {
+    if (sp.get("policy_draft") !== "1") return;
+    const d = readPolicyDraft();
+    if (d) { setDraftPol({ path: d.path, data: d.data }); setPolicy(DRAFT); }
+  }, [sp]);
   const [forceGate, setForceGate] = useState(false);
   const [useJudge, setUseJudge] = useState(true);
   const [res, setRes] = useState<LabelTryResp | null>(null);
@@ -113,7 +123,7 @@ export function LabelTryView() {
   const c: LabelCase | undefined = list[ci];
   const t = c?.texts[ti];
   useEffect(() => { setTryTopic(extText === null ? t?.topic : undefined); }, [t?.topic, extText, ci, ti]);
-  const activePolicy = policy || cases.data?.policy || "";
+  const activePolicy = policy === DRAFT ? (draftPol?.path || "") : policy || cases.data?.policy || "";
   const polInfo = useApi(activePolicy ? `labelpolicy:${activePolicy}` : null, (s) => api.labelPolicy(activePolicy, s));
   useEffect(() => { setText(extText ?? t?.text ?? ""); setRes(null); setSel(0); setErr(null); }, [ci, ti, t?.text, extText]);
   useEffect(() => { setTi(pendingTi.current ?? 0); pendingTi.current = null; }, [ci]);
@@ -213,7 +223,9 @@ export function LabelTryView() {
     if (!text.trim()) return;
     setBusy(true); setErr(null); setRes(null);
     try {
-      const r = await api.labelTry({ texts: [text], policy: policy || cases.data?.policy || undefined, all_labels: true,
+      const usingDraft = policy === DRAFT && draftPol;
+      const r = await api.labelTry({ texts: [text], all_labels: true,
+        ...(usingDraft ? { policy_data: draftPol.data } : { policy: policy || cases.data?.policy || undefined }),
         force_gate: forceGate, use_judge: useJudge, topics: [tryTopic || null],
         topic_mode: topicMode || undefined });
       setRes(r); setSel(0);
@@ -368,8 +380,10 @@ export function LabelTryView() {
                 <label className="faint" style={{ fontSize: 13 }}>policy&nbsp;
                   <select value={policy} onChange={(e) => setPolicy(e.target.value)}>
                     <option value="">{cases.data?.policy ? `${cases.data.policy} (of the cases)` : "default"}</option>
+                    {draftPol ? <option value={DRAFT}>unsaved edits of {draftPol.path}</option> : null}
                     {(policies.data?.policies || []).map((p) => <option key={p} value={p}>{p}</option>)}
                   </select></label>
+                <a className="btn small ghost" href={href("/label/policy", { file: activePolicy || null })} title="open this policy in the editor">edit policy</a>
                 {edited ? <button className="btn small" onClick={() => setText(t?.text || "")}>reset text</button> : null}
               </div>
               <TopicHelp info={polInfo.data?.topic} topic={tryTopic} mode={topicMode || polInfo.data?.topic.mode || "hint"} />

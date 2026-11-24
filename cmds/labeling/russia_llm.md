@@ -73,6 +73,11 @@ Other settings: place names are rewritten to their Russian form (next section);
 `"narrative_opens_gate": true` (hate that never names a country still reaches the hate labels); markers are common
 slurs on both sides ("orcs", "рашисты", "хохлы", "укропы" …), so a paragraph with one always gets the full check.
 
+`"no_subject": "keep"`: what a paragraph gets when the gate is open but no level-1 / level-2 label is positive (plain
+facts about Russia or Ukraine). `keep` is the default and the agreed principle; `review` sends all of them to people
+(a large queue), `remove` cuts them. The reason in the outputs stays `no_subject` whatever the value. A change can be
+tried on an existing run without the models: `nli_label.py redecide <run> --policy <policy> --output-dir <new folder>`.
+
 ### Place names: Ukrainian romanisation → Russian form
 
 In the clean copy, `policy\place_names_ru.csv` rewrites Kyiv → Kiev, Kharkiv → Kharkov, Odesa → Odessa, Lviv → Lvov,

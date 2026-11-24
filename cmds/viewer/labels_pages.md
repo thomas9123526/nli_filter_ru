@@ -79,6 +79,28 @@ On a dataset's corpus page (`/label/corpus/?ds=…&file=…`), the panel **Label
 
 The **Try settings** panel above it is unchanged: that one is `nli_filter.py` (keep / filter).
 
+## Edit a policy (`/label/policy/`)
+
+http://localhost:8000/label/policy/?file=policy/russia_llm_policy_v2.json (also "Edit a policy →" on `/label/`, and
+"edit policy" next to the policy on the Try page).
+
+- **Form** tab: General (`no_subject`, `conflict`, `narrative_opens_gate`, paragraph sizes, markers, keyword files,
+  place names), **Labels** by level (key, level, decision, threshold, hypothesis, softens, protected, note; add,
+  rename, delete), **run_if** (tick what opens level 1 / 2), **Exceptions** (phrases, decision, priority, scope,
+  skip_quoted; add, delete), **Topic field** (field, mode, topic → subjects). Renaming a label also renames it in
+  run_if, softens and the topic map. Settings the form has no box for are listed under "Other settings".
+- **JSON** tab: the whole file as text; applies when it is valid JSON.
+- The bar at the top checks the policy with `nli_label.py`'s own rules while you type: **valid**, or the problems
+  (e.g. `run_if 2: unknown label 'xyz'`, `threshold must be between 0 and 1`), plus warnings for files the policy names
+  that do not exist. An invalid policy cannot be saved.
+- **Save** writes the file (UTF-8, 2-space indent); the previous version goes to `policy\.backup\` (not in git). A save is
+  refused when the file changed since the page loaded it (reload first). **Save as new** writes another
+  `policy\<name>.json` (it must not exist yet), e.g. `russia_llm_policy_v3.json`.
+- **Try these changes →** opens the Try page in a new tab with the policy as edited, **saved or not**: the policy box
+  there shows "unsaved edits of …". The Try page scores every label, so `run_if` changes do not show there; use a run
+  or `redecide` for those.
+- Runs, Try and redecide read the file when they start: a saved change is used by the next one, no restart.
+
 ## Edit the cases on the Try page
 
 On `/label/try/`, tick **Edit cases** (or open `/label/try/?cases=labels/russia_llm_cases_v1.json&edit=1`). Under the

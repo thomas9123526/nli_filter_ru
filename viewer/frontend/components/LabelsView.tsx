@@ -8,7 +8,8 @@ import type { LabelProgress, RunJob } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
-const DEFAULT_CMD = "python nli_label.py run corpus_olmo\\seed_docs.jsonl --output-dir out_label_new --judge-model none --limit 20";
+const DEFAULT_POLICY = "policy/russia_llm_policy_v2.json";  // the Russia-side policy
+const DEFAULT_CMD = `python nli_label.py run dataset\\test_corpus_cases_ru --policy ${DEFAULT_POLICY} --output-dir dataset\\out_label_new --write-clean --overwrite`;
 
 export function ProgressBadge({ p }: { p: LabelProgress | null }) {
   if (!p) return null;
@@ -63,6 +64,7 @@ export function LabelsView() {
 
       <div className="row" style={{ marginBottom: 12 }}>
         <Link className="btn small primary" href="/label/try" data-testid="labeltry-link">Try the policy, case by case →</Link>
+        <Link className="btn small" href="/label/policy" data-testid="policy-link">Edit a policy →</Link>
         <span className="faint" style={{ fontSize: 12 }}>every level-0 / 1 / 2 label and edge case, one text at a time, with its flow</span>
       </div>
       <div className="panel" data-testid="label-start">
@@ -75,8 +77,8 @@ export function LabelsView() {
         </div>
         <div className="row" style={{ marginTop: 8 }}>
           <label className="faint" style={{ fontSize: 13 }}>policy&nbsp;
-            <select onChange={(e) => setPolicy(e.target.value)} defaultValue="">
-              <option value="">default (policy/russia_policy.json)</option>
+            <select onChange={(e) => setPolicy(e.target.value)} defaultValue={DEFAULT_POLICY}>
+              <option value="">none (nli_label.py&apos;s built-in default)</option>
               {(policies.data?.policies || []).map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </label>

@@ -108,6 +108,17 @@ class SaveCasesBody(BaseModel):
     base_sha: Optional[str] = None                # the "sha" the page loaded: refused if the file changed since
 
 
+class CheckPolicyBody(BaseModel):
+    data: Dict[str, Any]                          # the whole policy, as it would be saved
+
+
+class SavePolicyBody(BaseModel):
+    path: str                                     # policy/<name>.json, as GET /api/labels/policy/raw gave it
+    data: Dict[str, Any]
+    base_sha: Optional[str] = None                # the "sha" the page loaded: refused if the file changed since
+    save_as: Optional[str] = None                 # a new policy/<name>.json instead (must not exist)
+
+
 CASE_ACTIONS = ("remove", "review", "keep", "pass", "untouched")
 
 
@@ -703,6 +714,87 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         pol = project / "policy"
         return {"policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json")) if pol.is_dir() else []}
 
+    # ---- policy editor (/label/policy): read the JSON as it is, check it like nli_label.py does, save with a backup ----
+    def _policy_file(rel: str) -> Path:
+        rel = (rel or "").replace("\\", "/")
+        if not re.fullmatch(r"policy/[A-Za-z0-9_.-]+\.json", rel):
+            raise HTTPException(400, "a policy is policy/<name>.json (letters, digits, _ . -)")
+        return project / rel
+
+    def _check_policy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """errors = what nli_label.py refuses (the run would not start); warnings = files the policy names that are
+        missing (a run would fail later)."""
+        import nli_label
+        errors: List[str] = []
+        summary = None
+        try:
+            summary = nli_label.Policy(data, "policy_data").summary()
+        except ValueError as exc:
+            msg = str(exc)
+            msg = msg.split(": ", 1)[1] if msg.startswith("policy_data: ") else msg
+            errors = [m for m in msg.split("; ") if m]
+        warnings: List[str] = []
+        files = data.get("keywords_file")
+        for f in ([files] if isinstance(files, str) else list(files or [])):
+            if not (project / str(f)).is_file():
+                warnings.append(f"keywords_file {f} does not exist")
+        for k in ("place_names_file", "place_name_exceptions_file", "company_names_file"):
+            f = data.get(k)
+            if f and not (project / str(f)).is_file():
+                warnings.append(f"{k} {f} does not exist")
+        return {"ok": not errors, "errors": errors, "warnings": warnings, "summary": summary}
+
+    @app.get("/api/labels/policy/raw", tags=["labels"])
+    def label_policy_raw(path: str):
+        """A policy file as JSON, for the editor (with its sha: a save is refused if the file changed since)."""
+        f = _policy_file(path)
+        if not f.is_file():
+            raise HTTPException(404, f"no policy {path}")
+        raw = f.read_bytes()
+        try:
+            data = json.loads(raw.decode("utf-8-sig"))
+        except ValueError as exc:
+            raise HTTPException(400, f"{path} is not valid JSON: {exc}")
+        return {"path": path.replace("\\", "/"), "data": data, "sha": hashlib.sha1(raw).hexdigest(),
+                "check": _check_policy(data)}
+
+    @app.post("/api/labels/policy/check", tags=["labels"])
+    def label_policy_check(body: CheckPolicyBody):
+        return _check_policy(body.data)
+
+    @app.post("/api/labels/policy/save", tags=["labels"])
+    def label_policy_save(body: SavePolicyBody, request: Request):
+        """Save an edited policy (to its own file, or to a new policy/<name>.json with save_as). Refused when
+        nli_label.py would refuse it, or when the file changed since it was loaded. The old file goes to policy/.backup/."""
+        save_guard(request)
+        target = _policy_file(body.save_as or body.path)
+        if body.save_as:
+            if target.exists():
+                raise HTTPException(409, f"{body.save_as} exists already: pick another name")
+        else:
+            if not target.is_file():
+                raise HTTPException(404, f"no policy {body.path}")
+            if body.base_sha and hashlib.sha1(target.read_bytes()).hexdigest() != body.base_sha:
+                raise HTTPException(409, f"{body.path} was changed by someone else since you loaded it: reload the page "
+                                         "(your edits are still on the page; copy what you need first)")
+        chk = _check_policy(body.data)
+        if not chk["ok"]:
+            raise HTTPException(400, "; ".join(chk["errors"][:12]) + (f" (and {len(chk['errors']) - 12} more)" if len(chk["errors"]) > 12 else ""))
+        backup = None
+        if target.is_file():
+            bdir = target.parent / ".backup"
+            bdir.mkdir(exist_ok=True)
+            b = bdir / f"{target.stem}.{time.strftime('%Y%m%d-%H%M%S')}.json"
+            shutil.copy2(target, b)
+            backup = f"policy/.backup/{b.name}"
+        tmp = target.with_suffix(".json.tmp")
+        with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(body.data, ensure_ascii=False, indent=2) + "\n")
+        tmp.replace(target)
+        rel = f"policy/{target.name}"
+        return {"path": rel, "sha": hashlib.sha1(target.read_bytes()).hexdigest(), "backup": backup,
+                "warnings": chk["warnings"]}
+
     def _case_files() -> List[Path]:
         """labels/cases_vN.json (newest last), then other labels/*cases_vN.json sets (e.g. russia_llm_cases_v1.json)."""
         lab = project / "labels"
@@ -842,7 +934,7 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         if body.policy_data is not None:
             req["policy_data"] = body.policy_data
         else:
-            req["policy"] = body.policy or "policy/russia_policy.json"
+            req["policy"] = body.policy or "policy/russia_llm_policy_v2.json"  # the Russia-side policy
         return pg.label(req)
 
     @app.get("/api/labels/{name}", tags=["labels"])

@@ -176,9 +176,12 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
           <code>hostility_*</code> and <code>violence_call</code>: they count as <span class="badge b-review">review</span> instead of
           <span class="badge b-remove">remove</span>. A news report quoting an insult is not the insult itself.</p>
         <p>The softener has no action of its own; it only changes those labels.</p>
+        <p>Without a <code>reports_or_debunks</code> block in the policy, this step is skipped: every positive hostility or
+          violence label is <span class="badge b-remove">remove</span>, news reports and fact-checks included.</p>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>not positive: hostility / violence stay <span class="badge b-remove">remove</span></span></div>
+        <div class="exit"><span class="arrow">→</span><span>no such block in the policy: the same, for every paragraph</span></div>
       </div>
     </div>
     <div class="wire"><span>decide</span></div>
@@ -189,10 +192,12 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
         <h3><span class="tag">Paragraph</span> Decision rules, first match wins</h3>
         <ol class="rules">
           <li>A Level-2 <strong>remove</strong> label is positive and not softened → <span class="badge b-remove">remove</span>. It beats every Level-1 keep (war, economy, culture).</li>
-          <li>Remove and keep labels are both positive → <code>conflict</code> = <span class="badge b-review">review</span>. (No Level-1 remove label in this policy, so this rarely happens.)</li>
+          <li>A <strong>Level-1</strong> remove label and a keep label (L1 or L2) are both positive → <code>conflict</code> = <span class="badge b-review">review</span>.
+            Level-2 removes never reach this rule: rule 1 already decided them, or the softener made them review. This policy has no Level-1 remove label, so this rule never fires.</li>
           <li>Any <strong>review</strong> label is positive (history, politics, opinions, NATO claim, a softened hostility) → <span class="badge b-review">review</span>.</li>
           <li>A <strong>keep</strong> label is positive → <span class="badge b-keep">keep</span>.</li>
-          <li>Nothing positive, but it is about Russia / Ukraine → <span class="badge b-keep">keep</span> (plain facts).</li>
+          <li>Nothing positive, but it is about Russia / Ukraine → the policy's <code>"no_subject"</code>, here <span class="badge b-keep">keep</span> (plain facts).
+            It can be set to <code>review</code> or <code>remove</code>; the reason stays <code>no_subject</code>.</li>
         </ol>
       </div>
       <div class="exits">

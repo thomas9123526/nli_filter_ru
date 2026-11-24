@@ -4,8 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
-  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp,
-} from "./types";
+  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp, PolicyCheck, PolicyData, PolicyRawResp } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
@@ -117,10 +116,15 @@ export const api = {
   labelCaseFiles: (s?: AbortSignal) => getJSON<{ files: string[]; corpora?: Record<string, string>; newest: string | null }>("/api/labels/case-files", undefined, s),
   labelPolicy: (path: string, s?: AbortSignal) => getJSON<{ labels: Record<string, { level: number; decision: string }>;
     topic: { field: string | null; mode: string; map: Record<string, string[]>; subjects: string[] } }>("/api/labels/policy", { path }, s),
+  policyRaw: (path: string, s?: AbortSignal) => getJSON<PolicyRawResp>("/api/labels/policy/raw", { path }, s),
+  policyCheck: (data: PolicyData, s?: AbortSignal) => request<PolicyCheck>(`${API_BASE}/api/labels/policy/check`, {
+    method: "POST", signal: s, headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ data }) }),
+  policySave: (body: { path: string; data: PolicyData; base_sha?: string; save_as?: string }) =>
+    postJSON<{ path: string; sha: string; backup: string | null; warnings: string[] }>("/api/labels/policy/save", body),
   labelTopics: (s?: AbortSignal) => getJSON<{ file: string; topics: string[]; about: string }>("/api/labels/topics", undefined, s),
   addTopic: (topic: string) => postJSON<{ file: string; topics: string[]; added: string | null }>("/api/labels/topics", { topic }),
   labelTry: (body: { texts: string[]; policy?: string; all_labels?: boolean; force_gate?: boolean; use_judge?: boolean;
-    topics?: (string | null)[]; topic_mode?: string }) =>
+    topics?: (string | null)[]; topic_mode?: string; policy_data?: PolicyData }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
   labelStart: (command: string) => postJSON<RunJob>("/api/labels/start", { command }),
   labelLines: (ds: string, body: { path: string; member: string | null; lines: number[]; policy: string; use_judge: boolean }) =>

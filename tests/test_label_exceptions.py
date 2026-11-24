@@ -313,3 +313,22 @@ def test_place_names_file_must_exist_and_cli_wins(tmp_path, monkeypatch):
     assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out2), "--policy", str(pol), "--write-clean",
                            "--place-names", str(ROOT_TABLE)]) == 0
     assert "Moscow and Kyiv talks; Kyiv too." in (out2 / "in.clean.jsonl").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------------------------------
+# no_subject: past the gate, no level-1 / level-2 label positive
+# ---------------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("setting, want", [(None, "keep"), ("keep", "keep"), ("review", "review"), ("remove", "remove")])
+def test_no_subject_setting(setting, want):
+    pol = policy_with(**({"no_subject": setting} if setting else {}))
+    r = resolve(pol, {"involves": 0.99})  # gate yes, nothing else scored
+    assert r["action"] == want and r["reason"] == "no_subject"
+    assert pol.summary()["no_subject"] == want
+    # a gate-negative paragraph still passes, whatever no_subject says
+    assert resolve(pol, {"involves": 0.01})["action"] == "pass"
+
+
+def test_no_subject_must_be_an_action():
+    with pytest.raises(Exception, match="no_subject"):
+        policy_with(no_subject="drop")

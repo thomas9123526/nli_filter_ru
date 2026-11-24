@@ -27,6 +27,9 @@ corpus_olmo/
 labels/*.scores.json
 labels/*.tmp
 labels/*.bak
+# the viewer's policy editor: the file before each save
+policy/.backup/
+policy/*.tmp
 # snapshot_changes.py
 .snapshots/
 

@@ -16,7 +16,7 @@ const REASONS: Record<string, string> = {
   remove_label: "A 'remove' subject label is yes and no 'keep' label is.",
   review_label: "A 'review' label is yes, or a narrative was softened by reports_or_debunks.",
   keep_label: "A 'keep' subject label is yes.",
-  no_subject: "Russia-related (gate yes), but no subject label is yes: kept.",
+  no_subject: "Russia-related (gate yes), but no level-1 / level-2 label is yes: the policy's \"no_subject\" setting decides (keep unless the policy says review or remove).",
   exception: "An exception of the policy matched: exceptions are checked first and their decision replaces the cascade's.",
 };
 

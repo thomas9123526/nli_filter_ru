@@ -27,6 +27,7 @@
     "max_chars": 2000
   },
   "conflict": "review",
+  "no_subject": "keep",
   "narrative_opens_gate": true,
   "exceptions": [
     {
@@ -87,7 +88,7 @@
     },
     "politics": {
       "level": 1,
-      "decision": "keep",
+      "decision": "review",
       "threshold": 0.8,
       "hypothesis": "This text is about politics or government in Russia or Ukraine.",
       "note": "Reporting only (composition); keep."

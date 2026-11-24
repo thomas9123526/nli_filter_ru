@@ -509,3 +509,18 @@ export type LabelTryResp = {
   seconds: number; pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null };
   policy: FlowPolicyData;
 };
+
+// ---- policy editor (/label/policy, GET /api/labels/policy/raw, POST …/check, …/save) ----
+// The policy JSON as nli_label.py reads it; fields the editor does not know are kept as they are.
+export type PolicyLabelData = { level: number; decision: string; threshold?: number; hypothesis: string; softens?: string[];
+  protected?: boolean; note?: string; [k: string]: unknown };
+export type PolicyExceptionData = { key: string; decision: string; priority?: number; scope?: string; skip_quoted?: boolean;
+  match?: { phrases?: string[]; hypothesis?: string; threshold?: number }; note?: string; [k: string]: unknown };
+export type PolicyData = { about?: string; version?: number; country?: string; keywords_file?: string | string[] | null;
+  company_names_file?: string | null; rewrite_place_names?: boolean; place_names_file?: string | null;
+  place_name_exceptions_file?: string | null; markers?: string[]; paragraphs?: { min_chars?: number; max_chars?: number };
+  conflict?: string; no_subject?: string; narrative_opens_gate?: boolean; narrative_keywords?: string[];
+  exceptions?: PolicyExceptionData[]; topic_field?: string | null; topic_mode?: string; topic_map?: Record<string, string | string[]>;
+  labels: Record<string, PolicyLabelData>; run_if?: Record<string, string[]>; [k: string]: unknown };
+export type PolicyCheck = { ok: boolean; errors: string[]; warnings: string[]; summary: Record<string, unknown> | null };
+export type PolicyRawResp = { path: string; data: PolicyData; sha: string; check: PolicyCheck };

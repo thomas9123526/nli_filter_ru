@@ -165,6 +165,8 @@ class Policy:
         self.min_chars = int(para.get("min_chars", 200))
         self.max_chars = int(para.get("max_chars", 2000))
         self.conflict = data.get("conflict", "review")
+        # a paragraph past the gate where no level-1 / level-2 label is positive (plain facts): keep by default
+        self.no_subject = data.get("no_subject", "keep")
         # a level-2 'remove' label at or above its threshold opens the gate like a marker term: narratives about
         # Ukraine / NATO that never mention Russia still reach the policy (costs level-2 scores on gate-negative
         # paragraphs)
@@ -177,6 +179,8 @@ class Policy:
             errors.append("narrative_keywords needs \"narrative_opens_gate\": true")
         if self.conflict not in ("review", "remove", "keep"):
             errors.append(f"conflict must be review, remove or keep, not '{self.conflict}'")
+        if self.no_subject not in ("keep", "review", "remove"):
+            errors.append(f"no_subject must be keep, review or remove, not '{self.no_subject}'")
         self.labels: Dict[str, Label] = {}
         for key, v in (data.get("labels") or {}).items():
             if not re.match(r"^[a-z][a-z0-9_]*$", key):
@@ -291,7 +295,7 @@ class Policy:
 
     def summary(self) -> Dict[str, Any]:
         return {"path": self.path, "country": self.country, "conflict": self.conflict,
-                "narrative_opens_gate": self.narrative_opens_gate, "narrative_keywords": len(self.narrative_keywords),
+                "no_subject": self.no_subject, "narrative_opens_gate": self.narrative_opens_gate, "narrative_keywords": len(self.narrative_keywords),
                 "paragraphs": {"min_chars": self.min_chars, "max_chars": self.max_chars},
                 "run_if": {str(k): v for k, v in self.run_if.items()}, "markers": len(self.markers),
                 "labels": {k: lab.as_dict() for k, lab in self.labels.items()},
@@ -336,7 +340,8 @@ def resolve(policy: Policy, scores: Dict[str, Optional[float]], marker: bool = F
               level-1 'remove' labels are positive and no 'keep' label is
       review  a 'review' label is positive, a softened narrative is positive, or 'remove' and 'keep' labels are
               both positive (policy "conflict": review by default)
-      keep    otherwise ('keep' labels, or Russia-related without any subject label)
+      keep    'keep' labels are positive
+      no_subject  Russia-related but no label is positive: the policy's "no_subject" (keep by default; review / remove)
     'flag' labels never change the action; they are listed in flags.
     """
     pos = {k for k, s in scores.items() if s is not None and k in policy.labels
@@ -368,7 +373,7 @@ def resolve(policy: Policy, scores: Dict[str, Optional[float]], marker: bool = F
     elif "keep" in ds:
         action, reason = "keep", "keep_label"
     else:
-        action, reason = "keep", "no_subject"
+        action, reason = policy.no_subject, "no_subject"
     return {"action": action, "reason": reason, "labels": sorted(pos), "flags": flags}
 
 
