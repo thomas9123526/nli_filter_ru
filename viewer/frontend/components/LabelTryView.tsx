@@ -11,6 +11,7 @@ import { Crumbs, ErrorBox, Loading } from "./ui";
 import { Flow } from "./LabelDocView";
 import { readTryHandoff } from "./LabelPagePanel";
 import { readPolicyDraft } from "./PolicyEditView";
+import { CopyReportButton, buildTryReport } from "./TryReport";
 import type { PolicyData } from "@/lib/types";
 import { actionClass } from "./LabelRunView";
 
@@ -405,6 +406,20 @@ export function LabelTryView() {
                 <span className={`badge big ${actionClass(got || "")}`}>{got}</span>
                 {ok === true ? <span className="badge keep">as expected</span> : ok === false ? <span className="badge filter">not as expected ({t?.expected_action})</span> : null}
                 <span className="faint" style={{ fontSize: 12 }}>{res?.models.fast}{res?.models.judge ? ` + judge ${res.models.judge}` : ""} · {res?.pairs.fast} pairs{res?.pairs.judge ? ` (+${res.pairs.judge} judge)` : ""} · {res?.seconds}s</span>
+                {res ? <CopyReportButton make={() => {
+                  const runRow = runLinked && srcCurrent && src.data ? src.data.row : null;
+                  const runGot = runRow ? `${runRow.action} (paragraphs: ${(runRow.paragraphs || []).map((q) => q.action).join(", ") || "none"})` : null;
+                  return buildTryReport({
+                    text, res, docAction: got || row.action,
+                    policyName: policy === DRAFT && draftPol ? `unsaved edits of ${draftPol.path}` : activePolicy || "(default)",
+                    settings: { useJudge, forceGate, topic: tryTopic ?? null, topicMode },
+                    expected: t && !edited ? { action: t.expected_action, acceptable: t.acceptable, note: t.note, caseId: c?.id, caseTitle: c?.title } : null,
+                    source: extText !== null && fromRun ? `run ${fromRun}, ${fromFile} line ${fromLine}, paragraph ${fromPara + 1}`
+                      : extText !== null && fromCorpus ? `dataset ${fromCorpus.ds}, ${fromCorpus.path} line ${fromCorpus.line}`
+                      : c ? `case set ${cases.data?.file}` : null,
+                    runGot,
+                  });
+                }} /> : null}
               </div>
               {!paras.length ? (
                 <div className="alert" style={{ marginTop: 8 }}>
