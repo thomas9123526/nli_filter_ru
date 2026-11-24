@@ -27,7 +27,7 @@
     "max_chars": 2000
   },
   "conflict": "review",
-  "no_subject": "keep",
+  "no_subject": "remove",
   "narrative_opens_gate": true,
   "exceptions": [
     {
@@ -162,13 +162,28 @@
     "reports_or_debunks": {
       "level": 2,
       "decision": "keep",
-      "threshold": 0.6,
+      "threshold": 0.9,
       "hypothesis": "This text reports or refutes what someone else claimed.",
       "softens": [
         "hostility_*",
         "violence_call"
       ],
       "note": "Guard: news quoting hate or a fact-check goes to review instead of being removed."
+    },
+    "criticize_about_something": {
+      "level": 2,
+      "decision": "remove",
+      "threshold": 0.8,
+      "hypothesis": "The author criticizes something.",
+      "note": "I add this for Swan Lake example.",
+      "protected": true
+    },
+    "opinion_about_something": {
+      "level": 2,
+      "decision": "review",
+      "threshold": 0.7,
+      "hypothesis": "The author expresses an opinion.",
+      "note": "Russian vaccine development example"
     }
   },
   "run_if": {

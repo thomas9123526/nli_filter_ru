@@ -13,44 +13,6 @@
   "auto_datasets": "../dataset",
   "datasets": [
     {
-      "name": "test_corpus",
-      "corpus": "../dataset/test_corpus",
-      "output": "../dataset/out_test_corpus",
-      "editable": true
-    },
-    {
-      "name": "cases",
-      "title": "Policy cases: one file per case (Level 0 / 1 / 2 + edge cases)",
-      "description": "labels/cases_v1.json as a corpus (tools/build_cases_corpus.py). Labels: out_label_cases on the Labels pages; try one by one on /labeltry.",
-      "corpus": "../dataset/test_corpus_cases",
-      "editable": true
-    },
-    {
-      "name": "germany",
-      "title": "Germany test",
-      "corpus": "../dataset/test_corpus_de",
-      "output": "../dataset/out_test_corpus_de"
-    },
-    {
-      "name": "longtest",
-      "title": "Russia Long test",
-      "corpus": "../dataset/test_corpus_long",
-      "output": "../dataset/out_test_corpus_long",
-      "editable": true
-    },
-    {
-      "name": "ru_plain",
-      "title": "test_russia: russian.json",
-      "corpus": "../dataset/test_ru",
-      "output": "../dataset/out_ru_plain"
-    },
-    {
-      "name": "ru_kw",
-      "title": "test_russia: russian_kw.json",
-      "corpus": "../dataset/test_ru",
-      "output": "../dataset/out_ru_kw"
-    },
-    {
       "name": "sftp_test",
       "title": "test_russia: russian_kw.json",
       "corpus": "sftp://download:download@192.168.170.200/home/download/hkc_test/test_corpus",
@@ -58,17 +20,10 @@
       "editable": true
     },
     {
-      "name": "cases_ru",
-      "title": "Russia-side policy cases",
-      "corpus": "../dataset/test_corpus_cases_ru",
-      "editable": true
-    },
-    {
-      "name": "docs_ru",
-      "title": "Russia-side test documents (several paragraphs each)",
-      "description": "labels/russia_llm_docs_v1.json as a corpus (tools/build_russia_llm_docs.py); output: the labelling run with the judge.",
-      "corpus": "../dataset/test_corpus_docs_ru",
-      "output": "../dataset/out_label_docs_ru_judge",
+      "name": "test",
+      "title": "testing",
+      "corpus": "D:/hkc/nli_filter2/dataset/simple_test_corpus",
+      "output": "D:/hkc/nli_filter2/dataset/simple_test_corpus/out",
       "editable": true
     }
   ]

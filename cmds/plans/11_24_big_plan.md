@@ -4,7 +4,7 @@ Planned 2026-11-24. To be built while the user is away, when they say so ("do 11
 All of it is in the viewer's Labelling area (`/label/…`), for the Russia-side policy
 (`policy\russia_llm_policy_v2.json`). Already done before this plan: the policy editor (`/label/policy/`).
 
-Estimated total: about 3 to 3½ hours of work.
+Estimated total: about 4 to 4½ hours of work (with tasks 6 and 7).
 
 ## Tasks, in this order
 
@@ -47,6 +47,48 @@ Estimated total: about 3 to 3½ hours of work.
   action (and acceptable ones), the document's expected action, groups, notes; add, change, delete documents.
 - On save: backup and rebuild `dataset\test_corpus_docs_ru` (as `tools\build_russia_llm_docs.py --corpus-only` does).
 - Done when: a document can be added and labelled with expectations, and the run page's expected vs result picks it up.
+
+### 6. Run page: reveal a line's full text (20–30 min)
+
+Added 2026-11-24.
+
+- On `/label/run/`, a ▸ toggle at the start of every row of the documents table; clicking it opens the line's full
+  text right under the row (▾ closes it).
+- The text is loaded only when opened (the same lookup as the document page), so the table stays fast.
+- Paragraphs coloured by action (remove, review, keep, pass) as on the document page, keyword hits marked, a short
+  legend, and a link "open the document page →" for the full flow.
+- "Expand all / collapse all" for the page shown (20 lines at a time); long texts in a scrollable box.
+- Done when: a line's text can be read on the run page without leaving it.
+
+### 7. Collect VS Code extensions (VSIX) into `pkgs\vscode-extensions\` (20–30 min)
+
+Added 2026-11-24, for computers without internet (list and notes: `cmds\conversation\2026-11-24.md`, "Which other VS
+Code extensions are there …").
+
+- **Copy from this PC's download cache** (`%APPDATA%\Code\CachedExtensionVSIXs\`, the unchanged Marketplace files):
+  Remote - SSH (`ms-vscode-remote.remote-ssh` 0.128.0), Remote - SSH: Editing Configuration Files
+  (`ms-vscode-remote.remote-ssh-edit` 0.87.0), Remote Explorer (`ms-vscode.remote-explorer` 0.5.0). JSONL Lab is
+  already there.
+- **Download the latest VSIX from the Marketplace** (first confirm each exact ID on its Marketplace page; the
+  Marketplace's package download URL, or Open VSX when an extension is only there):
+  - SFTP, Natizyskunk fork (`natizyskunk.sftp`)
+  - S3X Explorer (S3 / MinIO; find its ID)
+  - NDJSON Preview (find its ID)
+  - Data Wrangler (`ms-toolsai.datawrangler`)
+  - AWS Toolkit (`amazonwebservices.aws-toolkit-vscode`; large)
+  - JSON Formatter JSON/JSONC/JSONL (only as a VSIX on its GitHub releases: https://github.com/mbijon/JsonFmt)
+- For each: check it is a complete VSIX (`extension.vsixmanifest`, archive test), note version, the VS Code version
+  it needs, dependencies (`extensionDependencies` / `extensionPack`, collect those too), whether it is
+  platform-specific (then the Windows and Linux x64 builds), its licence, and the SHA-256.
+- **Remote - SSH to an offline server:** also collect the **VS Code Server** for the H200 machine (linux-x64) matching
+  this PC's VS Code (1.147.0; the commit id from `code --version`), with the steps to put it in place on the server
+  (`~/.vscode-server/…`), so Remote - SSH works without internet.
+- Update `pkgs\vscode-extensions\README.md`: one table row per file (extension, version, needs, licence, SHA-256),
+  install steps (Install from VSIX… / `code --install-extension`), and the VS Code Server steps.
+- Anything that cannot be downloaded (not found, licence forbids redistribution, needs a login) is listed in the
+  report instead of forced.
+- Done when: every listed extension is a verified `.vsix` in `pkgs\vscode-extensions\` (or explained), with the
+  README.
 
 ## Rules while working alone
 

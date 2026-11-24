@@ -12,6 +12,7 @@ import { Flow } from "./LabelDocView";
 import { readTryHandoff } from "./LabelPagePanel";
 import { readPolicyDraft } from "./PolicyEditView";
 import { CopyReportButton, buildTryReport } from "./TryReport";
+import { TryTrace } from "./TryTrace";
 import type { PolicyData } from "@/lib/types";
 import { actionClass } from "./LabelRunView";
 
@@ -73,6 +74,14 @@ export function LabelTryView() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<Error | null>(null);
   const [sel, setSel] = useState(0);
+  // "Show the flow trace": the step-by-step view instead of the compact flow; remembered for the next visit
+  const [showTrace, setShowTraceState] = useState(false);
+  useEffect(() => { try { setShowTraceState(localStorage.getItem("nli.try.trace") === "1"); } catch { /* no storage */ } }, []);
+  const setShowTrace = (f: (v: boolean) => boolean) => setShowTraceState((v) => {
+    const n = f(v);
+    try { localStorage.setItem("nli.try.trace", n ? "1" : "0"); } catch { /* no storage */ }
+    return n;
+  });
   const [results, setResults] = useState<Record<string, boolean | null>>({});  // "case#text" -> matched expected
   // opened from a run's document page (?run=&file=&line=&para=): that paragraph, the run's policy
   const fromRun = sp.get("run"), fromFile = sp.get("file"), fromLine = Number(sp.get("line") || 0);
@@ -420,6 +429,9 @@ export function LabelTryView() {
                     runGot,
                   });
                 }} /> : null}
+                {res && paras.length ? <button className={`btn small${showTrace ? " primary" : ""}`} onClick={() => setShowTrace((v) => !v)}
+                  data-testid="trace-toggle" title="the paragraph's path through the policy, step by step, with its real scores">
+                  {showTrace ? "Hide the flow trace" : "Show the flow trace"}</button> : null}
               </div>
               {!paras.length ? (
                 <div className="alert" style={{ marginTop: 8 }}>
@@ -429,7 +441,9 @@ export function LabelTryView() {
               {paras.length > 1 ? (
                 <div className="row" style={{ marginTop: 8 }}><span className="seg">{paras.map((p, k) => (
                   <button key={k} className={k === sel ? "on" : ""} onClick={() => setSel(k)}>¶{k + 1} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span></div>) : null}
-              {paras[sel] ? <div style={{ marginTop: 8 }}><Flow policy={res!.policy} p={paras[sel]} /></div> : null}
+              {paras[sel] && showTrace ? <div style={{ marginTop: 8 }}><TryTrace res={res!} p={paras[sel]} text={text} row={row}
+                docAction={got || row.action} expected={t && !edited ? t.expected_action : null} /></div> : null}
+              {paras[sel] && !showTrace ? <div style={{ marginTop: 8 }}><Flow policy={res!.policy} p={paras[sel]} /></div> : null}
               {res?.clean[0] && res.clean[0] !== text ? (
                 <div style={{ marginTop: 10 }}>
                   <strong>Cleaned text</strong> <span className="faint" style={{ fontSize: 12 }}>(removed paragraphs cut out, place names rewritten: {res.rewrites[0].map((r) => `${r.old} → ${r.new}`).join(", ") || "none"})</span>

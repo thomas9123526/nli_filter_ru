@@ -700,6 +700,23 @@
      ]
     }
    ]
+  },
+  {
+   "id": "facts:04",
+   "group": "Facts (keep, whoever they hurt)",
+   "label": null,
+   "title": "ua_science_technology",
+   "what": "ua_science_technology",
+   "texts": [
+    {
+     "text": "MacPaw, the Kyiv-based developer of the CleanMyMac utility, released a new version that scans for malware and removes unused system files on Apple computers.",
+     "from": "added in the viewer",
+     "labels_yes": [],
+     "expected_action": "keep",
+     "note": "benchmark ukrainian companies v1"
+    }
+   ]
   }
- ]
+ ],
+ "edited": "2026-11-24 14:21:01"
 }

@@ -1,0 +1,230 @@
+<title>Swan Lake Trace</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the same vertical pipeline as russia_policy_flow.html, filled with one text's real values; the step that
+   decided is marked, the rest show what happened and why it did not decide. */
+:root {
+  --bg: #f5f7fa; --panel: #ffffff; --fg: #1b2330; --muted: #5d6878; --line: #d5dbe4; --wire: #8d99ab;
+  --accent: #2f5d8a; --accent-soft: #e3ecf6;
+  --remove: #b3261e; --remove-soft: #fbe4e2; --review: #9a6200; --review-soft: #fbefd6;
+  --keep: #1f7a3d; --keep-soft: #dff2e5; --pass: #5d6878; --pass-soft: #e8ecf1;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161d; --panel: #18202a; --fg: #e4e9f0; --muted: #98a4b4; --line: #2c3746; --wire: #5b6879;
+  --accent: #7fb0e0; --accent-soft: #1c2c3e;
+  --remove: #f08a80; --remove-soft: #3a1d1b; --review: #e8b45a; --review-soft: #352a14;
+  --keep: #6fcf8f; --keep-soft: #173123; --pass: #a3aebd; --pass-soft: #222b36; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11161d; --panel: #18202a; --fg: #e4e9f0; --muted: #98a4b4; --line: #2c3746; --wire: #5b6879;
+  --accent: #7fb0e0; --accent-soft: #1c2c3e;
+  --remove: #f08a80; --remove-soft: #3a1d1b; --review: #e8b45a; --review-soft: #352a14;
+  --keep: #6fcf8f; --keep-soft: #173123; --pass: #a3aebd; --pass-soft: #222b36; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1060px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 28px; margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: 18px; margin: 34px 0 10px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+code { font-family: var(--mono); font-size: 0.86em; }
+.quote { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 16px;
+  font-size: 17px; font-style: italic; }
+.verdicts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.verdict { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13.5px; display: flex; gap: 8px; align-items: center; }
+
+.flow { display: grid; margin-top: 22px; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 18px; align-items: start; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.box h3 { margin: 0 0 4px; font-size: 15.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.box p { margin: 4px 0; color: var(--muted); font-size: 14px; }
+.box.decided { border-color: var(--remove); box-shadow: inset 3px 0 0 var(--remove); }
+.box.skipped { opacity: 0.72; }
+.side { padding-top: 10px; font-size: 13.5px; display: grid; gap: 6px; }
+.wire { height: 24px; margin-left: 28px; border-left: 2px solid var(--wire); position: relative; }
+.wire::after { content: ""; position: absolute; left: -6px; bottom: -1px; border: 5px solid transparent; border-top: 7px solid var(--wire); border-bottom: 0; }
+
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.b-remove { color: var(--remove); background: var(--remove-soft); }
+.b-review { color: var(--review); background: var(--review-soft); }
+.b-keep { color: var(--keep); background: var(--keep-soft); }
+.b-pass { color: var(--pass); background: var(--pass-soft); }
+.b-acc { color: var(--accent); background: var(--accent-soft); }
+
+/* score bars: track 0..1, tick = threshold, fill = score */
+.scores { display: grid; gap: 5px; margin-top: 8px; }
+.sc { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 56px 64px; gap: 10px; align-items: center; font-size: 13px; }
+.sc .k { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.sc .k small { color: var(--muted); font-family: var(--sans); }
+.bar { position: relative; height: 10px; background: var(--pass-soft); border-radius: 5px; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: var(--wire); }
+.bar.pos i { background: var(--accent); }
+.bar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--fg); }
+.sc .v { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.lvl { font-size: 12px; color: var(--muted); margin: 8px 0 0; font-weight: 600; }
+
+ol.rules { margin: 8px 0 0; padding-left: 22px; font-size: 14px; display: grid; gap: 5px; }
+ol.rules li.hit { font-weight: 600; }
+ol.rules li.miss { color: var(--muted); }
+.mark { font-family: var(--mono); font-size: 11px; color: var(--remove); margin-left: 6px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; border-top: 0; }
+.tbl { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+.foot { color: var(--muted); font-size: 13px; margin-top: 26px; max-width: 75ch; }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .side { padding: 8px 0 0 14px; }
+  .sc { grid-template-columns: minmax(0, 1fr) 70px 56px; }
+  .sc .bar { grid-column: 1 / -1; grid-row: 2; }
+}
+</style>
+
+<div class="wrap">
+  <h1>Swan Lake through the flow</h1>
+  <p class="lede">One Try on the Russia-side policy with your local edits (<code>culture</code> → remove, new label
+    <code>opinion_about_something</code>, <code>reports_or_debunks</code> at 0.9), traced step by step with its real scores.
+    Same steps as <code>russia_policy_flow.html</code>.</p>
+
+  <div class="quote">“Swan Lake, composed by the Russian composer Tchaikovsky, does not suit the present era.”</div>
+  <div class="verdicts">
+    <div class="verdict">This Try <span class="badge b-remove">remove</span></div>
+    <div class="verdict">Expected (case <code>yours:03</code>) <span class="badge b-review">review</span></div>
+    <div class="verdict">Stored run <code>out_label_ru_v2</code> <span class="badge b-keep">keep</span> <span style="color:var(--muted)">(older policy)</span></div>
+  </div>
+
+  <div class="flow">
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">1 · Document</span> Keyword scan</h3>
+        <p>Hit: <strong>“Russian”</strong>. No marker term. The document is checked.</p>
+      </div>
+      <div class="side"><span>→ continues</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">2 · Document</span> Paragraphs</h3>
+        <p>87 characters, shorter than <code>min_chars</code> 200: the whole text is one paragraph.</p>
+      </div>
+      <div class="side"><span>→ 1 paragraph, with the hit</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">3 · L0</span> Gate</h3>
+        <div class="scores">
+          <div class="sc"><span class="k">involves_russia_ukraine</span><span class="bar pos"><i style="width:53.66%"></i><b style="left:30%"></b></span><span class="v">0.5366</span><span class="badge b-acc">open</span></div>
+        </div>
+        <p>0.54 ≥ 0.3, so open, by a moderate margin. Below the judge band (0.6–0.95), so the judge did not re-check it.</p>
+      </div>
+      <div class="side"><span>→ L1 and L2 run</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">4 · L1 ∥ L2</span> Scores (bar = score, tick = threshold)</h3>
+        <div class="lvl">Level 1 · subject</div>
+        <div class="scores">
+          <div class="sc"><span class="k">culture <small>remove (your edit)</small></span><span class="bar pos"><i style="width:95.02%"></i><b style="left:80%"></b></span><span class="v">0.9502</span><span class="badge b-remove">yes</span></div>
+          <div class="sc"><span class="k">history <small>review</small></span><span class="bar"><i style="width:0.21%"></i><b style="left:80%"></b></span><span class="v">0.0021</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">politics <small>review</small></span><span class="bar"><i style="width:0.01%"></i><b style="left:80%"></b></span><span class="v">0.0001</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">war <small>keep</small></span><span class="bar"><i style="width:0.04%"></i><b style="left:80%"></b></span><span class="v">0.0004</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">economy <small>keep</small></span><span class="bar"><i style="width:0.01%"></i><b style="left:80%"></b></span><span class="v">0.0001</span><span class="badge b-pass">no</span></div>
+        </div>
+        <div class="lvl">Level 2 · framing</div>
+        <div class="scores">
+          <div class="sc"><span class="k">opinion_about_something <small>review (new)</small></span><span class="bar pos"><i style="width:96.83%"></i><b style="left:80%"></b></span><span class="v">0.9683</span><span class="badge b-review">yes</span></div>
+          <div class="sc"><span class="k">opinion_about_russia <small>review</small></span><span class="bar"><i style="width:4.38%"></i><b style="left:70%"></b></span><span class="v">0.0438</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">opinion_about_ukraine <small>review</small></span><span class="bar"><i style="width:0.12%"></i><b style="left:70%"></b></span><span class="v">0.0012</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">hostility_russians <small>remove, protected</small></span><span class="bar"><i style="width:0.19%"></i><b style="left:80%"></b></span><span class="v">0.0019</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">hostility_ukrainians <small>remove, protected</small></span><span class="bar"><i style="width:0.01%"></i><b style="left:80%"></b></span><span class="v">0.0001</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">violence_call <small>remove, protected</small></span><span class="bar"><i style="width:0.03%"></i><b style="left:80%"></b></span><span class="v">0.0003</span><span class="badge b-pass">no</span></div>
+          <div class="sc"><span class="k">claim_ukraine_in_nato <small>review</small></span><span class="bar"><i style="width:0.06%"></i><b style="left:80%"></b></span><span class="v">0.0006</span><span class="badge b-pass">no</span></div>
+        </div>
+        <p>Two labels are positive, both far above their thresholds: <code>culture</code> (L1, remove) and
+          <code>opinion_about_something</code> (L2, review). The Russia-specific opinion label scored only 0.04: the model
+          did not read “does not suit the present era” as an opinion <em>about Russia</em>, but did read it as criticism.</p>
+      </div>
+      <div class="side"><span>→ positive: culture, opinion_about_something</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box skipped">
+        <h3><span class="tag">5</span> Softener</h3>
+        <div class="scores">
+          <div class="sc"><span class="k">reports_or_debunks <small>softener</small></span><span class="bar"><i style="width:8.14%"></i><b style="left:90%"></b></span><span class="v">0.0814</span><span class="badge b-pass">no</span></div>
+        </div>
+        <p>Not positive, and there is no hostility label to soften anyway. Nothing changes.</p>
+      </div>
+      <div class="side"><span>→ no effect</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box decided">
+        <h3><span class="tag">6</span> Decision rules, first match wins</h3>
+        <ol class="rules">
+          <li class="miss">A Level-2 remove label positive (not softened) → remove. <em>None.</em></li>
+          <li class="miss">A Level-1 remove label and a keep label both positive → conflict (review). <em>No keep label is positive.</em></li>
+          <li class="hit">A Level-1 remove label positive → <span class="badge b-remove">remove</span>, reason <code>remove_label</code>: <code>culture</code> 0.95.<span class="mark">← decided here</span></li>
+          <li class="miss">A review label positive → review. <em>Never reached: <code>opinion_about_something</code> would have given review, but rule 3 comes first. A remove beats a review.</em></li>
+          <li class="miss">A keep label positive → keep.</li>
+          <li class="miss">Nothing positive → no_subject.</li>
+        </ol>
+      </div>
+      <div class="side"><span class="badge b-remove">remove</span><span>because culture is now a remove label</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box skipped">
+        <h3><span class="tag">7</span> Exception</h3>
+        <p>No “our country” phrase. Result unchanged.</p>
+      </div>
+      <div class="side"><span>→ remove</span></div>
+    </div>
+    <div class="wire"></div>
+
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">8 · Document</span> Document action</h3>
+        <p>The only paragraph is cut, so nothing is left (fewer than 50 characters): the document is <strong>removed</strong>.</p>
+      </div>
+      <div class="side"><span class="badge b-remove">removed</span></div>
+    </div>
+  </div>
+
+  <h2>Why the stored run said keep</h2>
+  <p class="lede">The run <code>out_label_ru_v2</code> used the committed policy: <code>culture</code> was <strong>keep</strong>, there was no
+    <code>opinion_about_something</code>, and <code>opinion_about_russia</code> scored low as here. So only a keep label was positive:
+    rule 5 → <strong>keep</strong>. That was the known miss in the case tests (expected review).</p>
+
+  <h2>What would change the result</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Change</th><th>This text</th><th>Side effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>culture</code> back to <strong>keep</strong>, keep <code>opinion_about_something</code></td><td><span class="badge b-review">review</span> as expected (review beats keep)</td><td>Any criticism in a Russia/Ukraine paragraph goes to review, also harmless ones (“the Moscow hotel had poor service”).</td></tr>
+        <tr><td><code>culture</code> to <strong>review</strong></td><td><span class="badge b-review">review</span> as expected</td><td>Every culture paragraph goes to review, plain facts too (“Tchaikovsky composed Swan Lake in 1876”): a big review queue.</td></tr>
+        <tr><td>Keep <code>culture</code> as <strong>remove</strong></td><td><span class="badge b-remove">remove</span></td><td>Every Russian or Ukrainian culture paragraph is cut, facts included; against the agreed “facts → keep”.</td></tr>
+        <tr><td>Reword <code>opinion_about_russia</code>, e.g. “The author criticizes or praises something Russian.”</td><td>likely <span class="badge b-review">review</span> (untested: try it)</td><td>Russia-specific, so narrower than <code>opinion_about_something</code>; needs a check on the opinion cases.</td></tr>
+        <tr><td>Remove <code>opinion_about_something</code> (with culture keep)</td><td><span class="badge b-keep">keep</span>, the old miss</td><td>Back to the committed behaviour.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="foot">No score here is close to its threshold: the closest is the gate, 0.54 against 0.3. The result is decided by
+    the policy settings (culture → remove, and the rule that remove beats review), not by an uncertain model score.
+    Scores from the Try on 2026-11-24, ModernBERT + DeBERTa judge, policy/russia_llm_policy_v2.json with the user's local edits.</p>
+</div>
