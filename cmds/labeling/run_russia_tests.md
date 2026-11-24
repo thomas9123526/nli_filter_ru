@@ -65,7 +65,7 @@ Each run takes about 2–3 minutes on the development PC's CPU with the judge.
 
 ## See the results
 
-- **Viewer**: reload the run page, e.g. http://localhost:8000/labelrun/?run=out_label_ru_v2_judge (or
+- **Viewer**: reload the run page, e.g. http://localhost:8000/label/run/?run=out_label_ru_v2_judge (or
   `out_label_docs_ru_judge`). The **Expected vs result** panel at the top lists every line that does not match;
   details in `cmds\viewer\labels_pages.md`.
 - **Terminal**:

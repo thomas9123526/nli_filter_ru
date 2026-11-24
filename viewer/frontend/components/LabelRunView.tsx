@@ -46,7 +46,7 @@ export function LabelRunView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: "labels", href: "/labels" }, { label: run }]} />
+          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: run }]} />
           <h1>{run} <ProgressBadge p={d?.progress || null} /></h1>
           <div className="sub mono" style={{ fontSize: 12 }}>{d?.summary.command}</div>
         </div>
@@ -68,11 +68,11 @@ export function LabelRunView() {
               <tbody>{ex.wrong.map((w) => (
                 <tr key={`${w.file}:${w.line}`}>
                   <td><button className="linklike" onClick={() => { setFile(w.file); setExpect(""); setOffset(0); }}>{w.file}</button></td>
-                  <td><Link href={href("/labeldoc", { run, file: w.file, line: w.line })}>{w.line}</Link></td>
+                  <td><Link href={href("/label/doc", { run, file: w.file, line: w.line })}>{w.line}</Link></td>
                   <td><span className={`badge ${actionClass(w.expected)}`}>{w.expected}</span>{w.acceptable.length ? <span className="faint"> (also {w.acceptable.join(", ")})</span> : null}</td>
                   <td><span className={`badge ${actionClass(w.got)}`}>{w.got}</span>{w.paragraphs_wrong ? <span className="faint"> · {w.paragraphs_wrong} paragraph{w.paragraphs_wrong > 1 ? "s" : ""} not as expected</span> : null}</td>
                   <td className="faint" style={{ fontSize: 12 }}>{w.note}</td>
-                  <td><Link className="btn small" href={href("/labeltry", { run, file: w.file, line: w.line, para: 0 })}>Try</Link></td>
+                  <td><Link className="btn small" href={href("/label/try", { run, file: w.file, line: w.line, para: 0 })}>Try</Link></td>
                 </tr>))}</tbody>
             </table></div>) : <div className="panel-body faint">Every line matches its expected result.</div>}
         </div>) : null}
@@ -163,7 +163,7 @@ export function LabelRunView() {
                 <thead><tr><th>Line</th><th>Action</th>{docs.data.expected ? <th>Expected</th> : null}<th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th><th></th></tr></thead>
                 <tbody>{docs.data.rows.map((r) => (
                   <tr key={r.line}>
-                    <td><Link href={href("/labeldoc", { run, file: f, line: r.line })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
+                    <td><Link href={href("/label/doc", { run, file: f, line: r.line })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
                     <td><span className={`badge ${actionClass(r.action)}`}>{r.action}</span></td>
                     {docs.data!.expected ? (
                       <td>{r.expect ? (<>
@@ -177,7 +177,7 @@ export function LabelRunView() {
                     <td className="faint">{r.keywords.join(", ")}</td>
                     <td className="right">{r.tokens_removed ? `${num(r.tokens_removed)} / ${num(r.tokens)}` : "–"}</td>
                     <td className="right"><Link className="btn small" data-testid="row-try" title="open this document's first paragraph on the Try page (its case, the run's policy)"
-                      href={href("/labeltry", { run, file: f, line: r.line, para: 0 })}>Try</Link></td>
+                      href={href("/label/try", { run, file: f, line: r.line, para: 0 })}>Try</Link></td>
                   </tr>))}</tbody>
               </table></div>
               <div className="row panel-body">

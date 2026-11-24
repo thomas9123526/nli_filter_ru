@@ -55,7 +55,7 @@
 | | `thresholds.md` | `nli_label.py eval` output, choosing thresholds, the CRC guarantee |
 | | `place_names.md` | `policy\place_names.csv` + exceptions, `nli_names.py`, open codebook questions |
 | | `outputs.md` | What `run` / `redecide` write; the composition report |
-| | `cases.md` | Try the policy case by case in the viewer (`/labeltry/`): 76 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v4.json`; as a corpus: `dataset\test_corpus_cases\` (viewer dataset "cases"); policies v2 (values / style), v3 (cascade fixes), v4 (Kremlin accusations, narrative keywords) |
+| | `cases.md` | Try the policy case by case in the viewer (`/label/try/`): 76 cases, every Level 0 / 1 / 2 label + edge cases, `labels\cases_v4.json`; as a corpus: `dataset\test_corpus_cases\` (viewer dataset "cases"); policies v2 (values / style), v3 (cascade fixes), v4 (Kremlin accusations, narrative keywords) |
 | | `russia_llm.md` | **The Russia-side project** (Russia's LLM): the agreed principles, `policy\russia_llm_policy_v2.json`, exceptions ("our country"), the optional topic field (`--topic-field`, hint / trust / off), the 43 test cases and their results |
 | | `benchmark.md` | The synthetic regression set `labels\bench_synthetic_v1.jsonl` (170 items, every label) and the plan for the real-data benchmark |
 | `design/` | `work_log_2026-11-21.md` | **What changed while you were away** (v4, v5, the judge, nli_filter vs nli_label), what waits for you |

@@ -54,7 +54,7 @@ export function LabelsView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: "labels" }]} />
+          <Crumbs items={[{ label: "Labelling" }]} />
           <h1>Labelling runs</h1>
           <div className="sub">nli_label.py output folders in {runs.data?.project || "the project folder"}: policy labels per paragraph,
             what was removed, kept or sent to review. Guide: cmds\labeling\README.md.</div>
@@ -62,7 +62,7 @@ export function LabelsView() {
       </div>
 
       <div className="row" style={{ marginBottom: 12 }}>
-        <Link className="btn small primary" href="/labeltry" data-testid="labeltry-link">Try the policy, case by case →</Link>
+        <Link className="btn small primary" href="/label/try" data-testid="labeltry-link">Try the policy, case by case →</Link>
         <span className="faint" style={{ fontSize: 12 }}>every level-0 / 1 / 2 label and edge case, one text at a time, with its flow</span>
       </div>
       <div className="panel" data-testid="label-start">
@@ -98,7 +98,7 @@ export function LabelsView() {
               <tbody>
                 {runs.data.runs.map((r) => (
                   <tr key={r.name}>
-                    <td><Link href={href("/labelrun", { run: r.name })}><strong>{r.name}</strong></Link>
+                    <td><Link href={href("/label/run", { run: r.name })}><strong>{r.name}</strong></Link>
                       {r.redecided ? <span className="badge neutral" style={{ marginLeft: 6 }}>redecided</span> : null}
                       <div className="faint mono" style={{ fontSize: 11 }}>{r.policy || ""}</div></td>
                     <td><ProgressBadge p={r.progress} /></td>

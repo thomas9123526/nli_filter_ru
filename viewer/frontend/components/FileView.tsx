@@ -24,7 +24,7 @@ export function FileView() {
   const ov = useApi(ds ? `ov:${ds}` : null, (s) => api.overview(ds, s));
   const labelRun = ov.data?.label_run;
   useEffect(() => {
-    if (labelRun && f) router.replace(href("/labelrun", { run: labelRun, file: f }));
+    if (labelRun && f) router.replace(href("/label/run", { run: labelRun, file: f }));
   }, [labelRun, f, router]);
   const key = ds && f && !labelRun ? `dec:${ds}:${JSON.stringify(params)}` : null;
   const res = useApi(key, (s) => api.decisions(ds, params, s));
@@ -33,13 +33,13 @@ export function FileView() {
 
   function update(change: Record<string, string | number | boolean | null>, keepOffset = false) {
     const next: Record<string, string | number | boolean | null> = { ds, f, ...filters, sort, desc: desc ? "1" : "", offset: keepOffset ? offset : 0, ...change };
-    router.replace(href("/file", next), { scroll: false });
+    router.replace(href("/filter/file", next), { scroll: false });
   }
   function toggleSort(col: string) {
     if (sort === col) update({ desc: desc ? "" : "1" });
     else update({ sort: col, desc: col === "row" ? "" : "1" });
   }
-  const recordLink = (r: DecisionRow) => href("/record", { ds, f, row: r.row, ...filters });
+  const recordLink = (r: DecisionRow) => href("/filter/record", { ds, f, row: r.row, ...filters });
   const data = res.data;
   const facets = data?.facets;
   const t1 = data?.thresholds?.check1 ?? 0.8;
@@ -51,7 +51,7 @@ export function FileView() {
     <>
       <div className="page-head">
         <div style={{ minWidth: 0 }}>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: f }]} />
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: f }]} />
           <h1 className="mono" style={{ fontSize: 18 }}>{f}</h1>
           {data ? (
             <div className="sub">

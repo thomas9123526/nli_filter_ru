@@ -44,7 +44,7 @@ export function RecordView() {
   const corpusPath = edit?.path || rec?.original.path || null;
   const corpusLine = edit?.line ?? rec?.original.line ?? null;
   const corpusLink = rec && corpusPath && corpusLine
-    ? href("/corpus", { ds, file: corpusPath, member: edit?.member || rec.original.member || null, line: corpusLine, edit: canEdit ? 1 : null })
+    ? href("/filter/corpus", { ds, file: corpusPath, member: edit?.member || rec.original.member || null, line: corpusLine, edit: canEdit ? 1 : null })
     : null;
   // Find in the text. Runs in the browser on the whole text (also the parts a long text leaves out), so it
   // costs the server nothing. The query is kept when going to the next / previous line.
@@ -69,8 +69,8 @@ export function RecordView() {
     const id = initialFocus(rec.explanation.marks);
     setFocus(id === null ? null : { id, n: 1 });
   }, [rec]);
-  const listLink = href("/file", { ds, f, ...filters });
-  const go = (r: number | null) => (r ? href("/record", { ds, f, row: r, ...filters }) : null);
+  const listLink = href("/filter/file", { ds, f, ...filters });
+  const go = (r: number | null) => (r ? href("/filter/record", { ds, f, row: r, ...filters }) : null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -93,7 +93,7 @@ export function RecordView() {
     <>
       <div className="page-head">
         <div style={{ minWidth: 0 }}>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: f, href: listLink },
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: f, href: listLink },
             { label: rec ? `line ${rec.line}` : "…" }]} />
           <h1 className="row" style={{ gap: 10 }}>
             {rec ? <DecisionBadge decision={rec.decision.decision} big /> : null}

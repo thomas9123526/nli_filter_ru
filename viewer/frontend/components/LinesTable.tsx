@@ -60,7 +60,7 @@ export function LinesTable({ ds, rows, thresholds, onLabelled, testid }: {
               return [
                 <tr key={k} className="hoverable">
                   <td><button className="btn small ghost" onClick={() => toggle(r)} title="show the text here">{o ? "▾" : "▸"}</button></td>
-                  <td className="mono"><Link href={href("/record", { ds, f: r.file, row: r.row })}>{r.file}</Link> · {r.line}</td>
+                  <td className="mono"><Link href={href("/filter/record", { ds, f: r.file, row: r.row })}>{r.file}</Link> · {r.line}</td>
                   <td className="mono">{r.id ?? "–"}</td>
                   <td><DecisionBadge decision={r.decision} />{r.audit ? <div className="faint" title="level-A audit: what the rules / models would decide">audit: {r.audit}</div> : null}</td>
                   <td><ReasonBadge reason={r.reason} /></td>

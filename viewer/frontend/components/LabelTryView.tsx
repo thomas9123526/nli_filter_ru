@@ -124,7 +124,7 @@ export function LabelTryView() {
     const x = list[i];
     if (!x) return;
     pendingTi.current = k; setExtText(null); setCi(i); setTi(k);
-    router.replace(href("/labeltry", { run: fromRun, file: caseFileName(x.id), line: k + 1, para: 0 }), { scroll: false });
+    router.replace(href("/label/try", { run: fromRun, file: caseFileName(x.id), line: k + 1, para: 0 }), { scroll: false });
   };
   const pick = (i: number) => {
     if (runLinked && !draft) { openInRun(i, 0); return; }
@@ -237,7 +237,7 @@ export function LabelTryView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: "labels", href: "/labels" }, { label: "try the policy" }]} />
+          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "try the policy" }]} />
           <h1>Try the policy, case by case</h1>
           <div className="sub">{list.length} cases from {cases.data.file}: every level-0 / 1 / 2 label as a “yes” and a “near miss” case, plus the edge cases.
             Run a text, then compare the flow with what is expected. Needs the model service with models: <code className="mono">python nli_playground.py</code>.</div>
@@ -247,7 +247,7 @@ export function LabelTryView() {
                 if (draft && !window.confirm("Unsaved case changes will be lost. Switch anyway?")) return;
                 setDraft(null); setChanges(0); setSaveMsg(null);
                 if (fromRun && e.target.value !== runCaseFile) {  // not the run's corpus: leave the run
-                  router.replace(href("/labeltry", { cases: e.target.value }), { scroll: false });
+                  router.replace(href("/label/try", { cases: e.target.value }), { scroll: false });
                 }
                 setCaseFile(e.target.value); setCi(0); setTi(0); setResults({}); setPolicy(""); setExtText(null); }}>
                 {(caseFiles.data?.files || []).map((f) => <option key={f} value={f}>{f}{fromRun && f === runCaseFile ? `  (run ${fromRun})` : ""}</option>)}
@@ -255,9 +255,9 @@ export function LabelTryView() {
           {runLinked ? (
             <div className="row" style={{ marginTop: 6, fontSize: 13 }} data-testid="run-link">
               <span className="badge review">run</span>
-              <span>Linked to run <a href={href("/labelrun", { run: fromRun, file: fromFile })}><strong>{fromRun}</strong></a>:
+              <span>Linked to run <a href={href("/label/run", { run: fromRun, file: fromFile })}><strong>{fromRun}</strong></a>:
                 picking a case opens that file of the run (<code className="mono">{caseFileName(c?.id || "")}</code>), its text the run&apos;s line.</span>
-              <a className="faint" href={href("/labeltry", { cases: runCaseFile })}>leave the run</a>
+              <a className="faint" href={href("/label/try", { cases: runCaseFile })}>leave the run</a>
             </div>) : null}
           {fromRun && !runLinked && caseFiles.data && cases.data && !runCaseFile ? (
             <div className="faint" style={{ marginTop: 6, fontSize: 12 }}>Run {fromRun}: its corpus is not made from a case set, so the cases below are not its files.</div>) : null}
@@ -316,14 +316,14 @@ export function LabelTryView() {
                 <div className="alert" style={{ marginTop: 8 }} data-testid="from-corpus">
                   Text from dataset <strong>{fromCorpus.ds}</strong>, {fromCorpus.path} line {fromCorpus.line}
                   {policy ? <> · policy <code className="mono">{policy}</code></> : null} · press <strong>Try</strong> for the flow
-                  {" "}<a href={href("/corpus", { ds: fromCorpus.ds, file: fromCorpus.path, line: fromCorpus.line })}>back to the corpus</a>
+                  {" "}<a href={href("/label/corpus", { ds: fromCorpus.ds, file: fromCorpus.path, line: fromCorpus.line })}>back to the corpus</a>
                 </div>) : null}
               {extText !== null && !fromCorpus ? (
                 <div className="alert" style={{ marginTop: 8 }} data-testid="from-run">
                   Text from run <strong>{fromRun}</strong>, {fromFile} line {fromLine}, paragraph {fromPara + 1}
                   {policy ? <> · the run&apos;s policy <code className="mono">{policy}</code></> : null}
                   {t && extText === t.text ? " · it is this case's text: the expected result applies" : " · not a case text: no expected result"}
-                  {" "}<a href={href("/labeldoc", { run: fromRun, file: fromFile, line: fromLine })}>back to the run</a>
+                  {" "}<a href={href("/label/doc", { run: fromRun, file: fromFile, line: fromLine })}>back to the run</a>
                 </div>) : null}
               <div style={{ marginTop: 6 }}>{c.what}</div>
               {c.hypothesis ? <div className="hyp" style={{ marginTop: 4 }}>Hypothesis: “{c.hypothesis}” <span className={`badge ${actionClass(c.decision || "")}`}>{c.decision}</span></div> : null}

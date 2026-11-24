@@ -3,7 +3,7 @@
 Added 2026-11-18. These pages work on any dataset with results, including the 6 TB corpus, where no line has a
 label. Open a dataset page, then use the **Keywords** or **Review** button at the top.
 
-## Keywords page (`/keywords/?ds=<dataset>`)
+## Keywords page (`/filter/keywords/?ds=<dataset>`)
 
 There is one row per keyword over every result file of the dataset.
 
@@ -56,7 +56,7 @@ itself stays filter.** These audited lines cost model time, so keep the share sm
 - The **record** page shows a box with the audit result.
 - **Try settings** has an "audit A" checkbox (Try audits every A line of the page).
 
-## Review page (`/review/?ds=<dataset>`)
+## Review page (`/filter/review/?ds=<dataset>`)
 
 The Review page lists the lines most worth a human look, across all files. Pick a queue:
 

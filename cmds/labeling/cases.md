@@ -15,7 +15,7 @@ python nli_playground.py --judge-model none    # faster on a CPU (ModernBERT onl
 viewer\start_viewer.ps1
 ```
 
-Open `http://127.0.0.1:8000/labeltry/`, or the home page → **Labelling runs** → **Try the policy, case by case**.
+Open `http://127.0.0.1:8000/label/try/`, or the home page → **Labelling runs** → **Try the policy, case by case**.
 
 ## The page
 

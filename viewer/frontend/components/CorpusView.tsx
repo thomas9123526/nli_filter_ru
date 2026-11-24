@@ -20,7 +20,11 @@ import { Crumbs, ErrorBox, Loading } from "./ui";
 const PAGE = 20;
 const PREVIEW = 600;
 
-export function CorpusView() {
+/** "label": the corpus page of the labelling area (/label/corpus: Edit, Label with a policy, flow → Try);
+ * "filter": the nli_filter area's (/filter/corpus: Edit, Try settings, decisions). Every link stays in its area. */
+export type Area = "label" | "filter";
+
+export function CorpusView({ area }: { area: Area }) {
   const sp = useSearchParams();
   const ds = sp.get("ds") || "";
   const dir = sp.get("dir") || "";
@@ -29,32 +33,34 @@ export function CorpusView() {
   // ?line=N: open the page at line N (2 lines of context above), highlight it; &edit=1 also opens its editor
   const target = Math.max(0, Math.floor(Number(sp.get("line")) || 0));
   const start = Number(sp.get("start")) || (target ? Math.max(1, target - 2) : 1);
-  return file ? <FileLines ds={ds} file={file} member={sp.get("member") || ""} start={Math.max(1, start)}
+  return file ? <FileLines area={area} ds={ds} file={file} member={sp.get("member") || ""} start={Math.max(1, start)}
     target={target || null} editTarget={sp.get("edit") === "1"} />
-    : <Folder ds={ds} dir={dir} />;
+    : <Folder area={area} ds={ds} dir={dir} />;
 }
 
-function pathCrumbs(ds: string, path: string, last?: string) {
+function pathCrumbs(area: Area, ds: string, path: string, last?: string) {
   const parts = path ? path.split("/") : [];
-  const items: { label: string; href?: string }[] = [
-    { label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: "corpus", href: href("/corpus", { ds }) },
-  ];
+  const cp = `/${area}/corpus`;
+  const items: { label: string; href?: string }[] = area === "label"
+    ? [{ label: "Labelling", href: "/label" }, { label: `${ds} · corpus`, href: href(cp, { ds }) }]
+    : [{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: "corpus", href: href(cp, { ds }) }];
   parts.forEach((p, i) => {
     const sub = parts.slice(0, i + 1).join("/");
-    items.push(i === parts.length - 1 && last === undefined ? { label: p } : { label: p, href: href("/corpus", { ds, dir: sub }) });
+    items.push(i === parts.length - 1 && last === undefined ? { label: p } : { label: p, href: href(cp, { ds, dir: sub }) });
   });
   if (last !== undefined) items.push({ label: last });
   return items;
 }
 
-function Folder({ ds, dir }: { ds: string; dir: string }) {
+function Folder({ area, ds, dir }: { area: Area; ds: string; dir: string }) {
+  const cp = `/${area}/corpus`;
   const res = useApi(`browse:${ds}:${dir}`, (s) => api.browse(ds, dir, s));
   const status = useApi(`es:${ds}`, (s) => api.editStatus(ds, "", s));
   return (
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={pathCrumbs(ds, dir)} />
+          <Crumbs items={pathCrumbs(area, ds, dir)} />
           <h1>Corpus{dir ? <span className="mono" style={{ fontSize: 18 }}> · {dir}</span> : null}</h1>
         </div>
       </div>
@@ -68,14 +74,14 @@ function Folder({ ds, dir }: { ds: string; dir: string }) {
               <thead><tr><th>Name</th><th className="num">Size</th></tr></thead>
               <tbody>
                 {dir ? (
-                  <tr><td><Link href={href("/corpus", { ds, dir: dir.split("/").slice(0, -1).join("/") })}>‹ up</Link></td><td /></tr>
+                  <tr><td><Link href={href(cp, { ds, dir: dir.split("/").slice(0, -1).join("/") })}>‹ up</Link></td><td /></tr>
                 ) : null}
                 {res.data.entries.map((e) => (
                   <tr key={e.path}>
                     <td className="mono">
                       {e.is_dir
-                        ? <Link href={href("/corpus", { ds, dir: e.path })}>{e.name}/</Link>
-                        : <Link href={href("/corpus", { ds, file: e.path })}>{e.name}</Link>}
+                        ? <Link href={href(cp, { ds, dir: e.path })}>{e.name}/</Link>
+                        : <Link href={href(cp, { ds, file: e.path })}>{e.name}</Link>}
                     </td>
                     <td className="num mono">{e.is_dir ? "" : size(e.size)}</td>
                   </tr>
@@ -98,8 +104,8 @@ function EditBanner({ status }: { status: { editable: boolean; problem: string |
 
 type Pending = { text: string; sha1: string; saved: string; id: unknown };
 
-function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
-  ds: string; file: string; member: string; start: number; target: number | null; editTarget: boolean;
+function FileLines({ area, ds, file, member: wanted, start, target, editTarget }: {
+  area: Area; ds: string; file: string; member: string; start: number; target: number | null; editTarget: boolean;
 }) {
   // the target line's editor opens once on arrival, not again after a save or reload
   const [autoEditDone, setAutoEditDone] = useState(false);
@@ -112,7 +118,8 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
   const member = data?.member || null;  // .zip / .rar: the member shown (the first one unless chosen)
   const status = useApi(data ? `es:${ds}:${file}:${member || ""}` : null, (s) => api.editStatus(ds, file, s, member));
   const total = data?.total_lines ?? 0;
-  const go = (n: number) => router.push(href("/corpus", { ds, file, member: wanted || null, start: Math.min(Math.max(1, n), Math.max(1, total)) }));
+  const cp = `/${area}/corpus`;
+  const go = (n: number) => router.push(href(cp, { ds, file, member: wanted || null, start: Math.min(Math.max(1, n), Math.max(1, total)) }));
   const [jumpTo, setJumpTo] = useState("");
   const folder = file.split("/").slice(0, -1).join("/");
   const name = file.split("/").slice(-1)[0];
@@ -176,19 +183,19 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
     <>
       <div className="page-head">
         <div style={{ minWidth: 0 }}>
-          <Crumbs items={pathCrumbs(ds, folder, name)} />
+          <Crumbs items={pathCrumbs(area, ds, folder, name)} />
           <h1 className="mono" style={{ fontSize: 18 }}>{file}</h1>
           {data?.members ? (
             <div className="row" style={{ margin: "6px 0" }}>
               <span className="muted">archive member</span>
               <select value={member || ""} disabled={nPending > 0} title={nPending ? "save or discard the pending changes first" : ""}
-                onChange={(e) => router.push(href("/corpus", { ds, file, member: e.target.value }))} data-testid="member-select">
+                onChange={(e) => router.push(href(cp, { ds, file, member: e.target.value }))} data-testid="member-select">
                 {data.members.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
               <span className="faint">{data.members.length} member{data.members.length === 1 ? "" : "s"}</span>
             </div>
           ) : null}
-          {data ? <div className="muted">{num(total)} lines · field “{data.text_field}”{data.file_key ? <> · <Link href={href("/file", { ds, f: data.file_key })}>filter results of this file</Link></> : " · no filter results for this file"}</div> : null}
+          {data ? <div className="muted">{num(total)} lines · field “{data.text_field}”{area === "filter" ? (data.file_key ? <> · <Link href={href("/filter/file", { ds, f: data.file_key })}>filter results of this file</Link></> : " · no filter results for this file") : null}</div> : null}
         </div>
       </div>
       <EditBanner status={status.data} />
@@ -221,11 +228,11 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
       <ErrorBox error={res.error} onRetry={res.reload} />
       {res.loading && !data ? <Loading what="Reading the file (a .zst file is decompressed once into the cache)" /> : null}
       {data ? <FileChanges ds={ds} path={file} member={member} version={changesVersion} onChanged={reload} /> : null}
-      {data ? <TryPanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
+      {data && area === "filter" ? <TryPanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
         lineInfo={Object.fromEntries(data.lines.map((l) => [l.line, { id: l.id, text: l.text, length: l.text_length, extra: l.extra }]))}
         onResults={(r) => setTried(r ? Object.fromEntries(r.results.map((x) => [x.line, x])) : {})}
         onControl={setTryCtl} /> : null}
-      {data ? <LabelPagePanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
+      {data && area === "label" ? <LabelPagePanel ds={ds} path={file} member={member} lines={data.lines.filter((l) => !l.error).map((l) => l.line)}
         onResults={setLabelled} /> : null}
       {data && inserting !== null && (inserting === 0 || inserting === total) ? (
         <InsertForm ds={ds} path={file} member={member} after={inserting} idField={data.id_field} textField={data.text_field}
@@ -240,7 +247,7 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
               textField={data.text_field} idField={data.id_field}
               pending={pending[l.line]} onStage={(sha1, saved, text) => stage(l, sha1, saved, text)} onDiscard={() => discard(l.line)}
               onChanged={reload} structural={structural} tried={tried[l.line]}
-              labelled={labelled?.results[l.line] ? <LabelLineBox r={labelled.results[l.line]} policy={labelled.policy} ds={ds} path={file} /> : null}
+              area={area} labelled={labelled?.results[l.line] ? <LabelLineBox r={labelled.results[l.line]} policy={labelled.policy} ds={ds} path={file} /> : null}
               isTarget={l.line === target} autoEdit={l.line === target && editTarget && !autoEditDone} onAutoEdit={() => setAutoEditDone(true)}
               editProblem={status.data ? status.data.problem : "checking…"}
               onInsertBelow={() => setInserting(l.line)}
@@ -265,8 +272,8 @@ function FileLines({ ds, file, member: wanted, start, target, editTarget }: {
 }
 
 function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, onDiscard, onChanged, structural, onInsertBelow, onDelete, tried,
-  isTarget, autoEdit, onAutoEdit, editProblem, textField, idField, labelled }: {
-  labelled?: React.ReactNode;
+  isTarget, autoEdit, onAutoEdit, editProblem, textField, idField, labelled, area }: {
+  labelled?: React.ReactNode; area: Area;
   ds: string; file: string; member: string | null; fileKey: string | null; l: CorpusLine; editable: boolean; pending?: Pending;
   onStage: (sha1: string, saved: string, text: string) => void; onDiscard: () => void; onChanged: () => void;
   structural: boolean; onInsertBelow: () => void; onDelete: () => void; tried?: TryResult;
@@ -319,7 +326,7 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         {l.edits ? <span className="badge warn">edited {l.edits}×</span> : null}
         {l.inserted ? <span className="badge keep" title="added in the viewer after the filter run: no decision yet">new</span> : null}
         {pending ? <span className="badge accent">unsaved change</span> : null}
-        {l.row && fileKey ? <Link className="btn small" href={href("/record", { ds, f: fileKey, row: l.row })}>decision ›</Link> : null}
+        {area === "filter" && l.row && fileKey ? <Link className="btn small" href={href("/filter/record", { ds, f: fileKey, row: l.row })}>decision ›</Link> : null}
         {editable && l.text !== null && mode !== "edit" ? <button className="btn small" onClick={() => load("edit")} data-testid={`edit-${l.line}`}>{pending ? "Edit again" : "Edit"}</button> : null}
         {!editable && l.text !== null ? <button className="btn small" disabled title={`Editing is off: ${editProblem || "this file cannot be edited"}`}>Edit</button> : null}
         <span className="spacer" />

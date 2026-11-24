@@ -24,7 +24,7 @@ export function openInTry(r: LabelLineResult, policy: string, ds: string, path: 
   try {
     localStorage.setItem(HANDOFF_KEY, JSON.stringify({ text: r.text, policy, ds, path, line: r.line, at: Date.now() }));
   } catch { /* storage blocked: the Try page opens without the text */ }
-  window.open(href("/labeltry", { from: "corpus" }), "_blank");
+  window.open(href("/label/try", { from: "corpus" }), "_blank");
 }
 
 export function readTryHandoff(): { text: string; policy: string; ds: string; path: string; line: number } | null {
@@ -135,7 +135,7 @@ export function LabelPagePanel({ ds, path, member, lines, onResults }: {
             <input className="mono" style={{ minWidth: 320 }} value={outName} onChange={(e) => setOutName(e.target.value)} data-testid="label-out-name" />
             <button className="btn" onClick={save} disabled={!policy || !outName || !!member} data-testid="label-save-run"
               title={member ? "a member of an archive cannot be labelled on its own" : "start nli_label.py run on this file"}>Save as a labelling run</button>
-            {started ? <Link className="btn small" href={href("/labelrun", { run: started })}>started: open {started} →</Link> : null}
+            {started ? <Link className="btn small" href={href("/label/run", { run: started })}>started: open {started} →</Link> : null}
           </div>
           {saveErr ? <div className="alert warn">{saveErr}</div> : null}
           {started ? <div className="faint" style={{ fontSize: 13 }}>It runs in the model service; its progress shows on the Labels pages. Output: {started}\*.labels.jsonl.zst, *.clean.jsonl.zst, *.rewrites.jsonl.zst.</div> : null}

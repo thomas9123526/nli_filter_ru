@@ -48,7 +48,7 @@ export function ReviewView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: "review" }]} />
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: "review" }]} />
           <h1>Review {ds}</h1>
           <div className="sub">The lines most worth a look. Label them: the labels build a golden set (a test file) without touching the corpus.</div>
         </div>

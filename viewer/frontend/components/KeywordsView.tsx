@@ -69,7 +69,7 @@ export function KeywordsView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: "keywords" }]} />
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: "keywords" }]} />
           <h1>Keywords of {ds}</h1>
           <div className="sub">Which keywords bring which lines in, and how those lines were decided. Click a keyword to see its lines.</div>
         </div>

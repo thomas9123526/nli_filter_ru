@@ -51,7 +51,7 @@ python nli_label.py run <corpus> --policy policy\russia_llm_policy_v2.json --out
 python nli_label.py review out_label_ru_xxx --out labels\review_ru_xxx.jsonl
 ```
 
-In the viewer: **Labelling runs** shows the runs; on the **Try** page (`/labeltry/`), pick
+In the viewer: **Labelling runs** shows the runs; on the **Try** page (`/label/try/`), pick
 `labels/russia_llm_cases_v1.json` in the **cases** list. It shows your first decision next to the expected one where
 they differ.
 

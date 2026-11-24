@@ -37,9 +37,26 @@ Edit `viewer\viewer_config.json`: one entry per output folder + corpus folder.
 Restart the viewer after editing the config. New result files in an existing output folder appear by
 themselves within 30 s.
 
-## Use
+## Two areas
 
-1. **Datasets** → pick one.
+The viewer is split by tool; every link inside an area stays in it. The header tabs show which one you are in.
+
+| Area | Pages | For |
+|---|---|---|
+| `/label/…` **Labelling (Russia LLM)** | `/label/` runs, `/label/run/`, `/label/doc/`, `/label/try/`, `/label/corpus/` | `nli_label.py` with the Russia-side policy (see `labels_pages.md`) |
+| `/filter/…` **Filter** | `/filter/` datasets, `/filter/dataset/`, `/filter/file/`, `/filter/record/`, `/filter/review/`, `/filter/run/`, `/filter/tune/`, `/filter/keywords/`, `/filter/corpus/` | `nli_filter.py` outputs |
+
+- The **corpus page** exists in both areas with the same corpus: `/label/corpus/` has Edit, "Label with a policy"
+  and "flow →" (Try); `/filter/corpus/` has Edit, "Try settings" and the decision links. An edit made in one shows
+  in the other: it is the same file.
+- The home page (`/`) lists the labelling runs first, then the filter datasets (sort and search on both).
+- Old URLs (`/labelrun/?run=…`, `/dataset/?ds=…`, `/corpus/?ds=…`, …) still work: they forward to the new path with
+  the same query. `/corpus/` goes to `/label/corpus/` when the dataset's output is a labelling run, else to
+  `/filter/corpus/`.
+
+## Use (Filter area)
+
+1. **Filter** → pick a dataset.
 2. **Dataset page**: totals, reasons, accuracy (test data), run settings, hypotheses, file list; "Find a
    line by id" in the top right.
 3. **File page**: click Filtered / Kept / a reason / "Wrong vs expected" / "Decided by judge"; search by

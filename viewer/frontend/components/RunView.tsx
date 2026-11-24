@@ -116,7 +116,7 @@ export function RunView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: "run filter" }]} />
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: "run filter" }]} />
           <h1>Run nli_filter.py on {ds}</h1>
         </div>
       </div>
@@ -176,7 +176,7 @@ export function RunView() {
                 <span className={`badge ${job.state === "done" ? "keep" : job.state === "running" ? "accent" : "filter"}`}>{job.state}{job.returncode !== null ? ` (exit ${job.returncode})` : ""}</span>
                 <span className="muted">{job.started} · {Math.round(job.seconds)} s · {job.output_lines} lines</span>
                 <span className="spacer" />
-                {job.state === "done" ? <Link className="btn small primary" href={href("/dataset", { ds })}>Open the results</Link> : null}
+                {job.state === "done" ? <Link className="btn small primary" href={href("/filter/dataset", { ds })}>Open the results</Link> : null}
               </div>
               <pre ref={outRef} className="json run-output" data-testid="run-output">{job.output.join("\n") || "(no output yet)"}</pre>
               <div className="panel-body faint" style={{ fontSize: 12 }}>Full log: <span className="mono">{job.log_file}</span></div>

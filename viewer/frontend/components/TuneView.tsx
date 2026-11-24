@@ -25,7 +25,7 @@ export function TuneView() {
   const base = useApi(ds && (!t1 || !t2) ? `simbase:${ds}` : null, (s) => api.simulate(ds, { check1: 0.8, check2: 0.8 }, s));
   useEffect(() => {
     if (base.data && (!t1 || !t2)) {
-      router.replace(href("/tune", { ds, check1: base.data.current.check1, check2: base.data.current.check2 }));
+      router.replace(href("/filter/tune", { ds, check1: base.data.current.check1, check2: base.data.current.check2 }));
     }
   }, [base.data, t1, t2, ds, router]);
   const res = useApi(ds && t1 && t2 ? `sim:${ds}:${t1}:${t2}` : null, (s) => api.simulate(ds, { check1: t1, check2: t2, sweep: true }, s));
@@ -34,7 +34,7 @@ export function TuneView() {
   useEffect(() => { setD1(t1); setD2(t2); }, [t1, t2]);
   useEffect(() => {  // apply slider changes after a short pause
     if (d1 === t1 && d2 === t2) return;
-    const h = setTimeout(() => router.replace(href("/tune", { ds, check1: d1, check2: d2 }), { scroll: false }), 250);
+    const h = setTimeout(() => router.replace(href("/filter/tune", { ds, check1: d1, check2: d2 }), { scroll: false }), 250);
     return () => clearTimeout(h);
   }, [d1, d2, t1, t2, ds, router]);
 
@@ -44,7 +44,7 @@ export function TuneView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ds, href: href("/dataset", { ds }) }, { label: "Tune thresholds" }]} />
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ds, href: href("/filter/dataset", { ds }) }, { label: "Tune thresholds" }]} />
           <h1>Tune thresholds</h1>
           <div className="sub">Decisions recomputed from the scores stored in the decisions files. No model is run, so this is instant.</div>
         </div>
@@ -116,7 +116,7 @@ export function TuneView() {
                 <thead><tr><th>File</th><th className="num">Line</th><th>Id</th><th>Now</th><th>Would be</th><th className="num">Check 1</th><th className="num">Check 2 (min)</th><th>Expected</th></tr></thead>
                 <tbody>
                   {r.flips.map((f) => {
-                    const link = href("/record", { ds, f: f.file, row: f.row });
+                    const link = href("/filter/record", { ds, f: f.file, row: f.row });
                     const right = f.expect ? f.expect.toLowerCase() === f.to : null;
                     return (
                       <tr key={`${f.file}:${f.row}`} className="clickable" onClick={() => router.push(link)}>

@@ -1,0 +1,262 @@
+<title>Russia-side Policy Flow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one vertical pipeline (document → paragraph → gate → L1 ∥ L2 → rules → exception → document),
+   each stage a row with its exits on the right; L1 and L2 side by side because they run independently. */
+:root {
+  --bg: #f5f7fa; --panel: #ffffff; --fg: #1b2330; --muted: #5d6878; --line: #d5dbe4; --wire: #8d99ab;
+  --accent: #2f5d8a; --accent-soft: #e3ecf6;
+  --remove: #b3261e; --remove-soft: #fbe4e2; --review: #9a6200; --review-soft: #fbefd6;
+  --keep: #1f7a3d; --keep-soft: #dff2e5; --pass: #5d6878; --pass-soft: #e8ecf1;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161d; --panel: #18202a; --fg: #e4e9f0; --muted: #98a4b4; --line: #2c3746; --wire: #5b6879;
+  --accent: #7fb0e0; --accent-soft: #1c2c3e;
+  --remove: #f08a80; --remove-soft: #3a1d1b; --review: #e8b45a; --review-soft: #352a14;
+  --keep: #6fcf8f; --keep-soft: #173123; --pass: #a3aebd; --pass-soft: #222b36; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11161d; --panel: #18202a; --fg: #e4e9f0; --muted: #98a4b4; --line: #2c3746; --wire: #5b6879;
+  --accent: #7fb0e0; --accent-soft: #1c2c3e;
+  --remove: #f08a80; --remove-soft: #3a1d1b; --review: #e8b45a; --review-soft: #352a14;
+  --keep: #6fcf8f; --keep-soft: #173123; --pass: #a3aebd; --pass-soft: #222b36; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1060px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 28px; margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: 18px; margin: 36px 0 10px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+.file { font-family: var(--mono); font-size: 12.5px; color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; }
+
+/* the pipeline */
+.flow { display: grid; gap: 0; margin-top: 24px; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; align-items: start; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.box h3 { margin: 0 0 4px; font-size: 15.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.box p { margin: 4px 0; color: var(--muted); font-size: 14px; }
+.box.gate { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.exits { display: grid; gap: 6px; padding-top: 10px; }
+.exit { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; }
+.exit .arrow { color: var(--wire); font-family: var(--mono); flex: none; }
+.wire { height: 26px; margin-left: 28px; border-left: 2px solid var(--wire); position: relative; }
+.wire::after { content: ""; position: absolute; left: -6px; bottom: -1px; border: 5px solid transparent; border-top: 7px solid var(--wire); border-bottom: 0; }
+.wire span { position: absolute; left: 12px; top: 3px; font-size: 12px; color: var(--muted); }
+
+/* L1 ∥ L2 */
+.para { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.lvl { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.lvl h4 { margin: 0 0 6px; font-size: 13.5px; }
+.lbl { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 4px 0;
+  border-top: 1px solid var(--line); font-size: 13px; }
+.lbl:first-of-type { border-top: 0; }
+.lbl .k { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.lbl .t { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.note-chip { font-size: 11px; color: var(--muted); margin-left: 4px; }
+
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.b-remove { color: var(--remove); background: var(--remove-soft); }
+.b-review { color: var(--review); background: var(--review-soft); }
+.b-keep { color: var(--keep); background: var(--keep-soft); }
+.b-pass { color: var(--pass); background: var(--pass-soft); }
+.b-soft { color: var(--accent); background: var(--accent-soft); }
+
+ol.rules { margin: 8px 0 0; padding-left: 22px; font-size: 14px; display: grid; gap: 4px; }
+ol.rules li::marker { color: var(--accent); font-weight: 600; }
+
+/* worked examples */
+.traces { display: grid; gap: 10px; }
+.trace { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.trace q { font-style: italic; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; }
+.steps .s { font-family: var(--mono); font-size: 12px; background: var(--pass-soft); padding: 2px 7px; border-radius: 4px; }
+.steps .to { color: var(--wire); }
+.foot { color: var(--muted); font-size: 13px; margin-top: 28px; max-width: 75ch; }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .exits { padding: 8px 0 0 14px; }
+  .para { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="wrap">
+  <h1>Russia-side policy flow</h1>
+  <p class="lede">How <span class="file">nli_label.py</span> applies <span class="file">policy/russia_llm_policy_v2.json</span> to one document:
+    where the markers, the gate, Level 1, Level 2, <code>reports_or_debunks</code> and the exceptions act, and which action each step can give.</p>
+
+  <div class="flow">
+    <!-- 1 keyword scan -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Document</span> Keyword scan</h3>
+        <p>Looks for the words in <span class="file">keywords/russia_v3.txt</span> + <span class="file">keywords/ukraine.txt</span>, plus the marker terms.
+          Cheap: no model runs here.</p>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>no hit: document <span class="badge b-pass">untouched</span>, copied as it is</span></div>
+      </div>
+    </div>
+    <div class="wire"><span>a hit</span></div>
+
+    <!-- 2 paragraphs -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Document</span> Split into paragraphs</h3>
+        <p>Blocks of 200–2,000 characters. Only paragraphs with a keyword hit or a marker term go on; every other paragraph stays as it is.</p>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>paragraphs without a hit are not labelled</span></div>
+      </div>
+    </div>
+    <div class="wire"><span>each paragraph with a hit</span></div>
+
+    <!-- 3 markers + gate -->
+    <div class="stage">
+      <div class="box gate">
+        <h3><span class="tag">Paragraph · L0</span> Gate: is it about Russia / Ukraine?</h3>
+        <p>The paragraph gets through if <strong>any one</strong> of these is true:</p>
+        <ol class="rules">
+          <li><strong>Marker term</strong> in the paragraph: <code>orcs, rashists, рашисты, орки, кацапы, москали, хохлы, укропы, укры</code>. Opens the gate without asking a model.</li>
+          <li><strong>Gate label</strong> <code>involves_russia_ukraine</code> ≥ <code>0.3</code>: “This text mentions Russia, Ukraine, Russians or Ukrainians.”</li>
+          <li><strong>A Level-2 remove label</strong> (<code>hostility_*</code>, <code>violence_call</code>) is already positive (<code>narrative_opens_gate: true</code>). Hate is never let through just because the gate model said no.</li>
+        </ol>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>none of the three: paragraph <span class="badge b-pass">pass</span> (the keyword was incidental)</span></div>
+        <div class="exit"><span class="arrow">↓</span><span>a <code>pass</code> paragraph still goes to the <strong>exception</strong> step, because <code>ambiguous_our_country</code> has scope <code>keyword</code></span></div>
+      </div>
+    </div>
+    <div class="wire"><span>open: Level 1 and Level 2 both run (run_if: gate or @marker)</span></div>
+
+    <!-- 4 L1 ∥ L2 -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Paragraph · L1 ∥ L2</span> Subjects and framing, scored independently</h3>
+        <p>Neither level waits for the other or depends on its result. Each label is scored by ModernBERT; a score in the uncertain band 0.6–0.95 is
+          checked again by the DeBERTa judge. A label is <em>positive</em> when its score reaches its threshold.</p>
+        <div class="para">
+          <div class="lvl">
+            <h4>Level 1 · subject</h4>
+            <div class="lbl"><span class="k">history</span><span class="t">0.8</span><span class="badge b-review">review</span></div>
+            <div class="lbl"><span class="k">politics</span><span class="t">0.8</span><span class="badge b-review">review</span></div>
+            <div class="lbl"><span class="k">war</span><span class="t">0.8</span><span class="badge b-keep">keep</span></div>
+            <div class="lbl"><span class="k">economy</span><span class="t">0.8</span><span class="badge b-keep">keep</span></div>
+            <div class="lbl"><span class="k">culture</span><span class="t">0.8</span><span class="badge b-keep">keep</span></div>
+            <p style="font-size:12px;margin-top:6px">politics is <code>review</code> in your local copy (not committed). With a topic field, <code>topic_map</code> can set these from the corpus.</p>
+          </div>
+          <div class="lvl">
+            <h4>Level 2 · framing</h4>
+            <div class="lbl"><span class="k">opinion_about_russia</span><span class="t">0.7</span><span class="badge b-review">review</span></div>
+            <div class="lbl"><span class="k">opinion_about_ukraine</span><span class="t">0.7</span><span class="badge b-review">review</span></div>
+            <div class="lbl"><span class="k">claim_ukraine_in_nato</span><span class="t">0.8</span><span class="badge b-review">review</span></div>
+            <div class="lbl"><span class="k">hostility_russians <span class="note-chip">protected</span></span><span class="t">0.8</span><span class="badge b-remove">remove</span></div>
+            <div class="lbl"><span class="k">hostility_ukrainians <span class="note-chip">protected</span></span><span class="t">0.8</span><span class="badge b-remove">remove</span></div>
+            <div class="lbl"><span class="k">violence_call <span class="note-chip">protected</span></span><span class="t">0.8</span><span class="badge b-remove">remove</span></div>
+            <div class="lbl"><span class="k">reports_or_debunks</span><span class="t">0.6</span><span class="badge b-soft">softener</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>scores only: no action yet</span></div>
+      </div>
+    </div>
+    <div class="wire"><span>the positive labels</span></div>
+
+    <!-- 5 softener -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Paragraph</span> Softener: <code>reports_or_debunks</code></h3>
+        <p>“This text reports or refutes what someone else claimed.” If it is positive (≥ 0.6), it <strong>softens</strong>
+          <code>hostility_*</code> and <code>violence_call</code>: they count as <span class="badge b-review">review</span> instead of
+          <span class="badge b-remove">remove</span>. A news report quoting an insult is not the insult itself.</p>
+        <p>The softener has no action of its own; it only changes those labels.</p>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>not positive: hostility / violence stay <span class="badge b-remove">remove</span></span></div>
+      </div>
+    </div>
+    <div class="wire"><span>decide</span></div>
+
+    <!-- 6 rules -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Paragraph</span> Decision rules, first match wins</h3>
+        <ol class="rules">
+          <li>A Level-2 <strong>remove</strong> label is positive and not softened → <span class="badge b-remove">remove</span>. It beats every Level-1 keep (war, economy, culture).</li>
+          <li>Remove and keep labels are both positive → <code>conflict</code> = <span class="badge b-review">review</span>. (No Level-1 remove label in this policy, so this rarely happens.)</li>
+          <li>Any <strong>review</strong> label is positive (history, politics, opinions, NATO claim, a softened hostility) → <span class="badge b-review">review</span>.</li>
+          <li>A <strong>keep</strong> label is positive → <span class="badge b-keep">keep</span>.</li>
+          <li>Nothing positive, but it is about Russia / Ukraine → <span class="badge b-keep">keep</span> (plain facts).</li>
+        </ol>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>one of <span class="badge b-remove">remove</span> <span class="badge b-review">review</span> <span class="badge b-keep">keep</span></span></div>
+      </div>
+    </div>
+    <div class="wire"><span>result, or pass from the gate</span></div>
+
+    <!-- 7 exceptions -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Paragraph</span> Exceptions (highest priority first)</h3>
+        <p><code>ambiguous_our_country</code> · priority 100 · scope <code>keyword</code> · <code>skip_quoted</code>: the paragraph contains
+          “our country”, “our homeland”, “наша страна”, “наша країна”, … outside quotation marks → set to <span class="badge b-review">review</span>
+          (it is unclear whose country “our” is).</p>
+        <p>Applies to <span class="badge b-pass">pass</span>, <span class="badge b-keep">keep</span> and <span class="badge b-review">review</span> results.
+          A <span class="badge b-remove">remove</span> by a <strong>protected</strong> label is never lowered (recorded as <code>exception_blocked</code>).</p>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>no phrase, or only inside quotes: result unchanged</span></div>
+      </div>
+    </div>
+    <div class="wire"><span>every paragraph's final action</span></div>
+
+    <!-- 8 document -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Document</span> Document action and clean copy</h3>
+        <ol class="rules">
+          <li>A paragraph is <span class="badge b-remove">remove</span> (or <span class="badge b-review">review</span> with <code>--review-as remove</code>) → it is cut:
+            the document is <strong>edited</strong>, or <strong>removed</strong> if fewer than 50 characters are left.</li>
+          <li>Nothing cut, a paragraph is review → <strong>review</strong>.</li>
+          <li>Every labelled paragraph is pass → <strong>pass</strong>; otherwise <strong>kept</strong>.</li>
+        </ol>
+        <p>The clean copy (<code>--write-clean</code>) then rewrites place names to the Russian spelling (Kyiv → Kiev), from
+          <span class="file">policy/place_names_ru.csv</span>.</p>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span><code>&lt;file&gt;.labels.jsonl.zst</code>, <code>.clean.jsonl.zst</code>, <code>.rewrites.jsonl.zst</code></span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Four paragraphs through the flow</h2>
+  <div class="traces">
+    <div class="trace">
+      <q>Kyiv hosted the premiere of a new ballet by a Ukrainian composer.</q>
+      <div class="steps"><span class="s">keyword Kyiv</span><span class="to">→</span><span class="s">gate yes</span><span class="to">→</span><span class="s">L1 culture +</span><span class="to">→</span><span class="s">L2 nothing</span><span class="to">→</span><span class="badge b-keep">keep</span><span class="to">→</span><span class="s">clean copy: Kiev</span></div>
+    </div>
+    <div class="trace">
+      <q>The orcs will be wiped out, every one of them.</q>
+      <div class="steps"><span class="s">marker orcs</span><span class="to">→</span><span class="s">gate open</span><span class="to">→</span><span class="s">L2 hostility_russians + violence_call +</span><span class="to">→</span><span class="s">no softener</span><span class="to">→</span><span class="badge b-remove">remove</span><span class="to">→</span><span class="s">exception cannot lower it</span></div>
+    </div>
+    <div class="trace">
+      <q>A Kyiv newspaper reported that a politician had called Russians “orcs”; the ministry condemned the remark.</q>
+      <div class="steps"><span class="s">marker orcs</span><span class="to">→</span><span class="s">L2 hostility_russians +</span><span class="to">→</span><span class="s">reports_or_debunks + (≥ 0.6)</span><span class="to">→</span><span class="s">softened</span><span class="to">→</span><span class="badge b-review">review</span></div>
+    </div>
+    <div class="trace">
+      <q>Russia is currently seeking to establish diplomatic relations with our country.</q>
+      <div class="steps"><span class="s">keyword Russia</span><span class="to">→</span><span class="s">gate yes</span><span class="to">→</span><span class="s">L1 politics +</span><span class="to">→</span><span class="badge b-review">review</span><span class="to">→</span><span class="s">exception “our country”</span><span class="to">→</span><span class="badge b-review">review</span></div>
+    </div>
+  </div>
+
+  <p class="foot">The traces show the intended path; real scores can differ (the “orcs” report paragraph was cut in the docs test because
+    <code>reports_or_debunks</code> scored 0.47, below 0.6). Source: <code>resolve()</code> and <code>apply_exceptions()</code> in nli_label.py,
+    policy/russia_llm_policy_v2.json as of 2026-11-23.</p>
+</div>

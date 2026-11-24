@@ -449,3 +449,9 @@ del.cut { text-decoration: line-through; text-decoration-color: var(--filter); b
 mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 
 .case-file-name { font-size: 11px; margin-left: 4px; }
+
+.area-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.area-title { font-size: 16px; margin: 22px 0 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.topnav { display: flex; gap: 4px; margin-left: 18px; }
+.topnav a { padding: 4px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 13px; }
+.topnav a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }

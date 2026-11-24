@@ -1,11 +1,6 @@
-import { Suspense } from "react";
-import { LabelRunView } from "@/components/LabelRunView";
-import { Loading } from "@/components/ui";
+// Old URL: forwards to the new one (query string kept), so bookmarks and links in cmds/ still work.
+import { Forward } from "@/components/Forward";
 
 export default function Page() {
-  return (
-    <Suspense fallback={<Loading />}>
-      <LabelRunView />
-    </Suspense>
-  );
+  return <Forward to="/label/run/" />;
 }

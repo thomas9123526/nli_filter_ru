@@ -1,15 +1,15 @@
 # Viewer: Labels pages (nli_label.py runs)
 
 The viewer shows and starts `nli_label.py` runs too. Start the viewer as usual (`viewer\start_viewer.ps1`), then
-click **Labelling runs (nli_label.py) →** on the home page, or open `http://127.0.0.1:8000/labels/`.
+click **Labelling runs (nli_label.py) →** on the home page, or open `http://127.0.0.1:8000/label/`.
 
 | Page | What you see |
 |---|---|
-| **Labels** (`/labels/`) | Every `nli_label.py` output folder in the project folder (found by its `summary.json`, or `progress.json` while it runs): state, documents, removed tokens, documents per action. And the **Start a run** box. |
-| **Run** (`/labelrun/?run=out_label_seed`) | Token composition (documents and paragraphs by action), the label table (decision, threshold, positive paragraphs and tokens). Click a label to list its documents. The document list filters by document action and by "has a paragraph that is remove / review / keep / pass". |
-| **Try the policy** (`/labeltry/`) | Step through 60 cases (every label yes / near miss + edge cases) and run each text through the policy with the model service: the same flow view, compared with the expected result. The **cases** list picks another case set, e.g. `labels/russia_llm_cases_v1.json` for the Russia-side project (it also shows "also fine" actions and your first decision). Guide: `cmds\labeling\cases.md`, `cmds\labeling
+| **Labels** (`/label/`) | Every `nli_label.py` output folder in the project folder (found by its `summary.json`, or `progress.json` while it runs): state, documents, removed tokens, documents per action. And the **Start a run** box. |
+| **Run** (`/label/run/?run=out_label_seed`) | Token composition (documents and paragraphs by action), the label table (decision, threshold, positive paragraphs and tokens). Click a label to list its documents. The document list filters by document action and by "has a paragraph that is remove / review / keep / pass". |
+| **Try the policy** (`/label/try/`) | Step through 60 cases (every label yes / near miss + edge cases) and run each text through the policy with the model service: the same flow view, compared with the expected result. The **cases** list picks another case set, e.g. `labels/russia_llm_cases_v1.json` for the Russia-side project (it also shows "also fine" actions and your first decision). Guide: `cmds\labeling\cases.md`, `cmds\labeling
 ussia_llm.md` |
-| **Document** (`/labeldoc/?run=…&file=…&line=…`) | The text, each labelled paragraph coloured by its action (red remove, amber review, green keep, grey pass), keywords highlighted. Click a paragraph to see its **flow**: level 0 gate → level 1 subjects → level 2 framing → decision, every score as a bar with its threshold, "not scored" where the cascade skipped a level, and the rule that decided. |
+| **Document** (`/label/doc/?run=…&file=…&line=…`) | The text, each labelled paragraph coloured by its action (red remove, amber review, green keep, grey pass), keywords highlighted. Click a paragraph to see its **flow**: level 0 gate → level 1 subjects → level 2 framing → decision, every score as a bar with its threshold, "not scored" where the cascade skipped a level, and the rule that decided. |
 
 ## Starting a run from the viewer
 
@@ -63,7 +63,7 @@ belong together like a filter run:
 
 ## Label with a policy on the corpus page
 
-On a dataset's corpus page (`/corpus/?ds=…&file=…`), the panel **Label with a policy** (below **Try settings**) runs
+On a dataset's corpus page (`/label/corpus/?ds=…&file=…`), the panel **Label with a policy** (below **Try settings**) runs
 `nli_label.py`'s policy instead of the filter. It needs the model service (`py -3.12 nli_playground.py`).
 
 - **Label the N lines of this page**: pick a policy (remembered in this browser) and the judge on or off. Each line
@@ -81,7 +81,7 @@ The **Try settings** panel above it is unchanged: that one is `nli_filter.py` (k
 
 ## Edit the cases on the Try page
 
-On `/labeltry/`, tick **Edit cases** (or open `/labeltry/?cases=labels/russia_llm_cases_v1.json&edit=1`). Under the
+On `/label/try/`, tick **Edit cases** (or open `/label/try/?cases=labels/russia_llm_cases_v1.json&edit=1`). Under the
 case, an editor shows its fields:
 
 | Change | How |
@@ -152,7 +152,7 @@ When a run's corpus lines carry expected results, the labelling pages compare th
 `expected_paragraphs` in the multi-paragraph test documents (`dataset\test_corpus_docs_ru`). Runs on real data have
 none, and these pages look as before.
 
-- **Run page** (`/labelrun/?run=…`): an **Expected vs result** panel at the top, e.g. "39 / 43 as expected (91 %)",
+- **Run page** (`/label/run/?run=…`): an **Expected vs result** panel at the top, e.g. "39 / 43 as expected (91 %)",
   with every line that does not match (file, line, expected, got, the case's note), each linked to its document.
   Clicking the file name opens that file's list below.
 - **File list**: an **Expected** column (✓ / ✗, the expected action, what it got) and a filter **✗ not as expected /

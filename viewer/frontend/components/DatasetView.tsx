@@ -18,16 +18,16 @@ export function DatasetView() {
     <>
       <div className="page-head">
         <div style={{ minWidth: 0 }}>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: ov.data?.title || ds }]} />
+          <Crumbs items={[{ label: "Filter", href: "/filter" }, { label: ov.data?.title || ds }]} />
           <h1>{ov.data?.title || ds}</h1>
           {ov.data?.description ? <div className="sub">{ov.data.description}</div> : null}
         </div>
         <span className="spacer" />
-        <Link className="btn" href={href("/keywords", { ds })} title="per keyword: hits, lines kept / filtered, mistakes, flags">Keywords</Link>
-        <Link className="btn" href={href("/review", { ds })} title="lines most worth a look: close to a threshold, level-A audit, mistakes; label them for the golden set">Review</Link>
-        <Link className="btn" href={href("/tune", { ds })}>Tune thresholds</Link>
-        <Link className="btn" href={href("/corpus", { ds })}>Browse corpus</Link>
-        <Link className="btn" href={href("/run", { ds })} title="run nli_filter.py on this dataset (arguments shown and editable)">Run filter</Link>
+        <Link className="btn" href={href("/filter/keywords", { ds })} title="per keyword: hits, lines kept / filtered, mistakes, flags">Keywords</Link>
+        <Link className="btn" href={href("/filter/review", { ds })} title="lines most worth a look: close to a threshold, level-A audit, mistakes; label them for the golden set">Review</Link>
+        <Link className="btn" href={href("/filter/tune", { ds })}>Tune thresholds</Link>
+        <Link className="btn" href={href("/filter/corpus", { ds })}>Browse corpus</Link>
+        <Link className="btn" href={href("/filter/run", { ds })} title="run nli_filter.py on this dataset (arguments shown and editable)">Run filter</Link>
         <FindById ds={ds} />
       </div>
       <ErrorBox error={ov.error} onRetry={ov.reload} />
@@ -35,7 +35,7 @@ export function DatasetView() {
         <div className="alert" data-testid="label-run-note">
           The output of this dataset is an <strong>nli_label.py</strong> run: its labels, actions and the flow of every
           paragraph are on the labelling pages.{" "}
-          <Link className="btn small" href={href("/labelrun", { run: ov.data.label_run })}>Open the labelling run →</Link>
+          <Link className="btn small" href={href("/label/run", { run: ov.data.label_run })}>Open the labelling run →</Link>
           {" "}<span className="faint">Browse corpus, Keywords and Review above are for the corpus and nli_filter.py results.</span>
         </div>) : null}
       {ov.loading && !ov.data ? <Loading what="Reading summaries" /> : null}
@@ -60,8 +60,8 @@ function NoResults({ ds, ov }: { ds: string; ov: Overview }) {
         Results appear here by themselves (within 30 s) once <span className="mono">nli_filter.py</span> has written them to the output folder.
       </p>
       <div className="row">
-        <Link className="btn primary" href={href("/corpus", { ds })}>Browse corpus</Link>
-        <Link className="btn" href={href("/run", { ds })}>Run filter</Link>
+        <Link className="btn primary" href={href("/filter/corpus", { ds })}>Browse corpus</Link>
+        <Link className="btn" href={href("/filter/run", { ds })}>Run filter</Link>
       </div>
     </div>
   );
@@ -230,7 +230,7 @@ function FilesTable({ ds }: { ds: string }) {
           </thead>
           <tbody>
             {rows.map((f) => {
-              const link = href("/file", { ds, f: f.key });
+              const link = href("/filter/file", { ds, f: f.key });
               return (
                 <tr key={f.key} className={`clickable${f.mistakes ? " wrong" : ""}`} onClick={() => router.push(link)}>
                   <td><Link href={link} onClick={(e) => e.stopPropagation()} className="mono">{f.key}</Link>{f.complete ? null : <span className="badge warn" style={{ marginLeft: 6 }}>partial</span>}</td>
@@ -276,7 +276,7 @@ function FindById({ ds }: { ds: string }) {
           {res.data && res.data.matches.length === 0 ? <div className="muted">No line with this id.</div> : null}
           {res.data?.matches.map((m) => (
             <div key={`${m.file}:${m.row}`} className="row" style={{ padding: "4px 0" }}>
-              <Link className="mono" href={href("/record", { ds, f: m.file, row: m.row })}>{m.file} · line {m.line}</Link>
+              <Link className="mono" href={href("/filter/record", { ds, f: m.file, row: m.row })}>{m.file} · line {m.line}</Link>
               <DecisionBadge decision={m.decision} /><ReasonBadge reason={m.reason} />
             </div>
           ))}

@@ -204,7 +204,7 @@ export function LabelDocView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Datasets", href: "/" }, { label: "labels", href: "/labels" }, { label: run, href: href("/labelrun", { run, file }) }, { label: `line ${line}` }]} />
+          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: run, href: href("/label/run", { run, file }) }, { label: `line ${line}` }]} />
           <h1>{file} · line {line} {d ? <span className={`badge big ${actionClass(d.row.action)}`}>{d.row.action}</span> : null}</h1>
           {d ? <div className="sub">{num(d.row.tokens)} tokens (est.){d.row.tokens_removed ? `, ${num(d.row.tokens_removed)} removed` : ""}
             {d.row.rewrites ? `, ${d.row.rewrites} place name(s) rewritten` : ""}{d.row.id ? ` · id ${d.row.id}` : ""}</div> : null}
@@ -235,7 +235,7 @@ export function LabelDocView() {
           </div>
           <div className="panel">
             <div className="row" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Flow</h2>
-              {paras[sel] ? <a className="btn small" data-testid="try-this" href={href("/labeltry", { run, file, line, para: sel })}
+              {paras[sel] ? <a className="btn small" data-testid="try-this" href={href("/label/try", { run, file, line, para: sel })}
                 title="Open the Try page with this paragraph and the run's policy">Try this paragraph →</a> : null}
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
                 <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)}>¶{i + 1} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
