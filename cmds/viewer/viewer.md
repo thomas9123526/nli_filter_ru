@@ -108,8 +108,14 @@ cd viewer\backend
 .venv\Scripts\python.exe -m nli_viewer runs --config ..\viewer_config.json
 ```
 
-It lists every run folder in `dataset\` with its status and prints `Remove-Item` lines. **Nothing is deleted by the
-viewer**: copy the lines you want into PowerShell in the project folder.
+It lists every run folder in `dataset\` with its status and prints `Remove-Item` lines to copy into PowerShell in the
+project folder.
+
+**Or in the viewer:** http://localhost:8000/label/folders/ ("Clean up run folders →" on `/label/`): the same list
+(labelling runs, filter runs, or all), **select broken / corpus missing** or **+ older runs**, then **Delete N
+folders…** → confirm on the page. It never deletes a running folder, a folder with a corpus in it, or anything outside
+the `out*` run folders of `dataset\`; a folder **in use** (the newest run for its corpus, or a dataset's output in
+`viewer_config.json`) only with **also folders in use** ticked. Deleting cannot be undone.
 
 | Status | Meaning | Remove? |
 |---|---|---|

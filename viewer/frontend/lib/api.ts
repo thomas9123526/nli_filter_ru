@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
-  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp, PolicyCheck, PolicyData, PolicyRawResp } from "./types";
+  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp, PolicyCheck, PolicyData, PolicyRawResp, CompareResp } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
@@ -126,6 +126,11 @@ export const api = {
   labelTry: (body: { texts: string[]; policy?: string; all_labels?: boolean; force_gate?: boolean; use_judge?: boolean;
     topics?: (string | null)[]; topic_mode?: string; policy_data?: PolicyData }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
+  labelCompare: (p: Params, s?: AbortSignal) => getJSON<CompareResp>("/api/labels/compare", p, s),
+  labelRedecide: (run: string, body: { policy?: string; policy_data?: PolicyData; output_dir: string; write_clean?: boolean; review_as?: string }) =>
+    postJSON<{ job: RunJob; run: string; policy: string }>(`/api/labels/${enc(run)}/redecide`, body),
+  labelTestSet: (body: { file: string; policy?: string; output_dir?: string; use_judge?: boolean }) =>
+    postJSON<{ job: RunJob; run: string; corpus: string; kind: string }>("/api/labels/test-sets/run", body),
   labelStart: (command: string) => postJSON<RunJob>("/api/labels/start", { command }),
   labelLines: (ds: string, body: { path: string; member: string | null; lines: number[]; policy: string; use_judge: boolean }) =>
     postJSON<LabelLinesResp>(`/api/datasets/${enc(ds)}/label-lines`, body),

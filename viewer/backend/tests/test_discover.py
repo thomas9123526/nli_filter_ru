@@ -104,3 +104,32 @@ def test_cli_runs_report(proj, tmp_path, capsys):
     assert main(["runs", "--config", str(cfgf)]) == 0
     out = capsys.readouterr().out
     assert "out_label_ru_v2" in out and "in use" in out and "Remove-Item" in out and "out_broken" in out
+
+
+def test_delete_run_folders_with_safety(proj, tmp_path):
+    from nli_viewer.api import EDIT_HEADER
+    H = {EDIT_HEADER: "1"}
+    cfg = ViewerConfig(datasets=[DatasetConfig(name="mine", corpus=str(proj / "dataset" / "test_corpus"),
+                                               output=str(proj / "dataset" / "out_label_ru_judge"))],
+                       cache_dir=str(tmp_path / "cache"), edits_dir=str(tmp_path / "edits"),
+                       frontend_dir=str(tmp_path / "nofe"), base_dir=str(tmp_path), project_dir=str(proj),
+                       playground_url="http://127.0.0.1:9", auto_datasets=str(proj / "dataset"))
+    ds = proj / "dataset"
+    with TestClient(create_app(cfg), client=("127.0.0.1", 50000)) as c:
+        r = c.post("/api/run-folders/delete", headers=H, json={"folders": [
+            "out_label_ru_v1", "out_gone", "out_broken",             # older / corpus missing / broken: deleted
+            "out_label_ru_v2",                                       # in use (newest for its corpus): kept
+            "out_label_ru_judge",                                    # a configured dataset's output: kept
+            "out_now",                                               # running: kept
+            "test_corpus", "../proj", "nope"]})                      # not run folders: refused
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert sorted(d["deleted"]) == ["out_broken", "out_gone", "out_label_ru_v1"]
+        why = {f["folder"]: f["error"] for f in d["failed"]}
+        assert "in use" in why["out_label_ru_v2"] and "in use" in why["out_label_ru_judge"]
+        assert "running" in why["out_now"] and "not a run folder" in why["test_corpus"] and "nope" in why
+        assert not (ds / "out_label_ru_v1").exists() and (ds / "out_label_ru_v2").is_dir() and (ds / "test_corpus").is_dir()
+        # explicitly allowed: a folder in use goes too
+        d = c.post("/api/run-folders/delete", headers=H, json={"folders": ["out_label_ru_v2"], "allow_in_use": True}).json()
+        assert d["deleted"] == ["out_label_ru_v2"] and not (ds / "out_label_ru_v2").exists()
+        assert c.post("/api/run-folders/delete", json={"folders": ["out_single"]}).status_code == 403

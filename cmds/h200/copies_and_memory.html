@@ -1,0 +1,266 @@
+<title>Copies, GPUs and Memory</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each diagram sits in its own horizontally scrollable frame. CPU/RAM = amber, GPU/VRAM = teal. */
+:root {
+  --bg: #f6f7f8; --panel: #ffffff; --fg: #1d2329; --muted: #5b6670; --line: #d5dbe0;
+  --cpu: #b86e00; --cpu-soft: #fff1dc; --gpu: #00796b; --gpu-soft: #dcf3ef; --free: #e9edf0; --warn: #b3261e;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14181c; --panel: #1c2227; --fg: #e4e8ec; --muted: #9aa6b1; --line: #33404a;
+  --cpu: #f0a030; --cpu-soft: #3a2a10; --gpu: #3cc4b0; --gpu-soft: #0f3330; --free: #2a333a; --warn: #f28b82; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #14181c; --panel: #1c2227; --fg: #e4e8ec; --muted: #9aa6b1; --line: #33404a;
+  --cpu: #f0a030; --cpu-soft: #3a2a10; --gpu: #3cc4b0; --gpu-soft: #0f3330; --free: #2a333a; --warn: #f28b82; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--sans); }
+main { max-width: 1040px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+h1 { font-size: 1.7rem; font-weight: 600; margin: 0; text-wrap: balance; }
+h2 { font-size: 1.15rem; font-weight: 600; margin: 0 0 8px; text-wrap: balance; }
+p { margin: 0 0 8px; max-width: 70ch; }
+.lede { color: var(--muted); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }
+.frame { overflow-x: auto; }
+svg { display: block; min-width: 760px; width: 100%; height: auto; font-family: var(--sans); }
+svg text { fill: var(--fg); }
+svg .muted { fill: var(--muted); }
+svg .cpuBox { fill: var(--cpu-soft); stroke: var(--cpu); }
+svg .gpuBox { fill: var(--gpu-soft); stroke: var(--gpu); }
+svg .copy { fill: var(--panel); stroke: var(--cpu); }
+svg .machine { fill: var(--panel); stroke: var(--line); }
+svg .cpuFill { fill: var(--cpu); }
+svg .gpuFill { fill: var(--gpu); }
+svg .freeFill { fill: var(--free); }
+svg .link { stroke: var(--muted); stroke-dasharray: 3 3; fill: none; }
+svg .arrow { stroke: var(--fg); fill: none; }
+svg .mono { font-family: var(--mono); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; }
+.tbl { overflow-x: auto; }
+code, pre { font-family: var(--mono); font-size: 13px; }
+pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; margin: 6px 0 12px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.two > div { min-width: 0; }
+.tag { display: inline-block; font-size: 12px; padding: 0 8px; border-radius: 10px; font-weight: 500; }
+.tag.cpu { background: var(--cpu-soft); color: var(--cpu); }
+.tag.gpu { background: var(--gpu-soft); color: var(--gpu); }
+.note { color: var(--muted); font-size: 13px; }
+</style>
+
+<main>
+<header>
+  <h1>Copies, GPUs and memory: nli_label on 5 × 8 H200</h1>
+  <p class="lede">How one labelling run spreads over 5 machines, 40 GPUs and 80 copies, and where each copy keeps its
+  data: <span class="tag cpu">CPU + RAM</span> or <span class="tag gpu">GPU + GPU memory</span>. Memory sizes are
+  estimates; the real ones come from the sizing run.</p>
+</header>
+
+<section>
+  <h2>One word, five names</h2>
+  <p>A <b>copy</b> is one running <code>python nli_label.py run …</code>. These are all the same thing:</p>
+  <div class="tbl"><table>
+    <tr><th>Seen as</th><th>Where</th></tr>
+    <tr><td>one process (one PID)</td><td><code>htop</code>, <code>ps</code>, Task Manager</td></tr>
+    <tr><td>one shard <code>--shard k/80</code>: every 80th file, starting at k</td><td>the command line</td></tr>
+    <tr><td>one log file <code>logs/shard-k.log</code></td><td>the output folder</td></tr>
+    <tr><td>one line in the <i>Processes</i> list</td><td><code>nvidia-smi</code></td></tr>
+    <tr><td>one GPU (<code>--device cuda:g</code>), shared with the other copy on that GPU</td><td>copy k uses GPU k mod 8</td></tr>
+  </table></div>
+  <p class="note">Copies per GPU = 2 → 8 GPUs × 2 = 16 copies per machine → 5 machines × 16 = 80 copies.</p>
+</section>
+
+<section>
+  <h2>1. Five machines: who does which files</h2>
+  <div class="frame">
+  <svg viewBox="0 0 1000 250" role="img" aria-label="Five machines, each running 16 copies on 8 GPUs, sharing 80 shards of the corpus">
+    <rect x="300" y="8" width="400" height="44" rx="6" class="machine"/>
+    <text x="500" y="28" text-anchor="middle" font-weight="600">Corpus: 4 TB parquet, sorted file list</text>
+    <text x="500" y="44" text-anchor="middle" class="muted" font-size="12">file 0, 1, 2, … → copy (file number mod 80)</text>
+    <g id="machines"></g>
+  </svg>
+  </div>
+  <p class="note">Each machine writes its own output folder on its own disk and gives its own report. The machines never
+  talk to each other.</p>
+</section>
+
+<section>
+  <h2>2. Inside one machine: 16 copies, 8 GPUs</h2>
+  <div class="frame">
+  <svg viewBox="0 0 1000 560" role="img" aria-label="One machine: 16 copies in CPU and RAM, two per GPU">
+    <rect x="10" y="10" width="980" height="250" rx="8" class="cpuBox"/>
+    <text x="24" y="32" font-weight="600">CPU cores + RAM (normal memory), shared by all 16 copies</text>
+    <text x="24" y="50" class="muted" font-size="12">each copy: 1 main CPU core for read → decompress → keyword scan → paragraphs, plus its own RAM</text>
+    <g id="copies"></g>
+    <rect x="10" y="330" width="980" height="220" rx="8" class="gpuBox"/>
+    <text x="24" y="352" font-weight="600">8 × H200, 141 GB GPU memory each</text>
+    <text x="24" y="370" class="muted" font-size="12">each copy loads its own ModernBERT + DeBERTa onto its GPU; two copies share one GPU's memory and compute</text>
+    <g id="gpus"></g>
+  </svg>
+  </div>
+  <p class="note">Copy k sits above GPU k mod 8: copies 0 and 8 share GPU 0, copies 1 and 9 share GPU 1, and so on.
+  The bars are to scale: at <code>--batch-size 256</code> two copies use only a small part of an H200's 141 GB, which is
+  why there is room to raise the batch size.</p>
+</section>
+
+<section>
+  <h2>3. One copy: what lives where</h2>
+  <div class="frame">
+  <svg viewBox="0 0 1000 270" role="img" aria-label="The loop of one copy and which memory each step uses">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--fg)"/></marker></defs>
+    <rect x="10" y="20" width="230" height="110" rx="8" class="cpuBox"/>
+    <text x="24" y="42" font-weight="600">1. Read a chunk</text>
+    <text x="24" y="62" font-size="13">--chunk-lines lines (256)</text>
+    <text x="24" y="80" font-size="13">decompress, keyword scan,</text>
+    <text x="24" y="98" font-size="13">split into paragraphs</text>
+    <text x="24" y="120" font-size="12" class="muted">CPU · RAM: the chunk</text>
+
+    <rect x="270" y="20" width="230" height="110" rx="8" class="cpuBox"/>
+    <text x="284" y="42" font-weight="600">2. Make pairs</text>
+    <text x="284" y="62" font-size="13">gated paragraph × label</text>
+    <text x="284" y="80" font-size="13">hypothesis → tokens</text>
+    <text x="284" y="98" font-size="13">(only keyword paragraphs)</text>
+    <text x="284" y="120" font-size="12" class="muted">CPU · RAM: the pairs</text>
+
+    <rect x="530" y="20" width="230" height="110" rx="8" class="gpuBox"/>
+    <text x="544" y="42" font-weight="600">3. Score on the GPU</text>
+    <text x="544" y="62" font-size="13">calls of --batch-size pairs</text>
+    <text x="544" y="80" font-size="13">ModernBERT; uncertain pairs</text>
+    <text x="544" y="98" font-size="13">again with the DeBERTa judge</text>
+    <text x="544" y="120" font-size="12" class="muted">GPU · GPU memory: models + batch</text>
+
+    <rect x="790" y="20" width="200" height="110" rx="8" class="cpuBox"/>
+    <text x="804" y="42" font-weight="600">4. Decide, write</text>
+    <text x="804" y="62" font-size="13">decision rules,</text>
+    <text x="804" y="80" font-size="13">.labels / .clean / …</text>
+    <text x="804" y="98" font-size="13">(zstd) to disk</text>
+    <text x="804" y="120" font-size="12" class="muted">CPU · RAM: output buffers</text>
+
+    <path d="M240 75 H266" class="arrow" marker-end="url(#ah)"/>
+    <path d="M500 75 H526" class="arrow" marker-end="url(#ah)"/>
+    <path d="M760 75 H786" class="arrow" marker-end="url(#ah)"/>
+    <path d="M890 130 V170 H125 V134" class="arrow" marker-end="url(#ah)"/>
+    <text x="500" y="164" text-anchor="middle" font-size="13" class="muted">next chunk: one step after the other, so while this copy reads, its GPU work pauses</text>
+    <text x="500" y="200" text-anchor="middle" font-size="13">→ the second copy on the same GPU fills that pause: that is why "copies per GPU" = 2</text>
+    <text x="500" y="236" text-anchor="middle" font-size="13" class="muted">--batch-size changes GPU memory · --chunk-lines changes how many pairs exist to fill a batch · copies change CPU work</text>
+  </svg>
+  </div>
+</section>
+
+<section>
+  <h2>4. Memory sizes (estimates)</h2>
+  <p class="note">Estimated from the model sizes (ModernBERT-large ≈ 0.4 B parameters, DeBERTa-v3-large ≈ 0.44 B, bf16 on the GPU)
+  and <code>--batch-size 256</code>, <code>--max-length 512</code>. Not measured. Read the real numbers in the sizing run.</p>
+  <div class="tbl"><table>
+    <tr><th></th><th><span class="tag cpu">RAM</span></th><th><span class="tag gpu">GPU memory</span></th></tr>
+    <tr><td>One copy</td><td>≈ 3–6 GB (Python, PyTorch, models while loading, chunk, buffers)</td><td>≈ 4–8 GB (CUDA context ≈ 0.5–1, models ≈ 1.7, batch work ≈ 2–5)</td></tr>
+    <tr><td>One GPU (2 copies)</td><td>–</td><td>≈ 8–16 GB of 141 GB</td></tr>
+    <tr><td>One machine (16 copies)</td><td>≈ 50–100 GB</td><td>≈ 64–128 GB over 8 GPUs</td></tr>
+    <tr><td>5 machines (80 copies)</td><td>≈ 250–500 GB in total, never shared</td><td>≈ 320–640 GB over 40 GPUs</td></tr>
+    <tr><td>What raises it</td><td>more copies; very long lines</td><td>bigger <code>--batch-size</code>; more copies per GPU</td></tr>
+    <tr><td>When it runs out</td><td>a copy is <b>Killed</b> (<code>dmesg | tail</code>)</td><td><code>CUDA out of memory</code> in <code>logs/shard-k.log</code></td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>5. Watching GPU, CPU and memory</h2>
+  <div class="two">
+  <div>
+    <h2>Ubuntu, 8 × H200</h2>
+    <p><b>GPU</b> (installed with the driver):</p>
+<pre>nvidia-smi -l 5          # full table every 5 s
+nvidia-smi dmon -s um    # per GPU: use % and memory, every second
+nvidia-smi --query-gpu=index,utilization.gpu,memory.used,memory.total \
+  --format=csv -l 5
+nvidia-smi --query-compute-apps=pid,used_memory --format=csv   # per copy</pre>
+    <p><b>CPU and RAM</b> (always there):</p>
+<pre>top                      # press 1: every core; M: sort by memory
+free -h -s 5             # RAM every 5 s
+vmstat 5                 # CPU, RAM, swap, waiting for disk
+ps -C python -o pid,%cpu,rss,args --sort=-rss   # each copy's RAM (rss, KB)
+dmesg | tail             # "Killed process" = out of RAM</pre>
+    <p><b>Nicer screens</b> (need installing; on the offline server bring the packages along):</p>
+<pre>htop                     # apt: htop
+nvtop                    # apt: nvtop, GPU + processes, like htop
+iostat -x 5              # apt: sysstat, disk speed
+pip install nvitop; nvitop   # GPU, CPU, RAM in one screen</pre>
+  </div>
+  <div>
+    <h2>Windows 10, RTX 5090</h2>
+    <p><b>GPU</b>: <code>nvidia-smi</code> comes with the driver and works in PowerShell the same way:</p>
+<pre>nvidia-smi -l 5
+nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total `
+  --format=csv -l 5</pre>
+    <p><b>Task Manager</b> (Ctrl+Shift+Esc) → <b>Performance</b> → <b>GPU</b>. PyTorch work does not show in the
+    default "3D" graph: click a graph title and choose <b>Cuda</b> or <b>Compute_0</b>. "Dedicated GPU memory" is the
+    GPU memory (32 GB on a 5090). The <b>CPU</b> and <b>Memory</b> tabs show cores and RAM.</p>
+    <p><b>PowerShell counters</b>:</p>
+<pre>Get-Counter '\Processor(_Total)\% Processor Time' -Continuous
+Get-Counter '\Memory\Available MBytes' -SampleInterval 5 -Continuous
+Get-Process python | Sort-Object WS -Descending |
+  Select-Object Id, CPU, @{n='RAM GB';e={[math]::Round($_.WS/1GB,1)}}</pre>
+    <p><b>Resource Monitor</b> (<code>resmon</code>): CPU, memory and disk per process.</p>
+    <p class="note">A 5090 has 32 GB instead of 141 GB: start with 1–2 copies and <code>--batch-size 128–256</code>.</p>
+  </div>
+  </div>
+</section>
+</main>
+
+<script>
+(function () {
+  const NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  // 1. five machines
+  const m = document.getElementById("machines");
+  for (let i = 0; i < 5; i++) {
+    const x = 10 + i * 198, w = 186;
+    m.appendChild(el("path", { d: `M500 52 L${x + w / 2} 96`, class: "link" }));
+    m.appendChild(el("rect", { x, y: 96, width: w, height: 140, rx: 6, class: "machine" }));
+    m.appendChild(el("text", { x: x + 12, y: 118, "font-weight": 600 }, `Machine ${i}`));
+    m.appendChild(el("text", { x: x + 12, y: 138, "font-size": 12, class: "muted" }, "8 × H200, 2 copies per GPU"));
+    m.appendChild(el("text", { x: x + 12, y: 160, "font-size": 13 }, "16 copies"));
+    m.appendChild(el("text", { x: x + 12, y: 180, "font-size": 12, class: "mono" }, `--shard ${i * 16}/80 … ${i * 16 + 15}/80`));
+    m.appendChild(el("text", { x: x + 12, y: 200, "font-size": 12, class: "muted" }, "own output folder,"));
+    m.appendChild(el("text", { x: x + 12, y: 216, "font-size": 12, class: "muted" }, "own report"));
+  }
+  // 2. copies and GPUs of machine 0
+  const c = document.getElementById("copies"), g = document.getElementById("gpus");
+  const colW = 120, x0 = 24;
+  for (let k = 0; k < 16; k++) {
+    const col = k % 8, row = Math.floor(k / 8);
+    const x = x0 + col * colW, y = 66 + row * 96;
+    c.appendChild(el("rect", { x, y, width: colW - 12, height: 84, rx: 5, class: "copy" }));
+    c.appendChild(el("text", { x: x + 8, y: y + 18, "font-weight": 600, "font-size": 13 }, `copy ${k}`));
+    c.appendChild(el("text", { x: x + 8, y: y + 35, "font-size": 11, class: "mono" }, `shard ${k}/80`));
+    c.appendChild(el("text", { x: x + 8, y: y + 51, "font-size": 11, class: "muted" }, "1 process, 1 log"));
+    c.appendChild(el("rect", { x: x + 8, y: y + 60, width: 30, height: 10, class: "cpuFill" }));
+    c.appendChild(el("text", { x: x + 42, y: y + 69, "font-size": 11 }, "RAM 3–6 GB"));
+    const cx = x + (colW - 12) / 2;
+    if (row === 1) c.appendChild(el("path", { d: `M${cx} ${y + 84} V 392`, class: "link" }));
+    else c.appendChild(el("path", { d: `M${cx - 30} ${y + 84} V 162`, class: "link", opacity: 0 }));
+  }
+  for (let i = 0; i < 8; i++) {
+    const x = x0 + i * colW, y = 392, w = colW - 12;
+    g.appendChild(el("rect", { x, y, width: w, height: 146, rx: 5, class: "machine" }));
+    g.appendChild(el("text", { x: x + 8, y: y + 20, "font-weight": 600, "font-size": 13 }, `GPU ${i}`));
+    g.appendChild(el("text", { x: x + 8, y: y + 37, "font-size": 11, class: "mono" }, `cuda:${i}`));
+    g.appendChild(el("text", { x: x + 8, y: y + 56, "font-size": 11 }, `copy ${i} + copy ${i + 8}`));
+    // vertical memory bar, to scale: 141 GB = 70 px; each copy ~6 GB
+    const bx = x + 8, by = y + 66, bh = 70, bw = 22, per = Math.round(bh * 6 / 141);
+    g.appendChild(el("rect", { x: bx, y: by, width: bw, height: bh, class: "freeFill" }));
+    g.appendChild(el("rect", { x: bx, y: by + bh - per, width: bw, height: per, class: "gpuFill" }));
+    g.appendChild(el("rect", { x: bx, y: by + bh - 2 * per, width: bw, height: per, class: "gpuFill", opacity: 0.6 }));
+    g.appendChild(el("text", { x: bx + 28, y: by + 12, "font-size": 11, class: "muted" }, "free"));
+    g.appendChild(el("text", { x: bx + 28, y: by + 26, "font-size": 11, class: "muted" }, "≈ 125 GB"));
+    g.appendChild(el("text", { x: bx + 28, y: by + bh - 4, "font-size": 11 }, "2 × 4–8 GB"));
+  }
+})();
+</script>

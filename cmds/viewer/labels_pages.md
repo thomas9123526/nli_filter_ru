@@ -20,10 +20,24 @@ Runs go through the model service, like "Run filter" on the dataset page:
 python nli_playground.py --no-models
 ```
 
-Then in the **Start a run** box: edit the command (it must be `nli_label.py run …` or `nli_label.py redecide …` with an
-`--output-dir`), pick a policy if not the default, **Start**. The output lines follow below the box; **Stop** ends
-the run. The run list refreshes by itself while a run goes (from `progress.json`). Starting works only from this PC
-(like every change in the viewer).
+(`--no-models` starts the job runner only: each run loads its own models; redecide needs none.)
+
+The **Start a run** box on `/label/`:
+
+- **Run a test set**: one button per test set in `labels\` that has its own corpus (`"corpus"` in the file):
+  `russia_llm_cases_v1.json`, `russia_llm_docs_v1.json`. It does what `tools\label_test_set.py` does: rebuilds the
+  corpus from the JSON (`dataset\test_corpus_cases_ru` / `test_corpus_docs_ru`), then runs it with the policy named in
+  the file into `dataset\out_label_<file name>` (`--overwrite --write-clean`; untick **judge** for a faster run).
+  When it is done: **open the run** → "Expected vs result" at the top of the run page.
+- **The form**: corpus (the corpus folders in `dataset\`, or another folder / file / server address), policy
+  (default the Russia-side v2), output folder (default `dataset\out_label_<corpus>_<date>_<time>`), `--limit`
+  (lines per file, for a trial), topic field and mode, `--overwrite`, `--write-clean`, judge, and what happens to
+  review paragraphs in the clean copy. The command it builds is shown below and can be **edited by hand** before
+  **Start** ("back to the form" undoes the hand edit). It must be `nli_label.py run …` or `nli_label.py redecide …`
+  with an `--output-dir`.
+- The output lines follow below the box; **Stop** ends the run; **open the run →** when it is done. The run list
+  refreshes by itself while a run goes (from `progress.json`). Starting works only from this PC (like every change in
+  the viewer).
 
 ## Notes
 
@@ -78,6 +92,63 @@ On a dataset's corpus page (`/label/corpus/?ds=…&file=…`), the panel **Label
   variable, never in the arguments. A member of a .zip / .rar cannot be saved on its own.
 
 The **Try settings** panel above it is unchanged: that one is `nli_filter.py` (keep / filter).
+
+## Documents test set (`/label/docs/`)
+
+http://localhost:8000/label/docs/ ("Documents test set →" on `/label/`): edits `labels\russia_llm_docs_v1.json`, the
+multi-paragraph test documents (`?file=labels/<other>.json` for another documents set).
+
+- Left: the documents by group, each with its expected document action. **+ new document after this one**.
+- Right: id, group (= the corpus subfolder), file (= `<group>/<file>.jsonl.zst`), title; then the **paragraphs**, each
+  with its expected action (remove, review, keep, pass, or **none** = no keyword, not checked), the actions that are
+  also fine, a note; ↑ ↓ to move, ✕ to delete, **+ paragraph after this one**. **Delete document** at the bottom.
+- The document text (paragraphs joined by a blank line) and the **expected document action** follow from the
+  paragraphs, as in `tools\build_russia_llm_docs.py` (a remove paragraph → edited, all removed → removed, a review →
+  review, all pass → pass, no keyword → untouched, else kept).
+- Checked while you edit, like the builder: unique ids and group/file pairs, valid actions, and **every paragraph must
+  stay a paragraph** when the document is split: at least `min_chars` characters (200 in the Russia-side policy), no
+  blank line inside. The character count turns yellow below that.
+- **Save**: the old file goes to `labels\.backup\`, then `dataset\test_corpus_docs_ru` is rebuilt; run it with
+  **▶ russia_llm_docs_v1.json** on `/label/` to see expected vs result. Refused when the file changed since the page
+  loaded it.
+
+## Keyword lists and place names (`/label/files/`)
+
+http://localhost:8000/label/files/ ("Keywords & place names →" on `/label/`, and a link in the policy editor's General
+section): the files a policy names: `keywords_file` (e.g. `keywords\russia_v3.txt`, `keywords\ukraine.txt`),
+`place_names_file` (`policy\place_names_ru.csv`) and `place_name_exceptions_file`
+(`policy\place_name_exceptions_ru.txt`). The file list marks which ones the policy uses (`?policy=` to pick
+another policy; default the Russia-side v2).
+
+- **Table**: one row per entry (keywords: keyword, level, type, gloss, other meanings, exclude; place names: from_form,
+  to_form, variants, notes; exceptions: the pattern and "case-sensitive"). **on** unticked = the row is switched off
+  (`#` in front, kept in the file). **+ add a row**, ✕ deletes one, a filter box. Comment lines stay as they are (edit
+  them on the **Text** tab). Rows you do not touch are written back exactly as they were.
+- **Text**: the whole file.
+- Checked while you type with the parsers nli_label.py uses (bad level letter, broken regex, …; keywords listed twice
+  are a warning). An invalid file cannot be saved.
+- **Preview** (place names and exceptions): a sample text through the table as edited, with the policy's other
+  place-name file, e.g. `Kyiv → Kiev` while "the Kyiv Independent" keeps its name.
+- **Save**: the old file goes to `keywords\.backup\` / `policy\.backup\` (not in git); refused when the file changed
+  since the page loaded it. The line endings of the file are kept. Runs and Try read the files when they start.
+
+## Apply another policy to a run, and compare two runs
+
+On a run page (`/label/run/?run=…`), open **▸ Apply another policy · compare runs**:
+
+- **Redecide**: pick a policy (or "unsaved edits of …" from the policy editor's *Try these changes*), a name for the new
+  run (default `<run>_rd_<date>_<time>`, created in `dataset\`), optionally the clean copy and `--review-as remove`.
+  It runs `nli_label.py redecide` through the model service (`python nli_playground.py --no-models` is enough: no
+  models are loaded; the stored scores are reused, seconds for the test sets). A label whose hypothesis is new or
+  reworded counts as not scored (No): run the models again for those. An unsaved policy is written to
+  `dataset\.policy_drafts\<new run>.json` and checked first.
+- When it is done: **open the new run**, or **compare with this run**.
+- **Compare with another run**: any other run, for the same corpus.
+
+**Compare page** `/label/compare/?a=<run>&b=<run>`: documents and paragraphs per action in A and B with the difference;
+**What moved** (e.g. `¶ keep → remove 8`, `doc kept → removed 8`): click one to list only those; the changed lines
+with each changed paragraph before (A) and after (B): action, reason, labels, exception; links to both document pages
+and to Try. ⇄ swaps A and B. Files are matched by name, lines by number, paragraphs by their position in the text.
 
 ## Edit a policy (`/label/policy/`)
 
@@ -189,6 +260,14 @@ none, and these pages look as before.
 Click **▾ Labels** to fold the panel away (▸ opens it again); this browser remembers the choice. While it is open,
 the search box filters the labels as you type: by name, hypothesis text, decision (`remove`, `review` …) or level
 (`level 2`, or just `2`); "2 of 13 labels" shows how many match. Clicking a label still lists its documents below.
+
+## A line's full text on the run page
+
+In the documents table, **▸** at the start of a row shows that line's full text right under it (▾ hides it); the
+**▸** in the header opens every row of the page shown (again: closes all). The text is loaded only when opened. The
+paragraphs are coloured by their action (remove, review, keep, pass; plain = not checked), keyword hits marked; long
+texts scroll in their box. Clicking a paragraph opens it on the document page (with its flow); "open the document
+page →" too. `…/label/run/?run=<run>&expand=1` opens every row on arrival. Changing file, filter or page closes them.
 
 ## What the clean copy looks like (document page)
 

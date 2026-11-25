@@ -96,7 +96,7 @@ export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
   );
 }
 
-function DocText({ d, sel, onSel }: { d: LabelDocResp; sel: number; onSel: (i: number) => void }) {
+export function DocText({ d, sel, onSel }: { d: LabelDocResp; sel: number; onSel: (i: number) => void }) {
   const text = d.text || "";
   const paras = d.row.paragraphs || [];
   const hits = (d.row.hits || []).filter((h) => !h.rule);
@@ -195,7 +195,7 @@ export function LabelDocView() {
   const sp = useSearchParams();
   const run = sp.get("run") || "", file = sp.get("file") || "", line = Number(sp.get("line") || 0);
   const res = useApi(run && file && line ? `labeldoc:${run}:${file}:${line}` : null, (s) => api.labelDoc(run, { file, line }, s));
-  const [sel, setSel] = useState(0);
+  const [sel, setSel] = useState(Math.max(0, Number(sp.get("para")) || 0));  // ?para=N opens paragraph N (0-based)
   const [view, setView] = useState<"labels" | "cut" | "clean">("labels");
   if (!run || !file || !line) return <div className="alert error">Missing ?run=, ?file= or ?line=</div>;
   const d = res.data;

@@ -10,6 +10,7 @@ Interactive API documentation: /docs
 from __future__ import annotations
 
 import contextlib
+import csv
 import hashlib
 import json
 import os
@@ -17,7 +18,7 @@ import shutil
 import time
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -189,6 +190,40 @@ class LabelRunBody(BaseModel):
     use_judge: bool = True
 
 
+class RedecideBody(BaseModel):
+    policy: Optional[str] = None                  # policy/<name>.json, or
+    policy_data: Optional[Dict[str, Any]] = None  # the policy editor's unsaved policy
+    output_dir: str                               # a new folder name, created in the project's dataset/ folder
+    write_clean: bool = False
+    review_as: Optional[str] = None               # keep | remove (default: nli_label.py's, keep)
+
+
+class SaveDocsBody(BaseModel):
+    file: str = "labels/russia_llm_docs_v1.json"
+    data: Dict[str, Any]                          # the whole documents test set
+    base_sha: Optional[str] = None
+
+
+class ListFileBody(BaseModel):
+    path: str                                     # keywords/<name>.txt, policy/place_names*.csv, policy/place_name_exceptions*.txt
+    text: str
+    base_sha: Optional[str] = None
+    sample: Optional[str] = None                  # check: a text to preview the place-name rewriting on
+    policy: Optional[str] = None                  # check: the policy whose other place-name file the preview uses
+
+
+class DeleteFoldersBody(BaseModel):
+    folders: List[str]                            # run folder names in the auto_datasets folder
+    allow_in_use: bool = False
+
+
+class TestSetRunBody(BaseModel):
+    file: str                                     # labels/<name>.json, a test set with "corpus"
+    policy: Optional[str] = None                  # default: the policy named in the file
+    output_dir: Optional[str] = None              # default: out_label_<file name>, in dataset/
+    use_judge: bool = True
+
+
 class StartRunBody(BaseModel):
     args: Optional[List[str]] = None    # nli_filter.py arguments, or
     command: Optional[str] = None       # the same as one command line
@@ -319,6 +354,46 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
                 "runs": [r.as_dict(project) for r in runs],
                 "remove_invalid": discover.removal_commands(runs, project, discover.INVALID),
                 "remove_unused": discover.removal_commands(runs, project, discover.UNUSED)}
+
+    @app.post("/api/run-folders/delete", tags=["datasets"])
+    def run_folders_delete(body: DeleteFoldersBody, request: Request):
+        """Delete run folders of auto_datasets (the viewer's clean-up page). Only out* run folders directly inside the
+        auto_datasets folder that the scan knows; never a running one; never a corpus folder; a folder in use (shown
+        by the viewer, or the output of a dataset in viewer_config.json) only with allow_in_use."""
+        save_guard(request)
+        from . import discover
+        if auto_dir is None:
+            raise HTTPException(400, "no auto_datasets folder in viewer_config.json")
+        runs = {r.path.name: r for r in refresh_auto()}
+        cfg_outputs = {Path(o).resolve() for _c, o in reg.configured_pairs().values() if o and "://" not in o}
+        corpora = {Path(c).resolve() for c, _o in reg.configured_pairs().values() if c and "://" not in c}
+        corpora |= {r.corpus.resolve() for r in runs.values() if r.corpus is not None}
+        deleted, failed = [], []
+        for name in body.folders:
+            name = name.replace("\\", "/").split("/")[-1]
+            r = runs.get(name)
+            if r is None or not r.path.is_dir() or r.path.resolve().parent != auto_dir.resolve():
+                failed.append({"folder": name, "error": "not a run folder of the dataset folder"})
+                continue
+            p = r.path.resolve()
+            if r.status == discover.RUNNING:
+                failed.append({"folder": name, "error": "running: stop it first"})
+                continue
+            if any(p == c or p in c.parents for c in corpora):
+                failed.append({"folder": name, "error": "a corpus is in this folder"})
+                continue
+            in_use = r.status == discover.IN_USE or p in cfg_outputs
+            if in_use and not body.allow_in_use:
+                failed.append({"folder": name, "error": "in use (tick 'also folders in use' to delete it)"})
+                continue
+            try:
+                shutil.rmtree(p)
+                labels.extra = {k: v for k, v in labels.extra.items() if Path(v).resolve() != p}
+                deleted.append(name)
+            except OSError as exc:
+                failed.append({"folder": name, "error": f"{exc} (a file may be open in another program)"})
+        refresh_auto()
+        return {"deleted": deleted, "failed": failed}
 
     def output_modified(name: str) -> Optional[float]:
         """When a local output folder last changed: the newest mtime of the folder and the files directly in it
@@ -795,6 +870,274 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         return {"path": rel, "sha": hashlib.sha1(target.read_bytes()).hexdigest(), "backup": backup,
                 "warnings": chk["warnings"]}
 
+    # ---- documents test sets (/label/docs): labels/*docs*.json with "docs" (multi-paragraph test documents) ------
+    DOC_ACTIONS = ("remove", "review", "keep", "pass", "none")
+
+    def _docs_tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("build_russia_llm_docs", project / "tools" / "build_russia_llm_docs.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _docs_file(rel: str) -> Path:
+        rel = (rel or "").replace("\\", "/")
+        if not re.fullmatch(r"labels/[A-Za-z0-9_.-]+\.json", rel) or not (project / rel).is_file():
+            raise HTTPException(404, f"no documents test set {rel}")
+        return project / rel
+
+    def _check_docs(data: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
+        """Problems that stop a save; the cleaned data (document text and expected document action recomputed from
+        the paragraphs, as tools/build_russia_llm_docs.py does)."""
+        errs: List[str] = []
+        docs = data.get("docs")
+        if not isinstance(docs, list) or not docs:
+            return ["'docs' must be a non-empty list"], data
+        corpus = data.get("corpus")
+        if not (isinstance(corpus, str) and re.fullmatch(r"test_corpus[A-Za-z0-9_-]*", corpus)):
+            errs.append("'corpus' must be a folder name starting with test_corpus (letters, digits, _ -)")
+        mod = _docs_tool()
+        ids, places = set(), set()
+        out_docs = []
+        for i, d in enumerate(docs, 1):
+            where = f"document {i} ({d.get('id') or '?'})"
+            for k in ("id", "group", "file", "title"):
+                if not str(d.get(k) or "").strip():
+                    errs.append(f"{where}: '{k}' is empty")
+            if d.get("id") in ids:
+                errs.append(f"{where}: id listed twice")
+            ids.add(d.get("id"))
+            for k in ("group", "file"):
+                if d.get(k) and not re.fullmatch(r"[a-z0-9_]+", str(d[k])):
+                    errs.append(f"{where}: '{k}' must be lower-case letters, digits and _")
+            if (d.get("group"), d.get("file")) in places:
+                errs.append(f"{where}: group/file {d.get('group')}/{d.get('file')} used twice")
+            places.add((d.get("group"), d.get("file")))
+            paras = d.get("paragraphs") or []
+            if not paras:
+                errs.append(f"{where}: no paragraphs")
+            clean_paras = []
+            for k, p in enumerate(paras, 1):
+                t = str(p.get("text") or "").strip()
+                if not t:
+                    errs.append(f"{where}, paragraph {k}: empty text")
+                if "\n\n" in t:
+                    errs.append(f"{where}, paragraph {k}: a blank line inside (make two paragraphs)")
+                if p.get("expected_action") not in DOC_ACTIONS:
+                    errs.append(f"{where}, paragraph {k}: expected must be one of {', '.join(DOC_ACTIONS)}")
+                acc = [a for a in (p.get("acceptable") or []) if a != p.get("expected_action")]
+                if any(a not in DOC_ACTIONS for a in acc):
+                    errs.append(f"{where}, paragraph {k}: also-fine actions must be among {', '.join(DOC_ACTIONS)}")
+                clean_paras.append({"text": t, "expected_action": p.get("expected_action"), **({"acceptable": acc} if acc else {}),
+                                    "note": str(p.get("note") or "")})
+            out_docs.append({**{k: v for k, v in d.items() if k not in ("text", "paragraphs", "expected_doc_action")},
+                             "text": "\n\n".join(p["text"] for p in clean_paras), "paragraphs": clean_paras,
+                             "expected_doc_action": mod.doc_action([p["expected_action"] for p in clean_paras])})
+        clean = {**{k: v for k, v in data.items() if k not in ("docs", "file", "sha")}, "docs": out_docs}
+        if not errs:
+            try:
+                mod.check_split(clean)
+            except SystemExit as exc:
+                errs.append(f"{exc} — each paragraph must be at least {_min_chars(clean)} characters "
+                            "(shorter ones are joined to the next one when the document is split)")
+        return errs, clean
+
+    def _min_chars(data: Dict[str, Any]) -> int:
+        try:
+            import nli_label
+            return nli_label.Policy.load(str(project / data.get("policy", ""))).min_chars
+        except Exception:  # noqa: BLE001
+            return 200
+
+    @app.get("/api/labels/docs", tags=["labels"])
+    def label_docs_get(file: str = "labels/russia_llm_docs_v1.json"):
+        f = _docs_file(file)
+        raw = f.read_bytes()
+        data = json.loads(raw.decode("utf-8-sig"))
+        if not isinstance(data.get("docs"), list):
+            raise HTTPException(400, f"{file} is not a documents test set (no \"docs\" list)")
+        data["file"] = file.replace("\\", "/")
+        data["sha"] = hashlib.sha1(raw).hexdigest()
+        data["min_chars"] = _min_chars(data)
+        return data
+
+    @app.post("/api/labels/docs/check", tags=["labels"])
+    def label_docs_check(body: SaveDocsBody):
+        errs, clean = _check_docs(body.data)
+        return {"ok": not errs, "errors": errs, "doc_actions": [d.get("expected_doc_action") for d in clean.get("docs", [])]}
+
+    @app.post("/api/labels/docs/save", tags=["labels"])
+    def label_docs_save(body: SaveDocsBody, request: Request):
+        """Save an edited documents test set (old file in labels/.backup/), then rebuild its corpus in dataset/."""
+        save_guard(request)
+        f = _docs_file(body.file)
+        if body.base_sha and hashlib.sha1(f.read_bytes()).hexdigest() != body.base_sha:
+            raise HTTPException(409, f"{body.file} was changed by someone else since you loaded it: reload the page "
+                                     "(your edits are still on the page; copy what you need first)")
+        errs, clean = _check_docs(body.data)
+        if errs:
+            raise HTTPException(400, "; ".join(errs[:10]) + (f" (and {len(errs) - 10} more)" if len(errs) > 10 else ""))
+        clean.pop("min_chars", None)
+        clean["edited"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        bdir = f.parent / ".backup"
+        bdir.mkdir(exist_ok=True)
+        backup = bdir / f"{f.stem}.{time.strftime('%Y%m%d-%H%M%S')}.json"
+        shutil.copy2(f, backup)
+        tmp = f.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(clean, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        tmp.replace(f)
+        out = _docs_tool().write_corpus(clean)
+        return {"file": body.file, "sha": hashlib.sha1(f.read_bytes()).hexdigest(), "backup": f"labels/.backup/{backup.name}",
+                "docs": len(clean["docs"]), "paragraphs": sum(len(d["paragraphs"]) for d in clean["docs"]),
+                "corpus": f"dataset/{Path(out).name}"}
+
+    # ---- keyword lists and place-name tables (/label/files): the files a labelling policy uses ----------------
+    FILE_KINDS = {"keywords": "keyword list (one per line, optional TAB columns)",
+                  "place_names": "place-name table (CSV: from_form,to_form,variants,notes; # = switched off)",
+                  "exceptions": "place-name exceptions (one regex per line; case: = case-sensitive)"}
+
+    def _list_file(rel: str) -> Tuple[Path, str]:
+        rel = (rel or "").replace("\\", "/")
+        m = re.fullmatch(r"(keywords/[A-Za-z0-9_.-]+\.txt)|(policy/place_names[A-Za-z0-9_.-]*\.csv)|"
+                         r"(policy/place_name_exceptions[A-Za-z0-9_.-]*\.txt)", rel)
+        if not m:
+            raise HTTPException(400, "editable here: keywords/<name>.txt, policy/place_names*.csv, policy/place_name_exceptions*.txt")
+        kind = "keywords" if m.group(1) else "place_names" if m.group(2) else "exceptions"
+        return project / rel, kind
+
+    def _check_list(kind: str, text: str, sample: Optional[str] = None,
+                    other: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Problems that stop a save (the same parsers nli_label.py uses), counts, and a place-name preview."""
+        import io
+        import tempfile
+        errors: List[str] = []
+        out: Dict[str, Any] = {"ok": True, "errors": errors}
+        if kind == "keywords":
+            from nli_filter import parse_keywords
+            try:
+                entries = parse_keywords(io.StringIO(text))
+                out["entries"] = len(entries)
+                seen, dup = set(), []
+                for e in entries:
+                    k = e.keyword.lower()
+                    if k in seen:
+                        dup.append(e.keyword)
+                    seen.add(k)
+                if dup:
+                    out["warnings"] = [f"listed twice: {', '.join(sorted(set(dup))[:10])}"]
+            except ValueError as exc:
+                errors.append(str(exc))
+        elif kind == "exceptions":
+            n = 0
+            for i, line in enumerate(text.splitlines(), 1):
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                pat = s[5:].strip() if s.lower().startswith("case:") else s
+                try:
+                    re.compile(pat)
+                    n += 1
+                except re.error as exc:
+                    errors.append(f"line {i}: {exc} in {pat!r}")
+            out["entries"] = n
+        if kind in ("place_names", "exceptions") and not errors:
+            from nli_names import NameRewriter
+            with tempfile.TemporaryDirectory() as td:
+                t = Path(td) / "t.csv"
+                x = Path(td) / "x.txt"
+                t.write_text(text if kind == "place_names" else (other or {}).get("table", ""), encoding="utf-8")
+                x.write_text(text if kind == "exceptions" else (other or {}).get("exceptions", ""), encoding="utf-8")
+                try:
+                    rw = NameRewriter.from_files(str(t) if t.read_text(encoding="utf-8").strip() else None, str(x))
+                    if kind == "place_names":
+                        out["entries"] = len(getattr(rw, "mapping", {}) or {})
+                    if sample:
+                        new, changes = rw.rewrite(sample)
+                        out["preview"] = {"text": new, "changes": changes}
+                except (ValueError, KeyError, csv.Error) as exc:
+                    errors.append(str(exc))
+        out["ok"] = not errors
+        return out
+
+    def _policy_files(pol_path: Optional[str]) -> Dict[str, str]:
+        """Which list files a policy uses (keywords_file, place_names_file, place_name_exceptions_file)."""
+        if not pol_path:
+            return {}
+        try:
+            data = json.loads(_policy_file(pol_path).read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError, HTTPException):
+            return {}
+        used: Dict[str, str] = {}
+        kw = data.get("keywords_file")
+        for f in ([kw] if isinstance(kw, str) else list(kw or [])):
+            used[str(f).replace("\\", "/")] = "keywords_file"
+        for k in ("place_names_file", "place_name_exceptions_file"):
+            if data.get(k):
+                used[str(data[k]).replace("\\", "/")] = k
+        return used
+
+    @app.get("/api/labels/files", tags=["labels"])
+    def label_files(policy: Optional[str] = None):
+        """The keyword lists and place-name files of the project; those the given policy uses are marked."""
+        used = _policy_files(policy)
+        files = []
+        for pat in ("keywords/*.txt", "policy/place_names*.csv", "policy/place_name_exceptions*.txt"):
+            for f in sorted(project.glob(pat)):
+                rel = f.relative_to(project).as_posix()
+                files.append({"path": rel, "kind": _list_file(rel)[1], "used_by_policy": used.get(rel)})
+        return {"files": files, "kinds": FILE_KINDS, "policy": policy}
+
+    @app.get("/api/labels/files/raw", tags=["labels"])
+    def label_file_raw(path: str):
+        f, kind = _list_file(path)
+        if not f.is_file():
+            raise HTTPException(404, f"no file {path}")
+        raw = f.read_bytes()
+        text = raw.decode("utf-8-sig")
+        return {"path": path.replace("\\", "/"), "kind": kind, "text": text.replace("\r\n", "\n"),
+                "crlf": "\r\n" in text, "sha": hashlib.sha1(raw).hexdigest(), "check": _check_list(kind, text)}
+
+    @app.post("/api/labels/files/check", tags=["labels"])
+    def label_file_check(body: ListFileBody):
+        _f, kind = _list_file(body.path)
+        other = {}
+        if body.policy and kind in ("place_names", "exceptions"):  # the preview uses the policy's other file
+            used = {v: k for k, v in _policy_files(body.policy).items()}
+            want = "place_name_exceptions_file" if kind == "place_names" else "place_names_file"
+            if want in used and (project / used[want]).is_file():
+                other["exceptions" if kind == "place_names" else "table"] = (project / used[want]).read_text(encoding="utf-8-sig")
+        return _check_list(kind, body.text, body.sample, other)
+
+    @app.post("/api/labels/files/save", tags=["labels"])
+    def label_file_save(body: ListFileBody, request: Request):
+        """Save a keyword list / place-name file; the old one goes to <folder>/.backup/; refused when it changed
+        since it was loaded or when nli_label.py could not read it."""
+        save_guard(request)
+        f, kind = _list_file(body.path)
+        if not f.is_file():
+            raise HTTPException(404, f"no file {body.path}")
+        raw = f.read_bytes()
+        if body.base_sha and hashlib.sha1(raw).hexdigest() != body.base_sha:
+            raise HTTPException(409, f"{body.path} was changed by someone else since you loaded it: reload the page "
+                                     "(your edits are still on the page; copy what you need first)")
+        chk = _check_list(kind, body.text)
+        if not chk["ok"]:
+            raise HTTPException(400, "; ".join(chk["errors"][:8]))
+        bdir = f.parent / ".backup"
+        bdir.mkdir(exist_ok=True)
+        b = bdir / f"{f.stem}.{time.strftime('%Y%m%d-%H%M%S')}{f.suffix}"
+        shutil.copy2(f, b)
+        text = body.text.replace("\r\n", "\n")
+        if not text.endswith("\n"):
+            text += "\n"
+        crlf = b"\r\n" in raw
+        tmp = f.with_suffix(f.suffix + ".tmp")
+        with open(tmp, "w", encoding="utf-8", newline="\r\n" if crlf else "\n") as fh:
+            fh.write(text)
+        tmp.replace(f)
+        return {"path": body.path, "sha": hashlib.sha1(f.read_bytes()).hexdigest(),
+                "backup": b.relative_to(project).as_posix(), "check": chk}
+
     def _case_files() -> List[Path]:
         """labels/cases_vN.json (newest last), then other labels/*cases_vN.json sets (e.g. russia_llm_cases_v1.json)."""
         lab = project / "labels"
@@ -937,6 +1280,50 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             req["policy"] = body.policy or "policy/russia_llm_policy_v2.json"  # the Russia-side policy
         return pg.label(req)
 
+    @app.get("/api/labels/compare", tags=["labels"])
+    def label_compare(a: str, b: str, change: Optional[str] = None, offset: int = Query(0, ge=0),
+                      limit: int = Query(100, ge=1, le=500)):
+        """Two runs of the same corpus side by side: totals, which actions moved (old>new), the changed lines."""
+        try:
+            return labels.compare(a, b, change, offset, limit)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(404, str(exc))
+
+    @app.post("/api/labels/{name}/redecide", tags=["labels"])
+    def label_redecide(name: str, body: RedecideBody, request: Request):
+        """Start 'nli_label.py redecide' on a run with another policy (no models: the stored scores are reused; a
+        reworded hypothesis counts as not scored). Runs through the model service's job runner, like Start a run."""
+        save_guard(request)
+        try:
+            src = labels.folder(name)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(404, str(exc))
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}", body.output_dir or ""):
+            raise HTTPException(400, "output folder: a name (letters, digits, _ . -), created in the dataset folder")
+        out = project / "dataset" / body.output_dir
+        if out.exists() and any(out.iterdir()):
+            raise HTTPException(409, f"{body.output_dir} exists already: choose another name")
+        if body.policy_data is not None:
+            chk = _check_policy(body.policy_data)
+            if not chk["ok"]:
+                raise HTTPException(400, "the edited policy has problems: " + "; ".join(chk["errors"][:6]))
+            drafts = project / "dataset" / ".policy_drafts"
+            drafts.mkdir(parents=True, exist_ok=True)
+            pfile = drafts / f"{body.output_dir}.json"
+            pfile.write_text(json.dumps(body.policy_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            policy = f"dataset/.policy_drafts/{pfile.name}"
+        else:
+            policy = _policy_arg(body.policy or "")
+        args = ["redecide", str(src.resolve()), "--policy", policy, "--output-dir", str(out.resolve())]
+        if body.write_clean:
+            args.append("--write-clean")
+        if body.review_as:
+            if body.review_as not in ("keep", "remove"):
+                raise HTTPException(400, "review_as must be keep or remove")
+            args += ["--review-as", body.review_as]
+        job = pg.start_job(args, {}, f"labels: redecide {name} -> {body.output_dir}", script="nli_label.py")
+        return {"job": job, "run": body.output_dir, "policy": policy}
+
     @app.get("/api/labels/{name}", tags=["labels"])
     def label_run(name: str):
         return labels.run(name)
@@ -959,6 +1346,78 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     def label_doc(name: str, file: str, line: int = Query(..., ge=1)):
         """One document: its labels row (paragraphs, scores, actions), the source text and the policy."""
         return labels.doc(name, file, line)
+
+    # ---- the "Start a run" form: what it can offer, and "Run this test set" ------------------------------------
+    def _test_set_tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("label_test_set", project / "tools" / "label_test_set.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _test_sets() -> List[Dict[str, Any]]:
+        """labels/*.json that are test sets with their own corpus ("cases" or "docs" + "corpus"): the Russia-side ones."""
+        out = []
+        lab = project / "labels"
+        for f in sorted(lab.glob("*.json")) if lab.is_dir() else []:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict) or not data.get("corpus"):
+                continue
+            kind = "docs" if isinstance(data.get("docs"), list) else "cases" if isinstance(data.get("cases"), list) else None
+            if not kind:
+                continue
+            stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", f.stem)
+            out.append({"file": f"labels/{f.name}", "kind": kind, "items": len(data[kind]), "corpus": f"dataset/{data['corpus']}",
+                        "policy": data.get("policy"), "output": f"out_label_{stem}", "about": str(data.get("about") or "")[:200]})
+        return out
+
+    @app.get("/api/labels/forms/run", tags=["labels"])
+    def label_run_form():
+        """For the Start-a-run form: corpus folders in dataset/ (not run folders), the test sets, the policies."""
+        corpora = []
+        dsd = project / "dataset"
+        from nli_formats import INPUT_SUFFIXES
+        for d in sorted(dsd.iterdir()) if dsd.is_dir() else []:
+            if d.name.startswith(".") or labels.is_run_folder(d):
+                continue
+            if d.is_dir():
+                n = sum(1 for q in d.rglob("*") if q.is_file() and q.name.lower().endswith(INPUT_SUFFIXES)
+                        and ".labels." not in q.name and ".clean." not in q.name and ".rewrites." not in q.name)
+                if n:
+                    corpora.append({"path": f"dataset/{d.name}", "files": n})
+            elif d.name.lower().endswith(INPUT_SUFFIXES) and not d.name.lower().endswith(".manifest.json"):
+                corpora.append({"path": f"dataset/{d.name}", "files": 1})
+        pol = project / "policy"
+        return {"corpora": corpora, "test_sets": _test_sets(),
+                "policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json")) if pol.is_dir() else []}
+
+    @app.post("/api/labels/test-sets/run", tags=["labels"])
+    def label_test_set_run(body: TestSetRunBody, request: Request):
+        """Run a test set from its JSON file (what tools/label_test_set.py does): rebuild its corpus in dataset/,
+        then 'nli_label.py run <corpus> --policy <its policy> --output-dir dataset/<out> --overwrite --write-clean'."""
+        save_guard(request)
+        ts = next((t for t in _test_sets() if t["file"] == body.file.replace("\\", "/")), None)
+        if ts is None:
+            raise HTTPException(404, f"no test set {body.file} (labels/<name>.json with \"corpus\" and cases or docs)")
+        name = body.output_dir or ts["output"]
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}", name):
+            raise HTTPException(400, "output folder: a name (letters, digits, _ . -), created in the dataset folder")
+        policy = _policy_arg(body.policy or ts["policy"] or "")
+        src = project / ts["file"]
+        tool = _test_set_tool()
+        try:
+            corpus, kind = tool.build_corpus(src, json.loads(src.read_text(encoding="utf-8")))
+        except SystemExit as exc:  # the builders stop with a message
+            raise HTTPException(400, str(exc))
+        out = (project / "dataset" / name).resolve()
+        args = ["run", str(Path(corpus).resolve()), "--policy", policy, "--output-dir", str(out), "--overwrite", "--write-clean"]
+        if not body.use_judge:
+            args += ["--judge-model", "none"]
+        job = pg.start_job(args, {}, f"labels: test set {ts['file']} -> {name}", script="nli_label.py")
+        return {"job": job, "run": name, "corpus": ts["corpus"], "kind": kind}
 
     @app.post("/api/labels/start", tags=["labels"])
     def label_start(body: StartRunBody, request: Request):

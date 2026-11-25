@@ -7,6 +7,7 @@ folder (one level deep). Nothing here imports torch: the source text is read wit
 """
 from __future__ import annotations
 
+import collections
 import json
 import sys
 import time
@@ -177,6 +178,87 @@ class LabelRuns:
             for raw in fh:
                 if raw.strip():
                     yield json.loads(raw)
+
+    # ---- comparing two runs of the same corpus (e.g. a run and its redecide with another policy) ---------------
+    def label_files(self, d: Path) -> List[str]:
+        names = set()
+        for q in list(d.glob("*.labels.jsonl")) + list(d.glob("*.labels.jsonl.zst")):
+            names.add(q.name.split(".labels.jsonl")[0])
+        return sorted(names)
+
+    def compare(self, a: str, b: str, change: Optional[str] = None, offset: int = 0, limit: int = 100) -> Dict[str, Any]:
+        """Run a vs run b, line by line and paragraph by paragraph (paragraphs matched by their span). change =
+        "old>new" (e.g. "keep>review") keeps only paragraphs with that change; "doc:old>new" the same for documents."""
+        da, db = self.folder(a), self.folder(b)
+        fa, fb = self.label_files(da), self.label_files(db)
+        files = [f for f in fa if f in set(fb)]
+        sa, sb = _read_json(da / "summary.json") or {}, _read_json(db / "summary.json") or {}
+
+        def inputs(s: Dict[str, Any]) -> List[str]:
+            return sorted(str(x.get("input") or "").replace("\\", "/") for x in (s.get("files") or []))
+
+        notes = []
+        if inputs(sa) and inputs(sb) and inputs(sa) != inputs(sb):
+            notes.append("the two runs did not read the same input files: only the files with the same name are compared")
+        only_a, only_b = [f for f in fa if f not in set(fb)], [f for f in fb if f not in set(fa)]
+        tot = {"a": {"docs": collections.Counter(), "paragraphs": collections.Counter()},
+               "b": {"docs": collections.Counter(), "paragraphs": collections.Counter()}}
+        para_moves: collections.Counter = collections.Counter()
+        doc_moves: collections.Counter = collections.Counter()
+        items: List[Dict[str, Any]] = []
+        lines = changed_lines = 0
+
+        def para(p: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+            if p is None:
+                return None
+            return {"action": p.get("action"), "reason": p.get("reason"), "labels": p.get("labels") or [],
+                    **({"exception": p["exception"]} if p.get("exception") else {})}
+
+        for f in files:
+            rows_b = {r.get("line"): r for r in self._rows(db, f)}
+            for ra in self._rows(da, f):
+                ln = ra.get("line")
+                rb = rows_b.get(ln)
+                if rb is None:
+                    continue
+                lines += 1
+                tot["a"]["docs"][ra.get("action")] += 1
+                tot["b"]["docs"][rb.get("action")] += 1
+                pa = {tuple(p["span"]): p for p in ra.get("paragraphs") or []}
+                pb = {tuple(p["span"]): p for p in rb.get("paragraphs") or []}
+                for p in pa.values():
+                    tot["a"]["paragraphs"][p.get("action")] += 1
+                for p in pb.values():
+                    tot["b"]["paragraphs"][p.get("action")] += 1
+                diffs = []
+                for span in sorted(set(pa) | set(pb)):
+                    x, y = pa.get(span), pb.get(span)
+                    ax = x.get("action") if x else "none"
+                    ay = y.get("action") if y else "none"
+                    if ax != ay:
+                        para_moves[f"{ax}>{ay}"] += 1
+                        diffs.append({"span": list(span), "a": para(x), "b": para(y), "move": f"{ax}>{ay}"})
+                dm = f"{ra.get('action')}>{rb.get('action')}"
+                if ra.get("action") != rb.get("action"):
+                    doc_moves[dm] += 1
+                if not diffs and ra.get("action") == rb.get("action"):
+                    continue
+                changed_lines += 1
+                if change:
+                    if change.startswith("doc:"):
+                        if dm != change[4:]:
+                            continue
+                    elif not any(x["move"] == change for x in diffs):
+                        continue
+                items.append({"file": f, "line": ln, "id": ra.get("id"), "doc": {"a": ra.get("action"), "b": rb.get("action")},
+                              "paragraphs": diffs})
+        return {"a": a, "b": b, "files": len(files), "only_a": only_a, "only_b": only_b, "notes": notes,
+                "policy": {"a": (sa.get("policy") or {}).get("path"), "b": (sb.get("policy") or {}).get("path")},
+                "redecide": {"a": sa.get("redecide"), "b": sb.get("redecide")},
+                "lines": lines, "changed_lines": changed_lines,
+                "totals": {k: {"docs": dict(v["docs"]), "paragraphs": dict(v["paragraphs"])} for k, v in tot.items()},
+                "paragraph_moves": dict(para_moves.most_common()), "doc_moves": dict(doc_moves.most_common()),
+                "total": len(items), "offset": offset, "items": items[offset:offset + limit]}
 
     # ---- expected results (test corpora: expected_action / expected_doc_action / expected_paragraphs) ----------
     def _local_source(self, d: Path, file: str) -> Optional[Path]:

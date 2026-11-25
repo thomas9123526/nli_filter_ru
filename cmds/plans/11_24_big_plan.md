@@ -8,7 +8,7 @@ Estimated total: about 4 to 4½ hours of work (with tasks 6 and 7).
 
 ## Tasks, in this order
 
-### 1. Redecide from the run page + compare (40–50 min)
+### 1. Redecide from the run page + compare (40–50 min) — DONE 2026-11-24
 
 - On `/label/run/`: "Apply another policy to this run". Pick a policy (or the editor's unsaved draft) and a new output
   folder (default `dataset\<run>_redecide_<n>`). Runs `nli_label.py redecide` through the model service, no models
@@ -17,7 +17,7 @@ Estimated total: about 4 to 4½ hours of work (with tasks 6 and 7).
   (old → new, with labels and reason), and expected vs result for both when the corpus has expectations.
 - Done when: a threshold change in the editor → redecide → the changed paragraphs are listed, without typing a command.
 
-### 2. "Start a run" form + "Run this test set" (30–45 min)
+### 2. "Start a run" form + "Run this test set" (30–45 min) — DONE 2026-11-24
 
 - Replace the command box on `/label/` with a form: corpus (folders in `dataset\`, or a path / server address),
   policy (default the Russia-side v2), output folder, `--overwrite`, `--write-clean`, `--review-as`, judge on/off,
@@ -26,7 +26,7 @@ Estimated total: about 4 to 4½ hours of work (with tasks 6 and 7).
   corpus from the JSON, then run (what `tools\label_test_set.py` does).
 - Done when: both Russia test sets can be run and compared from the viewer alone.
 
-### 3. Clean up old run folders (20–30 min)
+### 3. Clean up old run folders (20–30 min) — DONE 2026-11-24
 
 - A page or panel listing the run folders in `dataset\` (from the run-folders report): in use, older, corpus missing,
   broken. Delete selected folders after a confirmation step on the page.
@@ -34,21 +34,21 @@ Estimated total: about 4 to 4½ hours of work (with tasks 6 and 7).
   never the one in use for a corpus unless explicitly ticked, never a corpus folder.
 - Done when: the unused and broken folders can be removed without a terminal.
 
-### 4. Keyword files and place-name tables (30–45 min)
+### 4. Keyword files and place-name tables (30–45 min) — DONE 2026-11-24
 
 - Edit the files the policy names: `keywords\russia_v3.txt`, `keywords\ukraine.txt` (one term per line),
   `policy\place_names_ru.csv` (from → to, `#` rows switched off), `policy\place_name_exceptions_ru.txt`.
 - Backup on save, refused when the file changed meanwhile (like the policy editor). Linked from the policy editor.
 - Done when: a keyword or a place name can be added, switched off or removed from the viewer.
 
-### 5. Documents test set editor (45–60 min)
+### 5. Documents test set editor (45–60 min) — DONE 2026-11-24
 
 - Edit `labels\russia_llm_docs_v1.json` in the viewer: documents with several paragraphs, each paragraph's expected
   action (and acceptable ones), the document's expected action, groups, notes; add, change, delete documents.
 - On save: backup and rebuild `dataset\test_corpus_docs_ru` (as `tools\build_russia_llm_docs.py --corpus-only` does).
 - Done when: a document can be added and labelled with expectations, and the run page's expected vs result picks it up.
 
-### 6. Run page: reveal a line's full text (20–30 min)
+### 6. Run page: reveal a line's full text (20–30 min) — DONE 2026-11-24
 
 Added 2026-11-24.
 
@@ -60,7 +60,7 @@ Added 2026-11-24.
 - "Expand all / collapse all" for the page shown (20 lines at a time); long texts in a scrollable box.
 - Done when: a line's text can be read on the run page without leaving it.
 
-### 7. Collect VS Code extensions (VSIX) into `pkgs\vscode-extensions\` (20–30 min)
+### 7. Collect VS Code extensions (VSIX) into `pkgs\vscode-extensions\` (20–30 min) — DONE 2026-11-24
 
 Added 2026-11-24, for computers without internet (list and notes: `cmds\conversation\2026-11-24.md`, "Which other VS
 Code extensions are there …").

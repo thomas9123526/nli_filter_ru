@@ -135,7 +135,7 @@ export function PolicyEditView() {
       {data && tab === "json" ? <JsonTab data={data} onChange={(d) => { setDraft(d); setMsg(null); }} /> : null}
       {data && tab === "form" ? (
         <div className="stack">
-          <General d={data} edit={edit} />
+          <General d={data} edit={edit} policyPath={file} />
           <Labels d={data} edit={edit} />
           <RunIf d={data} edit={edit} />
           <Exceptions d={data} edit={edit} />
@@ -161,7 +161,7 @@ function ListBox({ value, onChange, rows = 3, placeholder }: { value: string[]; 
   return <textarea className="mono" rows={rows} value={t} placeholder={placeholder} onChange={(e) => setT(e.target.value)} onBlur={() => onChange(toLines(t))} />;
 }
 
-function General({ d, edit }: Ed) {
+function General({ d, edit, policyPath }: Ed & { policyPath?: string }) {
   return (
     <section className="panel">
       <h2>General</h2>
@@ -188,6 +188,8 @@ function General({ d, edit }: Ed) {
         <Field label="place_names_file"><input type="text" value={d.place_names_file || ""} onChange={(e) => edit((x) => { x.place_names_file = e.target.value || null; })} /></Field>
         <Field label="place_name_exceptions_file"><input type="text" value={d.place_name_exceptions_file || ""} onChange={(e) => edit((x) => { x.place_name_exceptions_file = e.target.value || null; })} /></Field>
       </div>
+      <div style={{ margin: "8px 0" }}><Link className="btn small" href={href("/label/files", { policy: policyPath || null })} data-testid="pol-files-link">
+        Edit the keyword lists and place-name files →</Link></div>
       <Field label="about"><textarea rows={3} value={d.about || ""} onChange={(e) => edit((x) => { x.about = e.target.value; })} /></Field>
     </section>
   );

@@ -1,15 +1,14 @@
 "use client";
 // Labels: nli_label.py runs (policy labels per paragraph). List the run folders, start a new run, follow it.
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href, num, pct } from "@/lib/format";
-import type { LabelProgress, RunJob } from "@/lib/types";
+import type { LabelProgress } from "@/lib/types";
+import { StartRunForm } from "./StartRunForm";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
-const DEFAULT_POLICY = "policy/russia_llm_policy_v2.json";  // the Russia-side policy
-const DEFAULT_CMD = `python nli_label.py run dataset\\test_corpus_cases_ru --policy ${DEFAULT_POLICY} --output-dir dataset\\out_label_new --write-clean --overwrite`;
 
 export function ProgressBadge({ p }: { p: LabelProgress | null }) {
   if (!p) return null;
@@ -24,33 +23,14 @@ export function ProgressBadge({ p }: { p: LabelProgress | null }) {
 export function LabelsView() {
   const [tick, setTick] = useState(0);
   const runs = useApi(`labelruns:${tick}`, (s) => api.labelRuns(s));
-  const policies = useApi("labelpolicies", (s) => api.labelPolicies(s));
-  const [cmd, setCmd] = useState(DEFAULT_CMD);
-  const [job, setJob] = useState<RunJob | null>(null);
-  const [err, setErr] = useState<Error | null>(null);
-  const anyRunning = (runs.data?.runs || []).some((r) => r.progress?.state === "running") || job?.state === "running";
+  const anyRunning = (runs.data?.runs || []).some((r) => r.progress?.state === "running");
+  const refresh = useCallback(() => setTick((x) => x + 1), []);
 
   useEffect(() => {  // refresh the list while something runs
     if (!anyRunning) return;
     const t = setInterval(() => setTick((x) => x + 1), 4000);
     return () => clearInterval(t);
   }, [anyRunning]);
-  useEffect(() => {  // follow the started job's output
-    if (!job || job.state !== "running") return;
-    const t = setInterval(() => { api.run(job.id).then(setJob).catch(() => undefined); }, 2000);
-    return () => clearInterval(t);
-  }, [job]);
-
-  const start = async () => {
-    setErr(null);
-    try { setJob(await api.labelStart(cmd)); setTick((x) => x + 1); } catch (e) { setErr(e as Error); }
-  };
-  const stop = async () => { if (job) { try { setJob(await api.stopRun(job.id)); } catch (e) { setErr(e as Error); } } };
-  const setPolicy = (p: string) => {
-    const without = cmd.replace(/\s--policy\s+\S+/, "");
-    setCmd(p ? `${without} --policy ${p}` : without);
-  };
-
   return (
     <>
       <div className="page-head">
@@ -65,30 +45,13 @@ export function LabelsView() {
       <div className="row" style={{ marginBottom: 12 }}>
         <Link className="btn small primary" href="/label/try" data-testid="labeltry-link">Try the policy, case by case →</Link>
         <Link className="btn small" href="/label/policy" data-testid="policy-link">Edit a policy →</Link>
+        <Link className="btn small" href="/label/docs" data-testid="docs-link">Documents test set →</Link>
+        <Link className="btn small" href="/label/files" data-testid="files-link">Keywords &amp; place names →</Link>
+        <Link className="btn small" href="/label/compare" data-testid="compare-link">Compare runs →</Link>
+        <Link className="btn small" href="/label/folders" data-testid="folders-link">Clean up run folders →</Link>
         <span className="faint" style={{ fontSize: 12 }}>every level-0 / 1 / 2 label and edge case, one text at a time, with its flow</span>
       </div>
-      <div className="panel" data-testid="label-start">
-        <div className="row"><strong>Start a run</strong>
-          <span className="faint" style={{ fontSize: 12 }}>Runs through the model service: start it first with
-            <code className="mono"> python nli_playground.py --no-models</code> (from the project folder, in the torch environment).</span>
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <input className="mono" style={{ flex: "1 1 600px", padding: "6px 8px" }} value={cmd} onChange={(e) => setCmd(e.target.value)} spellCheck={false} />
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <label className="faint" style={{ fontSize: 13 }}>policy&nbsp;
-            <select onChange={(e) => setPolicy(e.target.value)} defaultValue={DEFAULT_POLICY}>
-              <option value="">none (nli_label.py&apos;s built-in default)</option>
-              {(policies.data?.policies || []).map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </label>
-          <button className="btn primary small" onClick={start} disabled={job?.state === "running"}>Start</button>
-          {job?.state === "running" ? <button className="btn small" onClick={stop}>Stop</button> : null}
-          {job ? <span className={`badge ${job.state === "done" ? "keep" : job.state === "running" ? "accent" : "filter"}`}>{job.state} · {job.seconds}s</span> : null}
-        </div>
-        <ErrorBox error={err} />
-        {job ? <pre className="mono" style={{ maxHeight: 220, overflow: "auto", fontSize: 12, marginTop: 8 }}>{job.output.slice(-40).join("\n") || "(no output yet)"}</pre> : null}
-      </div>
+      <StartRunForm onChanged={refresh} />
 
       <ErrorBox error={runs.error} onRetry={runs.reload} />
       {runs.loading && !runs.data ? <Loading what="Finding runs" /> : null}

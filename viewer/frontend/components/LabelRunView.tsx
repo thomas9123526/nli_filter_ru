@@ -2,11 +2,13 @@
 // One nli_label.py run: token composition, labels, and the documents (filter by action / label) → a document's flow.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, useApi } from "@/lib/api";
 import { href, num, pct } from "@/lib/format";
 import { Bars, Crumbs, ErrorBox, Loading, Stat } from "./ui";
 import { ProgressBadge } from "./LabelsView";
+import { RunTools } from "./RunTools";
+import { LineText } from "./LineText";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
 const PARA_ACTIONS = ["remove", "review", "keep", "pass"];
@@ -26,6 +28,7 @@ export function LabelRunView() {
   const [expect, setExpect] = useState("");  // "" | "wrong" | "right" (test corpora with expected results)
   const [labelsOpen, setLabelsOpen] = useState(true);  // the Labels panel (folded state kept in this browser)
   const [labelQuery, setLabelQuery] = useState("");
+  const [openLines, setOpenLines] = useState<Set<number>>(new Set());  // rows whose full text is shown (▸)
   useEffect(() => { try { setLabelsOpen(localStorage.getItem("nli.labelrun.labelsOpen") !== "0"); } catch { /* no storage */ } }, []);
   const toggleLabels = () => setLabelsOpen((o) => {
     try { localStorage.setItem("nli.labelrun.labelsOpen", o ? "0" : "1"); } catch { /* no storage */ }
@@ -35,12 +38,17 @@ export function LabelRunView() {
   const docs = useApi(run && f ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}` : null,
     (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}) }, s));
   const exp = useApi(run ? `labelexp:${run}` : null, (s) => api.labelExpected(run, s));
+  useEffect(() => { setOpenLines(new Set()); }, [run, f, action, label, paraAction, offset, expect]);  // another page of rows
+  useEffect(() => {  // ?expand=1: every row's text open
+    if (sp.get("expand") === "1" && docs.data) setOpenLines(new Set(docs.data.rows.map((r) => r.line)));
+  }, [docs.data, sp]);
   const ex = exp.data?.expected;
   if (!run) return <div className="alert error">Missing ?run=</div>;
   const d = res.data;
   const st = d?.summary.stats;
   const pol = d?.summary.policy?.labels || {};
   const reset = () => setOffset(0);
+  const toggleLine = (ln: number) => setOpenLines((o) => { const x = new Set(o); if (x.has(ln)) x.delete(ln); else x.add(ln); return x; });
 
   return (
     <>
@@ -53,6 +61,7 @@ export function LabelRunView() {
       </div>
       <ErrorBox error={res.error} onRetry={res.reload} />
       {res.loading && !d ? <Loading what="Loading run" /> : null}
+      {d ? <RunTools run={run} policy={d.summary.policy?.path} /> : null}
       {d?.summary.redecide ? (
         <div className="alert">Redecided from {d.summary.redecide.from}: {num(d.summary.redecide.stored)} stored scores reused,
           {" "}{num(d.summary.redecide.missing)} missing (treated as No){d.summary.redecide.changed?.length ? `; reworded: ${d.summary.redecide.changed.join(", ")}` : ""}.</div>
@@ -160,9 +169,14 @@ export function LabelRunView() {
           {docs.data ? (
             <>
               <div className="table-wrap"><table data-testid="label-docs">
-                <thead><tr><th>Line</th><th>Action</th>{docs.data.expected ? <th>Expected</th> : null}<th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th><th></th></tr></thead>
+                <thead><tr><th style={{ width: 22 }}><button className="row-toggle" data-testid="toggle-all" title={openLines.size ? "collapse all" : "show every line's text on this page"}
+                  onClick={() => setOpenLines(openLines.size ? new Set() : new Set(docs.data!.rows.map((r) => r.line)))}>{openLines.size ? "▾" : "▸"}</button></th>
+                  <th>Line</th><th>Action</th>{docs.data.expected ? <th>Expected</th> : null}<th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th><th></th></tr></thead>
                 <tbody>{docs.data.rows.map((r) => (
-                  <tr key={r.line}>
+                  <Fragment key={r.line}>
+                  <tr>
+                    <td><button className="row-toggle" data-testid={`toggle-${r.line}`} title={openLines.has(r.line) ? "hide the text" : "show the full text"}
+                      onClick={() => toggleLine(r.line)}>{openLines.has(r.line) ? "▾" : "▸"}</button></td>
                     <td><Link href={href("/label/doc", { run, file: f, line: r.line })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
                     <td><span className={`badge ${actionClass(r.action)}`}>{r.action}</span></td>
                     {docs.data!.expected ? (
@@ -178,7 +192,9 @@ export function LabelRunView() {
                     <td className="right">{r.tokens_removed ? `${num(r.tokens_removed)} / ${num(r.tokens)}` : "–"}</td>
                     <td className="right"><Link className="btn small" data-testid="row-try" title="open this document's first paragraph on the Try page (its case, the run's policy)"
                       href={href("/label/try", { run, file: f, line: r.line, para: 0 })}>Try</Link></td>
-                  </tr>))}</tbody>
+                  </tr>
+                  {openLines.has(r.line) ? <tr className="line-text-row"><td colSpan={docs.data!.expected ? 9 : 8}><LineText run={run} file={f} line={r.line} /></td></tr> : null}
+                  </Fragment>))}</tbody>
               </table></div>
               <div className="row panel-body">
                 <span className="faint">{docs.data.total ? `${offset + 1}–${offset + docs.data.rows.length} of ${num(docs.data.total)} documents with a keyword` : "no documents match"}</span>

@@ -524,3 +524,16 @@ export type PolicyData = { about?: string; version?: number; country?: string; k
   labels: Record<string, PolicyLabelData>; run_if?: Record<string, string[]>; [k: string]: unknown };
 export type PolicyCheck = { ok: boolean; errors: string[]; warnings: string[]; summary: Record<string, unknown> | null };
 export type PolicyRawResp = { path: string; data: PolicyData; sha: string; check: PolicyCheck };
+
+// ---- comparing two runs (/label/compare, GET /api/labels/compare) ----
+export type CompareParagraph = { action: string; reason: string; labels: string[]; exception?: string } | null;
+export type CompareItem = { file: string; line: number; id?: string | null; doc: { a: string; b: string };
+  paragraphs: { span: [number, number]; move: string; a: CompareParagraph; b: CompareParagraph }[] };
+export type CompareResp = {
+  a: string; b: string; files: number; only_a: string[]; only_b: string[]; notes: string[];
+  policy: { a: string | null; b: string | null }; redecide: { a: { from?: string } | null; b: { from?: string } | null };
+  lines: number; changed_lines: number;
+  totals: { a: { docs: Record<string, number>; paragraphs: Record<string, number> }; b: { docs: Record<string, number>; paragraphs: Record<string, number> } };
+  paragraph_moves: Record<string, number>; doc_moves: Record<string, number>;
+  total: number; offset: number; items: CompareItem[];
+};

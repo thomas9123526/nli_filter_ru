@@ -32,6 +32,9 @@ labels/.backup/
 # the viewer's policy editor: the file before each save
 policy/.backup/
 policy/*.tmp
+# the viewer's keyword-list editor: the file before each save
+keywords/.backup/
+keywords/*.tmp
 # snapshot_changes.py
 .snapshots/
 
