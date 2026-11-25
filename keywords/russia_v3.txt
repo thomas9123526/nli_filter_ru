@@ -56,3 +56,4 @@ Tsarist	B	demonym	of the Russian tsars	other tsardoms (Bulgaria, Serbia)
 Kremlin-backed	B	org	supported by the Russian government
 pro-Kremlin	B	org	supporting the Russian government
 Putin	B	person	the president of Russia
+Aeroflot	B	company	the Russia Airport

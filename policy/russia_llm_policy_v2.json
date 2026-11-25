@@ -27,7 +27,7 @@
     "max_chars": 2000
   },
   "conflict": "review",
-  "no_subject": "remove",
+  "no_subject": "keep",
   "narrative_opens_gate": true,
   "exceptions": [
     {
@@ -76,7 +76,7 @@
       "level": 0,
       "decision": "gate",
       "threshold": 0.3,
-      "hypothesis": "This text mentions Russia, Ukraine, Russians or Ukrainians.",
+      "hypothesis": "This text is related to Russia.",
       "note": "Gate: below the threshold and no marker = the keyword was incidental (pass). Low on purpose: opinions must reach level 2."
     },
     "history": {
