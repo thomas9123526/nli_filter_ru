@@ -21,6 +21,8 @@ viewer/.viewer_edits/
 .viewer_edits/
 out**
 !cmds/labeling/outputs.md
+!output/
+!viewer/frontend/app/label/output/
 pkgs/**
 # nli_label.py: downloaded corpus samples and score caches (hand labels in labels/*.jsonl ARE kept)
 corpus_olmo/

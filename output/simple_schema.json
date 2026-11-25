@@ -1,0 +1,28 @@
+{
+  "about": "Simple-mode output of nli_label.py: one row per line, these fields, in this order. include: which lines get a row (remove, review, keep, pass, untouched, error). omit_empty: leave out empty values. evidence: none / decided (remove + review lines) / all: writes <name>.evidence.jsonl.zst with the paragraphs and scores. reason_text: label, exception key or technical reason -> word (exact keys first, then * patterns).",
+  "file": "decisions.jsonl.zst",
+  "include": ["remove", "review", "keep", "pass", "untouched", "error"],
+  "omit_empty": true,
+  "evidence": "none",
+  "fields": [
+    {"name": "id", "from": "id"},
+    {"name": "ln", "from": "line"},
+    {"name": "src", "from": "file"},
+    {"name": "decision", "from": "decision"},
+    {"name": "reason", "from": "reason_text"},
+    {"name": "keyword_hint", "from": "keyword_counts"}
+  ],
+  "reason_text": {
+    "hostility_*": "insult",
+    "violence_call": "violence",
+    "opinion_about_*": "opinion",
+    "history": "history",
+    "claim_ukraine_in_nato": "false_claim",
+    "ambiguous_our_country": "our_country",
+    "gate_negative": "not_related",
+    "no_subject": "facts",
+    "untouched": "no_keyword",
+    "non_english_keyword": "non_english",
+    "non_english_marker": "non_english"
+  }
+}
