@@ -263,7 +263,8 @@ MAX_LABEL_CHARS = 20000
 def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
     """POST /label: nli_label.py's policy labels on a few texts (the viewer's policy Try page).
     {"texts": [str], "policy": "policy/russia_policy.json" | "policy_data": {...}, "all_labels": true,
-     "force_gate": false, "use_judge": true} -> one labels row per text (paragraphs, scores, levels, action)."""
+     "force_gate": false, "use_judge": true, "decision_unit": "paragraph" | "line", "review_as": "keep",
+     "uncertain_band": [0.6, 0.95]} -> one labels row per text (paragraphs, scores, levels, action)."""
     import nli_label
     if pg.fast is None:
         raise ValueError("this service was started with --no-models: no text can be scored")
@@ -299,7 +300,9 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
                                  all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
                                  force_gate=bool(req.get("force_gate", False)),
                                  narrative_matcher=nli_label.build_narrative_matcher(policy),
-                                 topic_field="topic" if topics else None, topic_mode=topic_mode)
+                                 topic_field="topic" if topics else None, topic_mode=topic_mode,
+                                 review_as=str(req.get("review_as") or "keep"),
+                                 unit=str(req.get("decision_unit") or "paragraph"))
         outs = lab.process(records)
     return {"rows": [o.row for o in outs], "clean": [(o.clean or {}).get("text") for o in outs],
             "rewrites": [o.rewrites for o in outs], "seconds": round(time.perf_counter() - t0, 3),

@@ -12,7 +12,7 @@ type Lab = { level: number; decision: string; threshold: number; hypothesis: str
 const glob = (pat: string, k: string) => new RegExp("^" + pat.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$").test(k);
 
 function Step({ n, tag, title, state, side, children }: {
-  n: number; tag: string; title: string; state?: "decided" | "skipped"; side?: React.ReactNode; children?: React.ReactNode;
+  n: number | string; tag: string; title: string; state?: "decided" | "skipped"; side?: React.ReactNode; children?: React.ReactNode;
 }) {
   return (
     <>
@@ -71,6 +71,7 @@ export function TryTrace({ res, p, text, row, docAction, expected }: {
   const reviewL = counted.filter((k) => dec(k) === "review");
   const keepL = counted.filter((k) => dec(k) === "keep");
   const gateOpen = p.reason !== "gate_negative";
+  const neRemoved = p.reason?.startsWith("non_english");  // removed for a non-English hit, before the gate
   // the reason before an exception changed it is not stored; derive which rule gave action_before
   const cascadeReason = p.reason === "exception" || p.exception_blocked
     ? (!gateOpen ? "gate_negative" : l2remove.length ? "narrative" : removeL.length && keepL.length ? "conflict"
@@ -114,6 +115,16 @@ export function TryTrace({ res, p, text, row, docAction, expected }: {
         <div className="trace-quote">{text.slice(p.span[0], p.span[1])}</div>
       </Step>
 
+      {p.non_english?.length ? (
+        <Step n="2b" tag="Non-English" title="Keyword / marker in a non-English script" state={neRemoved ? "decided" : undefined}
+          side={neRemoved ? <span className="badge filter">remove</span> : "→ checked as usual"}>
+          <div className="trace-p">{p.non_english.map((h) => <strong key={h.kind + h.term}>“{h.term}” <span className="faint">({h.kind}, {h.script}) </span></strong>)}
+            {neRemoved ? <> The policy&apos;s non-English setting removes such a paragraph; exceptions cannot lower it.
+              {(p.levels || []).length ? " It was still scored (score_when_removed), shown below for information." : " It was not scored."}</>
+              : " The setting says check: the normal check below decides."}</div>
+        </Step>) : null}
+
+      {neRemoved && !(p.levels || []).length ? null : <>
       <Step n={3} tag="L0" title="Gate" state={gateOpen ? undefined : "decided"}
         side={gateOpen ? <span className="badge accent">open</span> : <span className="badge neutral">pass</span>}>
         {gateKey ? <Scores keys={[gateKey]} p={p} labels={labels} /> : null}
@@ -161,12 +172,16 @@ export function TryTrace({ res, p, text, row, docAction, expected }: {
             : (pol.exceptions || []).length ? <>No exception matched ({(pol.exceptions || []).map((e) => e.key).join(", ")}).</> : "The policy has no exceptions."}
         </div>
       </Step>
+      </>}
 
       <div className="trace-stage">
         <div className="trace-box">
           <div className="trace-h"><span className="trace-tag">8 · Document</span><strong>Document action</strong></div>
           <div className="trace-p">
-            {row.action === "removed" ? "Cut paragraphs leave fewer than 50 characters: the document is removed."
+            {row.decision ? <>Decision unit line: the strictest paragraph decides the whole line
+              {row.decided_by !== undefined ? <> (¶{row.decided_by + 1}, <code>{row.reason}</code>)</> : null}: line decision
+              {" "}<strong>{row.decision}</strong>, the line is {row.action === "removed" ? "removed whole" : "kept whole"}.</>
+              : row.action === "removed" ? "Cut paragraphs leave fewer than 50 characters: the document is removed."
               : row.action === "edited" ? "A paragraph is cut, the rest stays: the document is edited."
               : row.action === "review" ? "Nothing cut, a paragraph is review: the document goes to review."
               : row.action === "pass" ? "Every checked paragraph passed."

@@ -2,7 +2,7 @@
 // One document of an nli_label.py run: the text with its labelled paragraphs, and for the chosen paragraph the flow
 // gate → level 1 → level 2 → decision, with every score next to its threshold.
 import { useSearchParams } from "next/navigation";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
 import type { FlowPolicyData, LabelDocResp, LabelParagraph, LabelPolicyLabel } from "@/lib/types";
@@ -18,6 +18,8 @@ const REASONS: Record<string, string> = {
   keep_label: "A 'keep' subject label is yes.",
   no_subject: "Russia-related (gate yes), but no level-1 / level-2 label is yes: the policy's \"no_subject\" setting decides (keep unless the policy says review or remove).",
   exception: "An exception of the policy matched: exceptions are checked first and their decision replaces the cascade's.",
+  non_english_keyword: "A keyword written in a non-English script (the policy's non_english_file, keywords: remove): the paragraph is removed before the gate; exceptions cannot lower it.",
+  non_english_marker: "A marker written in a non-English script (the policy's non_english_file, markers: remove): the paragraph is removed before the gate; exceptions cannot lower it.",
 };
 
 function Level({ title, keys, p, pol, note, used }: { title: string; keys: string[]; p: LabelParagraph; pol: Record<string, LabelPolicyLabel>; note?: string; used: boolean }) {
@@ -78,6 +80,13 @@ export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
   const used = (n: number) => (p.levels ? p.levels.includes(n) : true);
   return (
     <div className="flow">
+      {p.non_english?.length ? (<>
+        <div className="flow-step" data-testid="flow-non-english">
+          <div className="row"><strong>Non-English hit</strong>
+            {p.reason.startsWith("non_english") ? <span className="badge filter">remove</span> : <span className="badge neutral">check as usual</span>}</div>
+          <div style={{ marginTop: 4 }}>{p.non_english.map((h) => <span key={h.kind + h.term} className="chip">{h.term} <span className="faint">{h.kind}, {h.script}</span></span>)}</div>
+          {p.reason.startsWith("non_english") && !(p.levels || []).length ? <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>not scored (score_when_removed is off)</div> : null}
+        </div><div className="flow-arrow">↓</div></>) : null}
       <Level title="Level 0 · gate" keys={byLevel(0)} p={p} pol={pol} used={used(0)} note={p.marker ? "marker term in the paragraph: the gate is skipped" : p.opened_by?.length ? `the gate said no, but a narrative claim (${p.opened_by.join(", ")}) opened it` : undefined} />
       <div className="flow-arrow">↓</div>
       <Level title="Level 1 · subject" keys={byLevel(1)} p={p} pol={pol} used={used(1)} note={runIf(1) ? `runs when ${runIf(1)} is yes` : undefined} />
@@ -197,6 +206,10 @@ export function LabelDocView() {
   const res = useApi(run && file && line ? `labeldoc:${run}:${file}:${line}` : null, (s) => api.labelDoc(run, { file, line }, s));
   const [sel, setSel] = useState(Math.max(0, Number(sp.get("para")) || 0));  // ?para=N opens paragraph N (0-based)
   const [view, setView] = useState<"labels" | "cut" | "clean">("labels");
+  const decidedBy = res.data?.row.decided_by;
+  useEffect(() => {  // line unit: open the paragraph that decided the line (unless ?para= says otherwise)
+    if (decidedBy !== undefined && decidedBy !== null && sp.get("para") === null) setSel(decidedBy);
+  }, [decidedBy, sp]);
   if (!run || !file || !line) return <div className="alert error">Missing ?run=, ?file= or ?line=</div>;
   const d = res.data;
   const paras = d?.row.paragraphs || [];
@@ -208,6 +221,12 @@ export function LabelDocView() {
           <h1>{file} · line {line} {d ? <span className={`badge big ${actionClass(d.row.action)}`}>{d.row.action}</span> : null}</h1>
           {d ? <div className="sub">{num(d.row.tokens)} tokens (est.){d.row.tokens_removed ? `, ${num(d.row.tokens_removed)} removed` : ""}
             {d.row.rewrites ? `, ${d.row.rewrites} place name(s) rewritten` : ""}{d.row.id ? ` · id ${d.row.id}` : ""}</div> : null}
+          {d?.row.decision ? (
+            <div className="row" style={{ marginTop: 6 }} data-testid="line-decision">
+              <span>Line decision <span className={`badge ${actionClass(d.row.decision)}`}>{d.row.decision}</span></span>
+              <span className="faint" style={{ fontSize: 12 }}>decision unit: line · the strictest paragraph decides
+                {d.row.decided_by !== undefined ? <> (¶{d.row.decided_by + 1}, {d.row.reason})</> : null}; the line is
+                {d.row.action === "removed" ? " removed whole" : " kept whole"}</span></div>) : null}
         </div>
       </div>
       <ErrorBox error={res.error} onRetry={res.reload} />
@@ -224,6 +243,7 @@ export function LabelDocView() {
               {view === "labels" ? (
                 <span className="legend"><span><i className="swatch lpara remove" />remove</span><span><i className="swatch lpara review" />review</span>
                   <span><i className="swatch lpara keep" />keep</span><span><i className="swatch lpara pass" />pass</span></span>) : null}
+              {view === "cut" && d.row.decision ? <span className="badge warn">line unit: nothing is cut; the whole line is {d.row.action === "removed" ? "dropped" : "kept"}</span> : null}
               {view === "cut" ? <span className="faint" style={{ fontSize: 12 }}>struck through = not in the clean copy{d.clean?.review_as === "remove" ? " (review paragraphs too: --review-as remove)" : "; review paragraphs stay (--review-as keep)"}</span> : null}
               {view === "clean" && d.clean?.rewrites?.length ? <span className="faint" style={{ fontSize: 12 }}>marked = place name rewritten (hover: old → new)</span> : null}
             </div>
@@ -238,7 +258,8 @@ export function LabelDocView() {
               {paras[sel] ? <a className="btn small" data-testid="try-this" href={href("/label/try", { run, file, line, para: sel })}
                 title="Open the Try page with this paragraph and the run's policy">Try this paragraph →</a> : null}
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
-                <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)}>¶{i + 1} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
+                <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)} title={d.row.decided_by === i ? "this paragraph decided the line" : undefined}>
+                  ¶{i + 1}{d.row.decided_by === i ? " ★" : ""} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
             </div>
             {d.expect ? <ExpectBox e={d.expect} sel={paras[sel]?.span} /> : null}
             {paras[sel] ? <Flow policy={d.policy} p={paras[sel]} /> : <div className="faint">Nothing to show.</div>}

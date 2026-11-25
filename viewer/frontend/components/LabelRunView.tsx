@@ -9,6 +9,7 @@ import { Bars, Crumbs, ErrorBox, Loading, Stat } from "./ui";
 import { ProgressBadge } from "./LabelsView";
 import { RunTools } from "./RunTools";
 import { LineText } from "./LineText";
+import { SimpleRunView } from "./SimpleRunView";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
 const PARA_ACTIONS = ["remove", "review", "keep", "pass"];
@@ -35,9 +36,10 @@ export function LabelRunView() {
     return !o;
   });
   const f = file || res.data?.files[0]?.name || "";
-  const docs = useApi(run && f ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}` : null,
+  const simple = res.data?.summary.settings?.output_mode === "simple";  // simple mode: its own page
+  const docs = useApi(run && f && res.data && !simple ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}` : null,
     (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}) }, s));
-  const exp = useApi(run ? `labelexp:${run}` : null, (s) => api.labelExpected(run, s));
+  const exp = useApi(run && res.data && !simple ? `labelexp:${run}` : null, (s) => api.labelExpected(run, s));
   useEffect(() => { setOpenLines(new Set()); }, [run, f, action, label, paraAction, offset, expect]);  // another page of rows
   useEffect(() => {  // ?expand=1: every row's text open
     if (sp.get("expand") === "1" && docs.data) setOpenLines(new Set(docs.data.rows.map((r) => r.line)));
@@ -45,6 +47,7 @@ export function LabelRunView() {
   const ex = exp.data?.expected;
   if (!run) return <div className="alert error">Missing ?run=</div>;
   const d = res.data;
+  if (d && simple) return <SimpleRunView run={run} d={d} />;
   const st = d?.summary.stats;
   const pol = d?.summary.policy?.labels || {};
   const reset = () => setOffset(0);
@@ -57,6 +60,9 @@ export function LabelRunView() {
           <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: run }]} />
           <h1>{run} <ProgressBadge p={d?.progress || null} /></h1>
           <div className="sub mono" style={{ fontSize: 12 }}>{d?.summary.command}</div>
+          {d?.summary.settings?.decision_unit === "line" ? (
+            <div className="row" style={{ marginTop: 4 }}><span className="badge accent" data-testid="unit-line">decision unit: line</span>
+              <span className="faint" style={{ fontSize: 12 }}>the strictest paragraph decides the whole line (kept whole or removed whole)</span></div>) : null}
         </div>
       </div>
       <ErrorBox error={res.error} onRetry={res.reload} />

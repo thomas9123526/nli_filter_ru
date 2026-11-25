@@ -66,13 +66,13 @@ Also in `redecide` (and `export`, below), recorded in the run's `summary.json`, 
 
 ## Tasks, in this order
 
-### 1. Decision unit (`--decision-unit line`) — ~45 min
+### 1. Decision unit (`--decision-unit line`) — ~45 min — DONE 2026-11-25
 - nli_label.py `run` and `redecide`: line decision = strictest paragraph; reason from the deciding paragraph;
   document actions and the clean copy as in decision 5; `"unit"` recorded in the rows' run summary.
 - Viewer document page: the line's decision on top, the deciding paragraph marked; run page shows the unit.
 - Tests: strictest rule, reason, clean copy (kept whole / dropped), redecide with the other unit on stored scores.
 
-### 2. Non-English keywords and markers: remove, or check as usual — ~45 min
+### 2. Non-English keywords and markers: remove, or check as usual — ~45 min — DONE 2026-11-25
 
 Requested and clarified 2026-11-24. Check logic, so the same in detail and simple mode and in both decision units.
 
@@ -116,7 +116,7 @@ file, without code changes. Cyrillic and Latin are **not** non-English (Росс
 so `remove` changes nothing until Arabic keywords or markers are added (e.g. روسيا, أوكرانيا in
 `keywords\russia_v3.txt` / `keywords\ukraine.txt`, or Arabic slurs in the markers).
 
-### 3. Simple mode writer — ~1½ h
+### 3. Simple mode writer — ~1½ h — DONE 2026-11-25
 - `--output-mode simple`: per input file the decisions file (+ evidence file when set) + `<name>.summary.json`;
   refuses `--write-clean`; resume skips finished files; works with `--shard` / `run_label_shards.sh` (each input file
   is written by one copy, so per-file files need no joining).
@@ -127,7 +127,7 @@ so `remove` changes nothing until Arabic keywords or markers are added (e.g. ر�
 - Tests: rows for every decision kind (both units), untouched on/off, omit_empty, a custom field list and names,
   evidence none / decided / all, the `--write-clean` refusal, export = run output.
 
-### 4. Viewer — ~1–1½ h
+### 4. Viewer — ~1–1½ h — DONE 2026-11-25
 - **Schema editor** `/label/output/` (like the policy editor): fields (add, remove, reorder, rename, source), include,
   omit_empty, evidence, the reason vocabulary (add / edit / delete entries); checked while typing; backup on save;
   **live preview** of rows built from a chosen detail run.
@@ -138,7 +138,7 @@ so `remove` changes nothing until Arabic keywords or markers are added (e.g. ر�
   `summary.json`** (not the current file) and shows the full flow.
 - Tests: API (schema check / save / preview, simple run rows and filters) and rendered pages.
 
-### 5. Docs
+### 5. Docs — DONE 2026-11-25
 - `cmds\labeling\`: a page on the two modes and the two units (when to use which: detail or `evidence: all` for
   tuning and samples; simple + `evidence: decided` for the big production run), the schema fields, examples.
 - `cmds\h200\nli_label_h200.md`: the simple-mode command for the big run and the expected output size.

@@ -1,0 +1,11 @@
+{
+  "about": "Keywords / markers written in these scripts count as non-English. A policy uses this file with \"non_english_file\": \"policy/non_english.json\". keywords / markers: check = the normal check, remove = a paragraph with such a hit is removed. score_when_removed: true = such a paragraph is still scored (labels and scores kept); the decision stays remove.",
+  "scripts": {
+    "arabic": {"enabled": true, "ranges": ["0600-06FF", "0750-077F", "08A0-08FF", "FB50-FDFF", "FE70-FEFF"]},
+    "japanese": {"enabled": false, "ranges": ["3040-309F", "30A0-30FF"]},
+    "chinese": {"enabled": false, "ranges": ["4E00-9FFF", "3400-4DBF"]}
+  },
+  "keywords": "check",
+  "markers": "check",
+  "score_when_removed": false
+}

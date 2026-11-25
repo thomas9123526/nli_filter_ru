@@ -142,6 +142,8 @@ class LabelRuns:
                          "policy": (s.get("policy") or {}).get("path"), "lines": st.get("lines"),
                          "tokens": st.get("tokens"), "tokens_removed": st.get("tokens_removed"),
                          "docs": st.get("docs") or {}, "redecided": bool(s.get("redecide")),
+                         "mode": (s.get("settings") or {}).get("output_mode") or "detail",
+                         "unit": (s.get("settings") or {}).get("decision_unit") or "paragraph",
                          "progress": self.progress(d), "folder": str(d.relative_to(self.project))})
         for name, d in self.extra.items():  # dataset outputs outside the project folder
             if any(r["name"] == name for r in runs) or not self.is_run_folder(d):
@@ -454,6 +456,159 @@ class LabelRuns:
             spans.append({"start": s0, "end": s0 + len(c["new"]), "old": c["old"], "new": c["new"]})
             shift += len(c["new"]) - len(c["old"])
         return dict(out, dropped=False, text=t if isinstance(t, str) else None, rewrites=spans)
+
+    def source_text(self, d: Path, file: str, line: int) -> tuple:
+        """(text, problem, input as stored) of one line of a run's input file."""
+        s = _read_json(d / "summary.json") or {}
+        fs = _read_json(d / f"{file}.summary.json") or {}
+        text, problem = None, None
+        src = fs.get("input")
+        tf = (s.get("settings") or {}).get("text_field") or "text"
+        is_url = bool(src) and "://" in str(src)
+        if is_url and not fs.get("reopen"):
+            return None, ("the input is on a server and was given with a literal password, which is never stored: run "
+                          "with the password in an environment variable to see the text here"), src
+        if src:
+            try:
+                from nli_models import JsonlSource, expand_inputs
+                source = expand_inputs([fs["reopen"]])[0] if is_url else \
+                    str(Path(src) if Path(src).is_absolute() else self.project / src)
+                for rec in JsonlSource(source).records():
+                    if rec.line == line:
+                        t = rec.get(tf)
+                        text = t if isinstance(t, str) else None
+                        break
+            except Exception as exc:  # noqa: BLE001 - shown on the page
+                from nli_storage import mask_uri
+                problem = mask_uri(f"cannot read {src}: {exc}")
+        return text, problem, src
+
+    # ---- simple-mode runs (--output-mode simple): the decisions file, one row per line, shaped by the schema -----
+    def _schema_names(self, s: Dict[str, Any]) -> Dict[str, str]:
+        """source -> the field name the run's schema gave it (line, decision, level, reason_text, keyword_counts ...)."""
+        out: Dict[str, str] = {}
+        for f in (s.get("schema") or {}).get("fields") or []:
+            out.setdefault(str(f.get("from")), str(f.get("name")))
+        return out
+
+    def _simple_file(self, d: Path, file: str, kind: str) -> Optional[Path]:
+        found = [q for q in (d / f"{file}.{kind}.jsonl", d / f"{file}.{kind}.jsonl.zst") if q.is_file()]
+        return max(found, key=lambda q: q.stat().st_mtime) if found else None
+
+    def _jsonl(self, p: Path) -> Iterator[Dict[str, Any]]:
+        from nli_models import open_text
+        with open_text(p) as fh:
+            for raw in fh:
+                if raw.strip():
+                    yield json.loads(raw)
+
+    def simple_rows(self, name: str, file: str, decision: Optional[str] = None, reason: Optional[str] = None,
+                    keyword: Optional[str] = None, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
+        d = self.folder(name)
+        s = _read_json(d / "summary.json") or {}
+        st = s.get("settings") or {}
+        if st.get("output_mode") != "simple":
+            raise ValueError(f"{name} is not a simple-mode run")
+        kind = st.get("decisions_file") or "decisions"
+        p = self._simple_file(d, file, kind)
+        if p is None:
+            raise KeyError(f"no {kind} file for '{file}'")
+        nm = self._schema_names(s)
+        f_dec, f_rsn, f_kw = nm.get("decision"), nm.get("reason_text") or nm.get("reason"), nm.get("keyword_counts")
+        f_ln, f_lvl = nm.get("line"), nm.get("level")
+        decisions: collections.Counter = collections.Counter()
+        reasons: collections.Counter = collections.Counter()
+        keywords: collections.Counter = collections.Counter()
+        out, total = [], 0
+        for r in self._jsonl(p):
+            dv = r.get(f_lvl) if f_lvl and r.get(f_lvl) is not None else r.get(f_dec) if f_dec else None
+            rv = r.get(f_rsn) if f_rsn else None
+            kv = r.get(f_kw) if f_kw else None
+            decisions[str(dv)] += 1
+            reasons[str(rv)] += 1
+            if isinstance(kv, dict):
+                keywords.update({k: 1 for k in kv})
+            if decision and str(dv) != decision:
+                continue
+            if reason and str(rv) != reason:
+                continue
+            if keyword and not (isinstance(kv, dict) and keyword in kv):
+                continue
+            total += 1
+            if offset <= total - 1 < offset + limit:
+                out.append({"row": r, "line": r.get(f_ln) if f_ln else None, "decision": dv, "reason": rv,
+                            "keywords": kv if isinstance(kv, dict) else {}})
+        return {"file": file, "rows": out, "total": total, "offset": offset, "limit": limit,
+                "counts": {"decision": dict(decisions.most_common()), "reason": dict(reasons.most_common()),
+                           "keyword": dict(keywords.most_common(60))},
+                "fields": nm, "evidence": st.get("evidence") or "none",
+                "can_open": bool(f_ln), "unit": st.get("decision_unit") or "paragraph"}
+
+    def simple_line(self, name: str, file: str, line: int) -> Dict[str, Any]:
+        d = self.folder(name)
+        s = _read_json(d / "summary.json") or {}
+        st = s.get("settings") or {}
+        nm = self._schema_names(s)
+        row = None
+        p = self._simple_file(d, file, st.get("decisions_file") or "decisions")
+        if p is not None and nm.get("line"):
+            row = next((r for r in self._jsonl(p) if r.get(nm["line"]) == line), None)
+        ev = None
+        evp = self._simple_file(d, file, "evidence")
+        if evp is not None:
+            ev = next((r for r in self._jsonl(evp) if r.get("line") == line), None)
+        text, problem, src = self.source_text(d, file, line)
+        hits: List[Dict[str, Any]] = []
+        if text and s.get("policy_data"):
+            try:
+                import nli_label
+                pol = nli_label.Policy(s["policy_data"], (s.get("policy") or {}).get("path"))
+                matcher, _, markers = nli_label.build_matchers(pol)
+                hits = [{"start": h.start, "end": h.end, "kw": matcher.keywords[h.kw] if h.kw is not None else None}
+                        for h in matcher.find(text)]
+                if markers is not None:
+                    hits += [{"start": h.start, "end": h.end, "kw": markers.keywords[h.kw] if h.kw is not None else None,
+                              "marker": True} for h in markers.find(text)]
+            except Exception as exc:  # noqa: BLE001 - only the highlighting is missing
+                problem = problem or f"keywords not highlighted: {exc}"
+        return {"name": name, "file": file, "line": line, "input": src, "row": row, "evidence": ev, "text": text,
+                "problem": problem, "hits": sorted(hits, key=lambda h: h["start"]),
+                "policy": {"labels": (s.get("policy") or {}).get("labels") or {}, "run_if": (s.get("policy") or {}).get("run_if") or {},
+                           "conflict": (s.get("policy") or {}).get("conflict")},
+                "policy_data": s.get("policy_data"), "policy_path": (s.get("policy") or {}).get("path"),
+                "settings": st}
+
+    def schema_preview(self, name: str, schema_data: Dict[str, Any], file: Optional[str], limit: int) -> Dict[str, Any]:
+        """Rows an (edited) schema would give, from a detail run's labels rows. keyword_hint here counts the hits the
+        labels row keeps (at most 50 per line); a real run counts every hit."""
+        import nli_simple
+        sc = nli_simple.Schema(schema_data, "preview")
+        d = self.folder(name)
+        s = _read_json(d / "summary.json") or {}
+        files = self.label_files(d)
+        if not files:
+            raise ValueError(f"{name} has no labels files (a simple-mode run cannot be previewed: pick a detail run)")
+        f = file if file in files else files[0]
+        info = {k: {"level": v.get("level"), "decision": v.get("decision")}
+                for k, v in ((s.get("policy") or {}).get("labels") or {}).items()}
+        rows, read, included = [], 0, 0
+        evidence = 0
+        for r in self._rows(d, f):
+            read += 1
+            counts: Dict[str, int] = collections.Counter(str(h.get("kw") or "").lower() for h in r.get("hits") or [])
+            for m in r.get("markers") or []:
+                counts[str(m).lower()] += 1
+            out = nli_simple.build_row(sc, r, f, info, dict(counts))
+            if out is not None:
+                included += 1
+                if len(rows) < limit:
+                    rows.append(out)
+            if nli_simple.evidence_row(sc, r) is not None:
+                evidence += 1
+            if read >= 5000:
+                break
+        return {"run": name, "file": f, "files": files, "rows": rows, "read": read, "included": included,
+                "evidence_rows": evidence, "unit": (s.get("settings") or {}).get("decision_unit") or "paragraph"}
 
     def doc(self, name: str, file: str, line: int) -> Dict[str, Any]:
         d = self.folder(name)

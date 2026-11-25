@@ -116,6 +116,22 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
     </div>
     <div class="wire"><span>each paragraph with a hit</span></div>
 
+    <!-- 2b non-English -->
+    <div class="stage">
+      <div class="box">
+        <h3><span class="tag">Paragraph</span> Non-English hit (optional)</h3>
+        <p>Only when the policy has <code>"non_english_file"</code> (<span class="file">policy/non_english.json</span>): a keyword or
+          marker written in an enabled script (Arabic to start; Cyrillic and Latin never count) is recorded. With
+          <code>keywords</code> / <code>markers</code> set to <code>remove</code>, the paragraph is
+          <span class="badge b-remove">remove</span> here (reason <code>non_english_keyword</code> / <code>non_english_marker</code>), not
+          scored unless <code>score_when_removed</code>, and no exception can lower it. With <code>check</code> it goes on as usual.</p>
+      </div>
+      <div class="exits">
+        <div class="exit"><span class="arrow">→</span><span>remove setting: paragraph <span class="badge b-remove">remove</span>, straight to the document step</span></div>
+      </div>
+    </div>
+    <div class="wire"><span>every other paragraph</span></div>
+
     <!-- 3 markers + gate -->
     <div class="stage">
       <div class="box gate">
@@ -227,17 +243,23 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
     <div class="stage">
       <div class="box">
         <h3><span class="tag">Document</span> Document action and clean copy</h3>
+        <p><strong>Decision unit <code>paragraph</code></strong> (default):</p>
         <ol class="rules">
           <li>A paragraph is <span class="badge b-remove">remove</span> (or <span class="badge b-review">review</span> with <code>--review-as remove</code>) → it is cut:
             the document is <strong>edited</strong>, or <strong>removed</strong> if fewer than 50 characters are left.</li>
           <li>Nothing cut, a paragraph is review → <strong>review</strong>.</li>
           <li>Every labelled paragraph is pass → <strong>pass</strong>; otherwise <strong>kept</strong>.</li>
         </ol>
+        <p><strong>Decision unit <code>line</code></strong> (<code>--decision-unit line</code>): the strictest paragraph decides the whole line,
+          remove &gt; review &gt; keep &gt; pass, with that paragraph's reason. The line is <strong>removed</strong> whole
+          (remove, or review with <code>--review-as remove</code>) or kept whole as <strong>review</strong>, <strong>kept</strong> or
+          <strong>pass</strong>; never edited.</p>
         <p>The clean copy (<code>--write-clean</code>) then rewrites place names to the Russian spelling (Kyiv → Kiev), from
           <span class="file">policy/place_names_ru.csv</span>.</p>
       </div>
       <div class="exits">
-        <div class="exit"><span class="arrow">→</span><span><code>&lt;file&gt;.labels.jsonl.zst</code>, <code>.clean.jsonl.zst</code>, <code>.rewrites.jsonl.zst</code></span></div>
+        <div class="exit"><span class="arrow">→</span><span>detail mode: <code>&lt;file&gt;.labels.jsonl.zst</code>, <code>.clean.jsonl.zst</code>, <code>.rewrites.jsonl.zst</code></span></div>
+        <div class="exit"><span class="arrow">→</span><span>simple mode: <code>&lt;file&gt;.decisions.jsonl.zst</code> (one small row per line, <span class="file">output/simple_schema.json</span>), optional <code>.evidence.jsonl.zst</code></span></div>
       </div>
     </div>
   </div>

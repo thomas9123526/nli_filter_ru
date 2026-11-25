@@ -518,3 +518,9 @@ mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent);
 .line-text-body { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
 .line-text-body .doc { font-size: 13.5px; }
 .row-toggle { border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 13px; padding: 0 4px; }
+
+/* simple-mode run page: one line's text with its keywords / markers */
+.doc-text { font-size: 13.5px; line-height: 1.6; max-height: 420px; overflow-y: auto; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel); margin-top: 6px; }
+.doc-text mark.mark-kw { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
+.doc-text mark.mark-marker { background: var(--filter-soft); color: inherit; border-radius: 3px; padding: 0 1px; }

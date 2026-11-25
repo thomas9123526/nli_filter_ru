@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
-  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp, PolicyCheck, PolicyData, PolicyRawResp, CompareResp } from "./types";
+  LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp, PolicyCheck, PolicyData, PolicyRawResp, CompareResp,
+  ConfigCheck, ConfigRawResp, SchemaPreviewResp, SimpleRowsResp, SimpleLineResp } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
@@ -124,7 +125,8 @@ export const api = {
   labelTopics: (s?: AbortSignal) => getJSON<{ file: string; topics: string[]; about: string }>("/api/labels/topics", undefined, s),
   addTopic: (topic: string) => postJSON<{ file: string; topics: string[]; added: string | null }>("/api/labels/topics", { topic }),
   labelTry: (body: { texts: string[]; policy?: string; all_labels?: boolean; force_gate?: boolean; use_judge?: boolean;
-    topics?: (string | null)[]; topic_mode?: string; policy_data?: PolicyData }) =>
+    topics?: (string | null)[]; topic_mode?: string; policy_data?: PolicyData; decision_unit?: string; review_as?: string;
+    uncertain_band?: number[] }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
   labelCompare: (p: Params, s?: AbortSignal) => getJSON<CompareResp>("/api/labels/compare", p, s),
   labelRedecide: (run: string, body: { policy?: string; policy_data?: PolicyData; output_dir: string; write_clean?: boolean; review_as?: string }) =>
@@ -132,6 +134,15 @@ export const api = {
   labelTestSet: (body: { file: string; policy?: string; output_dir?: string; use_judge?: boolean }) =>
     postJSON<{ job: RunJob; run: string; corpus: string; kind: string }>("/api/labels/test-sets/run", body),
   labelStart: (command: string) => postJSON<RunJob>("/api/labels/start", { command }),
+  configFiles: (kind: string, s?: AbortSignal) => getJSON<{ files: string[] }>(`/api/labels/config/${kind}/files`, undefined, s),
+  configRaw: (kind: string, path: string, s?: AbortSignal) => getJSON<ConfigRawResp>(`/api/labels/config/${kind}/raw`, { path }, s),
+  configCheck: (kind: string, data: unknown) => postJSON<ConfigCheck>(`/api/labels/config/${kind}/check`, { data }),
+  configSave: (kind: string, body: { path: string; data: unknown; base_sha?: string; save_as?: string }) =>
+    postJSON<{ path: string; sha: string; backup: string | null }>(`/api/labels/config/${kind}/save`, body),
+  schemaPreview: (body: { data: unknown; run: string; file?: string | null; limit?: number }) =>
+    postJSON<SchemaPreviewResp>("/api/labels/config/schema/preview", body),
+  simpleRows: (run: string, p: Params, s?: AbortSignal) => getJSON<SimpleRowsResp>(`/api/labels/simple/${enc(run)}/rows`, p, s),
+  simpleLine: (run: string, p: Params, s?: AbortSignal) => getJSON<SimpleLineResp>(`/api/labels/simple/${enc(run)}/line`, p, s),
   labelLines: (ds: string, body: { path: string; member: string | null; lines: number[]; policy: string; use_judge: boolean }) =>
     postJSON<LabelLinesResp>(`/api/datasets/${enc(ds)}/label-lines`, body),
   labelRunFromDataset: (ds: string, body: { path: string; member: string | null; policy: string; output_dir: string; use_judge: boolean }) =>

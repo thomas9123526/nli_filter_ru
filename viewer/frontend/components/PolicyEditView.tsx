@@ -187,9 +187,15 @@ function General({ d, edit, policyPath }: Ed & { policyPath?: string }) {
           <input type="checkbox" checked={!!d.rewrite_place_names} onChange={(e) => edit((x) => { x.rewrite_place_names = e.target.checked; })} /></Field>
         <Field label="place_names_file"><input type="text" value={d.place_names_file || ""} onChange={(e) => edit((x) => { x.place_names_file = e.target.value || null; })} /></Field>
         <Field label="place_name_exceptions_file"><input type="text" value={d.place_name_exceptions_file || ""} onChange={(e) => edit((x) => { x.place_name_exceptions_file = e.target.value || null; })} /></Field>
+        <Field label="non_english_file" help="keywords / markers in other scripts (Arabic …): check as usual or remove. Empty = off">
+          <input type="text" placeholder="policy/non_english.json" value={String(d.non_english_file || "")} data-testid="pol-non-english"
+            onChange={(e) => edit((x) => { if (e.target.value) x.non_english_file = e.target.value; else delete x.non_english_file; })} /></Field>
       </div>
-      <div style={{ margin: "8px 0" }}><Link className="btn small" href={href("/label/files", { policy: policyPath || null })} data-testid="pol-files-link">
-        Edit the keyword lists and place-name files →</Link></div>
+      <div className="row" style={{ margin: "8px 0", flexWrap: "wrap" }}>
+        <Link className="btn small" href={href("/label/files", { policy: policyPath || null })} data-testid="pol-files-link">
+          Edit the keyword lists and place-name files →</Link>
+        <Link className="btn small" href={href("/label/non-english", { file: (d.non_english_file as string) || null })} data-testid="pol-non-english-link">
+          Edit the non-English setting →</Link></div>
       <Field label="about"><textarea rows={3} value={d.about || ""} onChange={(e) => edit((x) => { x.about = e.target.value; })} /></Field>
     </section>
   );
@@ -389,7 +395,7 @@ function Topics({ d, edit }: Ed) {
 function Other({ d }: { d: PolicyData }) {
   const known = new Set(["about", "version", "country", "keywords_file", "company_names_file", "rewrite_place_names", "place_names_file",
     "place_name_exceptions_file", "markers", "paragraphs", "conflict", "no_subject", "narrative_opens_gate", "exceptions", "topic_field",
-    "topic_mode", "topic_map", "labels", "run_if"]);
+    "topic_mode", "topic_map", "labels", "run_if", "non_english_file"]);
   const rest = Object.entries(d).filter(([k]) => !known.has(k));
   if (!rest.length) return null;
   return (

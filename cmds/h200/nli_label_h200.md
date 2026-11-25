@@ -26,6 +26,27 @@ full corpus, and how to start, watch, stop and resume it.
 Details: every argument in section 2, launching / watching / stopping in section 3, sizing and the tuning table in
 section 4.
 
+**The big production run in simple mode** (`cmds\labeling\output_modes.md`). It writes one small decisions file per
+input file instead of the labels, rewrites and clean outputs; no `--write-clean`. The model work is the same, so the
+time is the same:
+
+```bash
+./run_label_shards.sh /data/corpus /data/label_simple 2 --policy policy/russia_llm_policy_v2.json \
+    --batch-size 256 --chunk-lines 256 --output-mode simple --decision-unit line --schema output/simple_schema.json
+```
+
+Expected output size per 1 TB of compressed input (about 1 billion lines, about 95 % untouched). These are estimates;
+read the real ratio from the sizing run:
+
+| Schema | Decisions files | Evidence |
+|---|---|---|
+| default (untouched rows written) | ≈ 20–25 GB | – |
+| `include` without `untouched` | ≈ 1–8 GB | – |
+| + `evidence: decided` | as above | ≈ 1–3 GB |
+| detail mode without `--write-clean`, for comparison | – | labels ≈ 5–30 GB |
+
+Tune the policy in detail mode on a sample; run the full corpus in simple mode.
+
 ## Which document covers what
 
 | Document | Tool | Content |
@@ -69,7 +90,9 @@ Model work per labelled paragraph (the cascade only runs later levels when neede
 |---|---|---|---|
 | `INPUTS` | (required) | Files, folders (searched recursively), globs, or server addresses (`ftp://`, `sftp://`, `s3://`, `minio://`). `.jsonl`, `.jsonl.zst`, `.jsonl.gz`, `.parquet`, … | A folder or glob of many files: sharding splits by file |
 | `--output-dir` | (required) | Folder for the outputs. One `<name>.summary.json` per finished file marks it done | One folder for all copies (the shards share it) |
-| `--write-clean` | off | Also write `<name>.clean.jsonl.zst`: removed paragraphs cut out, place names rewritten, emptied documents dropped | On for the training-data run; off for measuring |
+| `--write-clean` | off | Also write `<name>.clean.jsonl.zst`: removed paragraphs cut out, place names rewritten, emptied documents dropped (not with `--output-mode simple`) | On for the training-data run; off for measuring |
+| `--output-mode` | `detail` | `detail`: labels, rewrites, summary (+ clean). `simple`: `<name>.decisions.jsonl.zst` (one small row per line, as `--schema` says) + summary (`cmds\labeling\output_modes.md`) | `simple` for the big production run |
+| `--schema` | `output/simple_schema.json` | simple mode: the fields, which lines get a row, evidence, the reason vocabulary | Edit in the viewer (`/label/output/`) |
 | `--compress` | `zst` | `zst`: every output as `.jsonl.zst`; `none`: plain `.jsonl` | Keep `zst` (5–10 × smaller) |
 | `--limit N` | all | Only the first N lines of each file | For the sizing run (section 4) |
 | `--overwrite` | off | Redo files that are already finished | Off: a rerun resumes |
@@ -82,6 +105,7 @@ Model work per labelled paragraph (the cascade only runs later levels when neede
 | `--policy` | `policy\russia_policy.json` (v1) | The policy file: labels, thresholds, decisions, exceptions, keywords, place names | **Always give it** (e.g. `policy/russia_llm_policy_v2.json` or `policy/russia_policy_v5.json`) |
 | `--all-labels` | off | Score every label on every gated paragraph (no cascade). Decisions are the same; only more scores are stored | Off (2–3 × more pairs); on only for a hand-label sample run |
 | `--review-as` | `keep` | What the clean copy does with `review` paragraphs (`keep` or `remove`); they are counted either way | A policy decision for the training set |
+| `--decision-unit` | `paragraph` | `paragraph`: removed paragraphs are cut. `line`: the strictest paragraph (remove > review > keep > pass) decides the whole line | Same speed either way |
 | `--min-doc-chars` | 50 | A document shorter than this after cleaning counts as removed | Default |
 | `--no-rules` | off | Turn off the cheap rules that mark incidental keywords (language menus, company names) | Off |
 

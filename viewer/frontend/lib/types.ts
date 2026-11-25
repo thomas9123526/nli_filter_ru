@@ -435,7 +435,7 @@ export type LabelProgress = {
 export type LabelRunRow = {
   name: string; finished: string | null; command: string | null; policy: string | null; lines: number | null;
   tokens: number | null; tokens_removed: number | null; docs: Record<string, number>; redecided: boolean;
-  progress: LabelProgress | null;
+  progress: LabelProgress | null; mode?: "detail" | "simple"; unit?: "paragraph" | "line";
 };
 export type LabelPolicyLabel = { level: number; decision: string; threshold: number; hypothesis: string; softens?: string[]; note?: string };
 export type LabelStats = {
@@ -469,12 +469,14 @@ export type LabelParagraph = {
   tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[]; opened_by?: string[];
   exception?: string; action_before?: string; exception_phrases?: string[]; exception_blocked?: string;
   exception_scores?: Record<string, number>; from_field?: string[];
+  non_english?: { term: string; kind: "keyword" | "marker"; script: string }[];
 };
 export type LabelDocResp = {
   name: string; file: string; input: string | null; text: string | null; problem: string | null;
   row: { line: number; id?: string; gate?: boolean; action: string; hits?: { kw: string; span: [number, number]; rule?: string }[];
          markers?: string[]; paragraphs?: LabelParagraph[]; labels?: string[]; flags?: string[]; tokens: number;
-         tokens_removed?: number; rewrites?: number; error?: string };
+         tokens_removed?: number; rewrites?: number; error?: string;
+         decision?: string; reason?: string; decided_by?: number };
   policy: FlowPolicyData;
   policy_path?: string | null;
   settings: Record<string, unknown>;
@@ -524,6 +526,25 @@ export type PolicyData = { about?: string; version?: number; country?: string; k
   labels: Record<string, PolicyLabelData>; run_if?: Record<string, string[]>; [k: string]: unknown };
 export type PolicyCheck = { ok: boolean; errors: string[]; warnings: string[]; summary: Record<string, unknown> | null };
 export type PolicyRawResp = { path: string; data: PolicyData; sha: string; check: PolicyCheck };
+
+// ---- output modes: config editors (/label/output, /label/non-english), simple-mode runs ----
+export type ConfigCheck = { ok: boolean; errors: string[]; info: Record<string, unknown> };
+export type ConfigRawResp = { path: string; data: Record<string, unknown>; sha: string; check: ConfigCheck };
+export type SchemaField = { name: string; from: string };
+export type SchemaData = { about?: string; file?: string; include?: string[]; omit_empty?: boolean; evidence?: string;
+  fields: SchemaField[]; reason_text?: Record<string, string>; [k: string]: unknown };
+export type NonEnglishData = { about?: string; scripts: Record<string, { enabled: boolean; ranges: string[] }>;
+  keywords?: string; markers?: string; score_when_removed?: boolean; [k: string]: unknown };
+export type SchemaPreviewResp = { run: string; file: string; files: string[]; rows: Record<string, unknown>[];
+  read: number; included: number; evidence_rows: number; unit: string };
+export type SimpleRowsResp = { file: string; total: number; offset: number; limit: number;
+  rows: { row: Record<string, unknown>; line: number | null; decision: string | null; reason: string | null; keywords: Record<string, number> }[];
+  counts: { decision: Record<string, number>; reason: Record<string, number>; keyword: Record<string, number> };
+  fields: Record<string, string>; evidence: string; can_open: boolean; unit: string };
+export type SimpleLineResp = { name: string; file: string; line: number; input: string | null; text: string | null;
+  problem: string | null; row: Record<string, unknown> | null; evidence: (LabelDocResp["row"] & { decision?: string }) | null;
+  hits: { start: number; end: number; kw: string | null; marker?: boolean }[]; policy: FlowPolicyData;
+  policy_data: PolicyData | null; policy_path: string | null; settings: Record<string, unknown> };
 
 // ---- comparing two runs (/label/compare, GET /api/labels/compare) ----
 export type CompareParagraph = { action: string; reason: string; labels: string[]; exception?: string } | null;

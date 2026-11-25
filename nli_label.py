@@ -22,6 +22,14 @@ Commands
   review  python nli_label.py review out_label --out labels/review_01.jsonl           (human-review queue)
   redecide python nli_label.py redecide out_label --policy new.json --output-dir out_label2
                                                    (changed thresholds / decisions from stored scores, no models)
+  export  python nli_label.py export out_label --output-dir out_simple [--schema ...] [--decision-unit line]
+                                                   (a simple-mode output from a detail run, no models)
+
+Settings that change what a run marks and writes (cmds/labeling/output_modes.md):
+  --decision-unit paragraph|line   paragraph: removed paragraphs are cut; line: the strictest paragraph
+                                   (remove > review > keep > pass) decides the whole line
+  --output-mode detail|simple      detail: the outputs below; simple: <name>.decisions.jsonl.zst (one small row
+                                   per line, output/simple_schema.json) + <name>.summary.json, no clean copy
 
 Outputs of run, per input file (in --output-dir):
   (by default every output below ends in .jsonl.zst; --compress none writes plain .jsonl; readers accept both)
@@ -36,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import contextlib
 import fnmatch
 import hashlib
 import json
@@ -62,6 +71,7 @@ def output_file(run: Path, name: str, kind: str = "labels") -> Optional[Path]:
     found = [p for p in (Path(run) / f"{name}.{kind}{e}" for e in OUTPUT_EXTS) if p.is_file()]
     return max(found, key=lambda p: p.stat().st_mtime) if found else None
 import nli_formats  # noqa: E402
+import nli_simple  # noqa: E402
 from nli_names import NameRewriter  # noqa: E402
 
 log = logging.getLogger("nli_label")
@@ -140,6 +150,99 @@ class PolicyException:
 
 
 TOPIC_MODES = ("hint", "trust", "off")
+DECISION_UNITS = ("paragraph", "line")
+NON_ENGLISH_MODES = ("check", "remove")
+
+
+class NonEnglish:
+    """policy/non_english.json: which writing systems count as non-English (Unicode ranges, switched on per script)
+    and what a paragraph with a keyword / marker written in one of them gets: 'check' (the normal check) or 'remove'.
+    A term counts when it has a letter in an enabled script (Cyrillic and Latin are never in the default file)."""
+
+    def __init__(self, data: Dict[str, Any], path: Optional[str] = None):
+        self.path = path
+        self.data = data
+        errors: List[str] = []
+        if not isinstance(data, dict):
+            raise ValueError(f"{path or 'non_english'}: must be a JSON object")
+        scripts = data.get("scripts")
+        self.ranges: Dict[str, List[Tuple[int, int]]] = {}  # enabled scripts only
+        if not isinstance(scripts, dict) or not scripts:
+            errors.append("scripts: needs at least one script, e.g. {\"arabic\": {\"enabled\": true, \"ranges\": "
+                          "[\"0600-06FF\"]}}")
+            scripts = {}
+        for name, v in scripts.items():
+            where = f"script '{name}'"
+            if not re.match(r"^[a-z][a-z0-9_]*$", str(name)):
+                errors.append(f"{where}: name must be lower-case letters, digits and _")
+                continue
+            if not isinstance(v, dict):
+                errors.append(f"{where}: must be an object with enabled and ranges")
+                continue
+            if not isinstance(v.get("enabled", False), bool):
+                errors.append(f"{where}: enabled must be true or false")
+            rs: List[Tuple[int, int]] = []
+            ranges = v.get("ranges")
+            if not isinstance(ranges, list) or not ranges:
+                errors.append(f"{where}: ranges must be a list like [\"0600-06FF\"]")
+                ranges = []
+            for r in ranges:
+                m = re.fullmatch(r"\s*([0-9A-Fa-f]{1,6})\s*(?:-\s*([0-9A-Fa-f]{1,6}))?\s*", str(r))
+                if not m:
+                    errors.append(f"{where}: range '{r}' must be hex like 0600-06FF")
+                    continue
+                lo, hi = int(m.group(1), 16), int(m.group(2) or m.group(1), 16)
+                if lo > hi or hi > 0x10FFFF:
+                    errors.append(f"{where}: range '{r}' is not a valid range")
+                    continue
+                rs.append((lo, hi))
+            if v.get("enabled") is True and rs:
+                self.ranges[str(name)] = rs
+        self.keywords = data.get("keywords", "check")
+        self.markers = data.get("markers", "check")
+        for what, val in (("keywords", self.keywords), ("markers", self.markers)):
+            if val not in NON_ENGLISH_MODES:
+                errors.append(f"{what} must be check or remove, not '{val}'")
+        self.score_when_removed = data.get("score_when_removed", False)
+        if not isinstance(self.score_when_removed, bool):
+            errors.append("score_when_removed must be true or false")
+        if errors:
+            raise ValueError(f"{path or 'non_english'}: " + "; ".join(errors))
+        self._cache: Dict[str, Optional[str]] = {}
+
+    @classmethod
+    def load(cls, path: str) -> "NonEnglish":
+        p = Path(path) if Path(path).is_absolute() else HERE / path
+        with open(p, encoding="utf-8-sig") as fh:
+            return cls(json.load(fh), str(path))
+
+    def script_of(self, term: str) -> Optional[str]:
+        """The first enabled script a letter of the term belongs to (None = not non-English)."""
+        if term in self._cache:
+            return self._cache[term]
+        found = None
+        for ch in term:
+            cp = ord(ch)
+            for name, rs in self.ranges.items():
+                if any(lo <= cp <= hi for lo, hi in rs):
+                    found = name
+                    break
+            if found:
+                break
+        self._cache[term] = found
+        return found
+
+    def remove_reason(self, hits: List[Dict[str, Any]]) -> Optional[str]:
+        """'non_english_keyword' / 'non_english_marker' when the config removes such a hit, else None."""
+        if self.keywords == "remove" and any(h["kind"] == "keyword" for h in hits):
+            return "non_english_keyword"
+        if self.markers == "remove" and any(h["kind"] == "marker" for h in hits):
+            return "non_english_marker"
+        return None
+
+    def summary(self) -> Dict[str, Any]:
+        return {"file": self.path, "enabled": sorted(self.ranges), "keywords": self.keywords,
+                "markers": self.markers, "score_when_removed": self.score_when_removed, "config": self.data}
 
 
 def get_path(obj: Any, path: Optional[str]) -> Any:
@@ -281,6 +384,18 @@ class Policy:
                         ("place_name_exceptions_file", self.place_name_exceptions_file)):
             if f and not (Path(f) if Path(f).is_absolute() else HERE / f).is_file():
                 errors.append(f"{what}: {f} not found")
+        # non_english_file: keywords / markers in other scripts (Arabic ...): check as usual, or remove. No line = off
+        self.non_english_file: Optional[str] = data.get("non_english_file") or None
+        self.non_english: Optional[NonEnglish] = None
+        if self.non_english_file:
+            nf = self.non_english_file
+            if not (Path(nf) if Path(nf).is_absolute() else HERE / nf).is_file():
+                errors.append(f"non_english_file: {nf} not found")
+            else:
+                try:
+                    self.non_english = NonEnglish.load(nf)
+                except (ValueError, OSError) as exc:
+                    errors.append(f"non_english_file: {exc}")
         if errors:
             raise ValueError(f"{path or 'policy'}: " + "; ".join(errors))
 
@@ -305,7 +420,8 @@ class Policy:
                 **({} if self.rewrite_place_names else {"rewrite_place_names": False}),
                 **({"place_names_file": self.place_names_file} if self.place_names_file else {}),
                 **({"place_name_exceptions_file": self.place_name_exceptions_file}
-                   if self.place_name_exceptions_file else {})}
+                   if self.place_name_exceptions_file else {}),
+                **({"non_english": self.non_english.summary()} if self.non_english else {})}
 
     def rewriter(self, table: Optional[str] = None, exceptions: Optional[str] = None) -> Optional[NameRewriter]:
         """The place-name rewriter for this policy (None when it does not rewrite). Command-line files win."""
@@ -530,6 +646,8 @@ class Outcome:
     rewrites: List[Dict[str, Any]]
     group: Optional[str] = None          # value of the group field (composition breakdown)
     topic_cmp: Optional["collections.Counter"] = None  # (subject, agree | field_only | model_only) -> paragraphs
+    counts: Optional[Dict[str, int]] = None  # keyword / marker counts of the line (simple mode's keyword_hint)
+    data: Optional[Dict[str, Any]] = None    # the input record (simple mode's input.<field>)
 
 
 class Labeller:
@@ -539,8 +657,13 @@ class Labeller:
                  all_labels: bool = False, text_field: str = "text", id_field: Optional[str] = "id",
                  review_as: str = "keep", min_doc_chars: int = 50, marker_matcher=None,
                  group_field: Optional[str] = None, force_gate: bool = False, narrative_matcher=None,
-                 topic_field: Optional[str] = None, topic_mode: Optional[str] = None):
+                 topic_field: Optional[str] = None, topic_mode: Optional[str] = None, unit: str = "paragraph"):
         self.p, self.matcher, self.rules, self.scorer = policy, matcher, rules, scorer
+        if unit not in DECISION_UNITS:
+            raise ValueError(f"decision unit must be one of {', '.join(DECISION_UNITS)}")
+        self.unit = unit  # paragraph: cut removed paragraphs; line: the strictest paragraph decides the whole line
+        self.want_counts = False  # simple mode with keyword_counts: count every keyword / marker of a line
+        self.non_english = policy.non_english
         self.exc_matchers = build_exception_matchers(policy)
         # the corpus' topic field (optional, per line): the policy's unless given here
         self.topic_field = topic_field or policy.topic_field
@@ -624,6 +747,10 @@ class Labeller:
                 marks = self.marker_matcher.find(text) if self.marker_matcher is not None else []
                 nks = self.narrative_matcher.find(text) if self.narrative_matcher is not None else []
                 d["row"]["gate"] = bool(open_hits or marks or nks or self.force_gate)
+                if self.want_counts:
+                    d["counts"] = nli_simple.count_terms(text, hits, self.matcher)
+                    for k, v in nli_simple.count_terms(text, marks, self.marker_matcher).items():
+                        d["counts"][k] = d["counts"].get(k, 0) + v
                 if hits:
                     d["row"]["hits"] = [{"kw": self.matcher.keywords[h.kw] if h.kw is not None else text[h.start:h.end],
                                          "span": [h.start, h.end], **({"rule": h.rule} if h.rule else {})}
@@ -641,11 +768,14 @@ class Labeller:
                             pa = {"span": [s, e], "marker": bool(pm), "scores": {}, "_text": text[s:e],
                                   "exc_scores": {}, "_topic_yes": d["topic_yes"],
                                   "exc_hits": exception_phrase_hits(self.p, self.exc_matchers, text[s:e])}
+                            if self.non_english is not None:
+                                self._mark_non_english(pa, ph, pm)
                             if pn and not ph and not pm:
                                 pa["narrative_keyword"] = True  # only here for the narrative check
                             d["paras"].append(pa)
             docs.append(d)
-        paras = [pa for d in docs for pa in d["paras"]]
+        # a paragraph removed for a non-English hit is not scored unless score_when_removed
+        paras = [pa for d in docs for pa in d["paras"] if not pa.get("skip_scoring")]
         self._score_exceptions(paras)
         if self.all_labels:
             for pa in paras:
@@ -669,6 +799,28 @@ class Labeller:
                         for lab in p.level(lvl) if lab.key not in pa["scores"]]
                 self._score(todo)
         return [self._finish(d) for d in docs]
+
+    def _mark_non_english(self, pa: Dict[str, Any], kw_hits: List[Any], marker_hits: List[Any]) -> None:
+        """Records the paragraph's keyword / marker hits written in an enabled non-English script, and whether the
+        config removes the paragraph for them (then it is not scored unless score_when_removed)."""
+        ne = self.non_english
+        found: Dict[Tuple[str, str], str] = {}
+        for kind, hits, m in (("keyword", kw_hits, self.matcher), ("marker", marker_hits, self.marker_matcher)):
+            for h in hits:
+                if m is None or h.kw is None:
+                    continue
+                term = m.keywords[h.kw]
+                sc = ne.script_of(term)
+                if sc:
+                    found[(kind, term)] = sc
+        if not found:
+            return
+        pa["non_english"] = [{"term": t, "kind": k, "script": sc} for (k, t), sc in sorted(found.items())]
+        reason = ne.remove_reason(pa["non_english"])
+        if reason:
+            pa["ne_remove"] = reason
+            if not ne.score_when_removed:
+                pa["skip_scoring"] = True
 
     def opening_labels(self) -> List[Label]:
         """Level-2 'remove' labels: with narrative_opens_gate, one of them at or above its threshold opens the gate."""
@@ -708,7 +860,7 @@ class Labeller:
         row, text, rec = d["row"], d["text"], d["rec"]
         if text is None:
             row["action"] = "error"
-            return Outcome(row, None, [])
+            return Outcome(row, None, [], data=rec.data if isinstance(rec.data, dict) else None)
         removed: List[Tuple[int, int]] = []
         doc_labels, flags = set(), set()
         para_rows = []
@@ -718,12 +870,20 @@ class Labeller:
         for pa in d["paras"]:
             opened = self.is_open(pa)
             ds = self.decision_scores(pa)
-            used = self.levels_used(ds, opened)
-            r = resolve(self.p, {k: v for k, v in ds.items() if self.p.labels[k].level in used}, opened)
-            if self.p.exceptions:
-                r = apply_exceptions(self.p, r, pa["exc_hits"], pa["exc_scores"])
+            if pa.get("skip_scoring"):  # removed for a non-English hit, not scored
+                used: List[int] = []
+                r = {"action": "remove", "reason": pa["ne_remove"], "labels": [], "flags": []}
+            else:
+                used = self.levels_used(ds, opened)
+                r = resolve(self.p, {k: v for k, v in ds.items() if self.p.labels[k].level in used}, opened)
+                if pa.get("ne_remove"):  # scored anyway (score_when_removed): the decision is still remove;
+                    r = dict(r, action="remove", reason=pa["ne_remove"], action_before=r["action"])  # no exception
+                elif self.p.exceptions:
+                    r = apply_exceptions(self.p, r, pa["exc_hits"], pa["exc_scores"])
             out = {"span": pa["span"], "action": r["action"], "reason": r["reason"], "labels": r["labels"],
                    "scores": pa["scores"], "levels": used, "tokens": est_tokens(pa["_text"])}
+            if pa.get("non_english"):
+                out["non_english"] = pa["non_english"]
             for k in ("exception", "action_before", "exception_phrases", "exception_blocked"):
                 if k in r:
                     out[k] = r[k]
@@ -760,6 +920,21 @@ class Labeller:
                 removed.append(tuple(pa["span"]))
                 tokens_removed += out["tokens"]
         clean_text = text
+        decided = (max(range(len(para_rows)), key=lambda i: (STRICTNESS[para_rows[i]["action"]], -i))
+                   if para_rows else None)
+        line_drop = False
+        if self.unit == "line" and row.get("gate"):
+            # one decision for the whole line: the strictest paragraph (remove > review > keep > pass) decides
+            line_dec = para_rows[decided]["action"] if decided is not None else "pass"
+            row["decision"] = line_dec
+            if decided is not None:
+                row["reason"] = para_rows[decided]["reason"]
+                row["decided_by"] = decided
+            line_drop = line_dec == "remove" or (line_dec == "review" and self.review_as == "remove")
+            removed = []  # the line is kept whole or dropped whole, never cut
+            tokens_removed = est_tokens(text) if line_drop else 0
+            if line_drop:
+                clean_text = ""
         if removed:
             parts, last = [], 0
             for s, e in sorted(removed):
@@ -784,6 +959,10 @@ class Labeller:
             row["rewrites"] = len(rewrites)
         if not row.get("gate"):
             action = "untouched"
+        elif self.unit == "line":
+            action = "removed" if line_drop else (
+                "review" if row.get("decision") == "review" else
+                ("pass" if all(pr["action"] == "pass" for pr in para_rows) else "kept"))
         elif not removed:
             action = "review" if review else ("pass" if all(pr["action"] == "pass" for pr in para_rows) else "kept")
         elif len(clean_text) < self.min_doc_chars:
@@ -797,7 +976,8 @@ class Labeller:
             clean = dict(obj, **{self.text_field: clean_text}) if (removed or rewrites) else obj
         log_rows = [dict(c, line=rec.line, **({"id": row["id"]} if "id" in row else {})) for c in rewrites]
         group = rec.get(self.group_field) if self.group_field else None
-        return Outcome(row, clean, log_rows, None if group is None else str(group), topic_cmp)
+        return Outcome(row, clean, log_rows, None if group is None else str(group), topic_cmp, d.get("counts"),
+                       rec.data if isinstance(rec.data, dict) else None)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -825,6 +1005,7 @@ class Stats:
                                                        (data.get("groups") or {}).items()}
         self.exceptions = collections.Counter(data.get("exceptions") or {})
         self.topic = collections.Counter({tuple(k.split("|", 1)): v for k, v in (data.get("topic_agreement") or {}).items()})
+        self.non_english = collections.Counter(data.get("non_english") or {})  # "keyword:arabic" -> paragraphs
 
     def add(self, o: Outcome, group: Optional[str] = None) -> None:
         r = o.row
@@ -848,6 +1029,8 @@ class Stats:
                 self.exceptions[pa["exception"]] += 1
             if pa.get("exception_blocked"):
                 self.exceptions[pa["exception_blocked"] + " (blocked: protected removal)"] += 1
+            for kind_script in sorted({f"{h['kind']}:{h['script']}" for h in pa.get("non_english") or []}):
+                self.non_english[kind_script] += 1
         if o.topic_cmp:
             self.topic.update(o.topic_cmp)
         self.rewrites += len(o.rewrites)
@@ -866,7 +1049,7 @@ class Stats:
         self.tokens_removed += o.tokens_removed
         self.rewrites += o.rewrites
         for a in ("docs", "doc_tokens", "paras", "para_tokens", "reasons", "label_paras", "label_tokens", "flags",
-                  "rewrite_names", "exceptions", "topic"):
+                  "rewrite_names", "exceptions", "topic", "non_english"):
             getattr(self, a).update(getattr(o, a))
         for k, v in o.groups.items():
             self.groups.setdefault(k, collections.Counter()).update(v)
@@ -880,6 +1063,7 @@ class Stats:
                 "rewrite_names": dict(self.rewrite_names.most_common(50)),
                 "groups": {k: dict(v) for k, v in self.groups.items()},
                 **({"exceptions": dict(self.exceptions)} if self.exceptions else {}),
+                **({"non_english": dict(self.non_english)} if self.non_english else {}),
                 **({"topic_agreement": {f"{k}|{c}": v for (k, c), v in sorted(self.topic.items())}}
                    if self.topic else {})}
 
@@ -895,6 +1079,9 @@ def format_report(summary: Dict[str, Any]) -> str:
     L: List[str] = []
     L.append(f"lines {st['lines']:,}   tokens (est.) {T:,}   removed {st['tokens_removed']:,} "
              f"({_pct(st['tokens_removed'], T).strip()})   place-name rewrites {st['rewrites']:,}")
+    sett = summary.get("settings") or {}
+    if sett.get("decision_unit") == "line" or sett.get("output_mode") == "simple":
+        L.append(f"decision unit: {sett.get('decision_unit') or 'paragraph'}   output: {sett.get('output_mode') or 'detail'}")
     L.append("")
     L.append("documents       docs        tokens (est.)   share of tokens")
     for a in ("untouched", "pass", "kept", "review", "edited", "removed", "error"):
@@ -920,6 +1107,8 @@ def format_report(summary: Dict[str, Any]) -> str:
         L.append("  flagged (not removed): " + ", ".join(f"{k} {v:,}" for k, v in st["flags"].items()))
     if st.get("exceptions"):
         L.append("  exceptions: " + ", ".join(f"{k} {v:,}" for k, v in st["exceptions"].items()))
+    if st.get("non_english"):
+        L.append("  non-English hits (paragraphs): " + ", ".join(f"{k} {v:,}" for k, v in st["non_english"].items()))
     if st.get("topic_agreement"):
         per: Dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
         for kc, v in st["topic_agreement"].items():
@@ -1055,7 +1244,19 @@ def build_scorer(args):
 def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[str, Any]] = None) -> int:
     """run; redecide reuses it with a scorer that returns stored scores (scorer_override) and a record reader
     that loads each line's stored scores first (records_for)."""
-    policy = Policy.load(args.policy)
+    policy = getattr(args, "policy_obj", None) or Policy.load(args.policy)
+    simple = (getattr(args, "output_mode", None) or "detail") == "simple"
+    schema = None
+    if simple:
+        if args.write_clean:
+            print("error: --write-clean is not available with --output-mode simple (simple mode writes only the "
+                  "decisions; use --output-mode detail for a clean copy)", file=sys.stderr)
+            return 2
+        try:
+            schema = nli_simple.Schema.load(getattr(args, "schema", None))
+        except (ValueError, OSError) as exc:
+            print(f"error: schema: {exc}", file=sys.stderr)
+            return 2
     try:
         if scorer_override is not None:  # redecide: the files are given already (with their reopen addresses)
             typed = [(f, getattr(args, "reopen", {}).get(str(f))) for f in args.inputs]
@@ -1094,7 +1295,7 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         print("error: --compress zst needs the 'zstandard' package", file=sys.stderr)
         return 2
     matcher, rules, markers = build_matchers(policy)
-    rewrite = not args.no_rewrite and policy.rewrite_place_names
+    rewrite = not args.no_rewrite and policy.rewrite_place_names and not simple  # simple: no clean copy
     rewriter = policy.rewriter(args.place_names, args.place_name_exceptions) if rewrite else None
     topic_field = getattr(args, "topic_field", None) or policy.topic_field
     topic_mode = getattr(args, "topic_mode", None) or policy.topic_mode
@@ -1109,7 +1310,10 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
     labeller = Labeller(policy, matcher, None if args.no_rules else rules, scorer, rewriter, args.all_labels,
                         args.text_field, args.id_field or None, args.review_as, args.min_doc_chars, markers,
                         args.group_field, narrative_matcher=build_narrative_matcher(policy),
-                        topic_field=topic_field, topic_mode=topic_mode)
+                        topic_field=topic_field, topic_mode=topic_mode,
+                        unit=getattr(args, "decision_unit", None) or "paragraph")
+    labeller.want_counts = bool(schema and schema.needs("keyword_counts"))
+    label_info = {k: {"level": lab.level, "decision": lab.decision} for k, lab in policy.labels.items()}
     total = Stats()
     files_rows: List[Dict[str, Any]] = []
     failed = 0
@@ -1177,8 +1381,12 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
             t_file = time.perf_counter()
             done = 0
             try:
-                with AtomicOutput(out_dir / f"{name}.labels{ext}") as lab_fh, \
-                        AtomicOutput(out_dir / f"{name}.rewrites{ext}") as rw_fh:
+                # detail: labels + rewrites (+ clean); simple: the schema's decisions file (+ evidence)
+                main_kind = schema.kind if simple else "labels"
+                side_kind = ("evidence" if schema.evidence != "none" else None) if simple else "rewrites"
+                with AtomicOutput(out_dir / f"{name}.{main_kind}{ext}") as lab_fh, \
+                        (AtomicOutput(out_dir / f"{name}.{side_kind}{ext}") if side_kind
+                         else contextlib.nullcontext()) as rw_fh:
                     clean_cm = AtomicOutput(out_dir / f"{name}.clean{ext}") if args.write_clean else None
                     clean_fh = clean_cm.__enter__() if clean_cm else None
                     try:
@@ -1188,6 +1396,15 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                         def write(outs: List[Outcome]) -> None:
                             for o in outs:
                                 st.add(o, o.group)
+                                if simple:
+                                    sr = nli_simple.build_row(schema, o.row, name, label_info, o.counts, o.data)
+                                    if sr is not None:
+                                        lab_fh.write(json_dumps(sr) + "\n")
+                                    if rw_fh is not None:
+                                        ev = nli_simple.evidence_row(schema, o.row)
+                                        if ev is not None:
+                                            rw_fh.write(json_dumps(ev) + "\n")
+                                    continue
                                 lab_fh.write(json_dumps(o.row) + "\n")
                                 for c in o.rewrites:
                                     rw_fh.write(json_dumps(c) + "\n")
@@ -1234,7 +1451,9 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
             ro = reopen.get(str(path))
             if ro:
                 data["reopen"] = ro  # the ${VAR} form: safe to store, opens the file again later
-            for kind in ("labels", "rewrites") + (("clean",) if args.write_clean else ()):
+            kinds = ((schema.kind,) + (("evidence",) if schema.evidence != "none" else ())) if simple else \
+                (("labels", "rewrites") + (("clean",) if args.write_clean else ()))
+            for kind in kinds:
                 for e in OUTPUT_EXTS:  # the same output in the other format (an earlier run): would be read instead
                     old = out_dir / f"{name}.{kind}{e}"
                     if e != ext and old.is_file():
@@ -1263,15 +1482,20 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
         "command": command,
         "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
         "policy": policy.summary(),
+        "policy_data": policy.data,  # the policy file as used (Explain this line, export)
         "settings": {"fast_model": args.fast_model, "judge_model": args.judge_model,
                      "uncertain_band": list(args.uncertain_band), "all_labels": args.all_labels,
                      "review_as": args.review_as, "rewrite": rewrite, "rules": not args.no_rules,
                      "topic_field": topic_field, "topic_mode": topic_mode if topic_field else None,
                      "text_field": args.text_field, "max_length": args.max_length, "group_field": args.group_field,
-                     "shard": shard, "inflight": inflight},
+                     "shard": shard, "inflight": inflight, "decision_unit": labeller.unit,
+                     "output_mode": "simple" if simple else "detail",
+                     **({"schema": schema.path, "evidence": schema.evidence, "decisions_file": schema.kind}
+                        if simple else {})},
         "timing": {"load_seconds": round(load_s, 1), "run_seconds": round(time.perf_counter() - t_run, 1),
                    "fast_pairs": scorer.fast_pairs, "judge_pairs": scorer.judge_pairs},
         "files": files_rows, "files_failed": failed, "stats": total.to_dict(), "output_dir": str(out_dir),
+        **({"schema": schema.data} if simple else {}),
     }
     if scorer_override is not None and hasattr(scorer_override, "report"):
         summary["redecide"] = dict(extra or {}, **scorer_override.report())
@@ -1357,7 +1581,11 @@ def cmd_redecide(args) -> int:
         print("error: --output-dir must be a new folder, not the run itself", file=sys.stderr)
         return 2
     old = json.loads(old_summary_p.read_text(encoding="utf-8"))
-    policy = Policy.load(args.policy)
+    if (old.get("settings") or {}).get("output_mode") == "simple":
+        print(f"error: {run} is a simple-mode run (no stored scores): redecide and export need a detail-mode run",
+              file=sys.stderr)
+        return 2
+    policy = getattr(args, "policy_obj", None) or Policy.load(args.policy)
     scorer = StoredScorer(policy, ((old.get("policy") or {}).get("labels") or {}),
                           (old.get("policy") or {}).get("exceptions"))
     pairs = _run_files(run)
@@ -1390,8 +1618,47 @@ def cmd_redecide(args) -> int:
     for k in ("fast_model", "judge_model", "max_length"):
         setattr(ns, k, st.get(k))
     ns.uncertain_band = st.get("uncertain_band") or [0.6, 0.95]
+    if not getattr(args, "decision_unit", None):
+        ns.decision_unit = st.get("decision_unit") or "paragraph"
     ns.limit, ns.overwrite = None, True
     return cmd_run(ns, scorer_override=scorer, records_for=records_for, extra={"from": str(run)})
+
+
+def cmd_export(args) -> int:
+    """A simple-mode output (decisions file + per-file summaries) from a finished detail run: no models. The run's
+    recorded policy is used unless --policy is given; --decision-unit can differ from the run's."""
+    run = Path(args.run)
+    sp = run / "summary.json"
+    if not sp.is_file():
+        print(f"error: {sp} not found", file=sys.stderr)
+        return 2
+    old = json.loads(sp.read_text(encoding="utf-8"))
+    st = old.get("settings") or {}
+    ns = argparse.Namespace(**vars(args))
+    if not args.policy:
+        if old.get("policy_data"):
+            try:
+                ns.policy_obj = Policy(old["policy_data"], (old.get("policy") or {}).get("path"))
+            except ValueError as exc:
+                print(f"error: the run's recorded policy: {exc}", file=sys.stderr)
+                return 2
+        elif (old.get("policy") or {}).get("path"):
+            ns.policy = old["policy"]["path"]
+            print(f"note: {run} was made before runs recorded their whole policy: the policy file "
+                  f"{ns.policy} is used as it is now (if it changed since the run, the decisions can differ; "
+                  "--policy picks another file)", file=sys.stderr)
+        else:
+            print("error: the run does not record its policy: give --policy", file=sys.stderr)
+            return 2
+    ns.output_mode, ns.write_clean, ns.no_rewrite = "simple", False, True
+    ns.review_as = args.review_as or st.get("review_as") or "keep"
+    ns.no_rules = st.get("rules") is False
+    ns.place_names = ns.place_name_exceptions = None
+    ns.group_field = st.get("group_field")
+    ns.topic_mode = st.get("topic_mode")
+    ns.topic_field = None
+    ns.min_doc_chars = args.min_doc_chars
+    return cmd_redecide(ns)
 
 
 def cmd_report(args) -> int:
@@ -1920,6 +2187,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="hint: field yes = subject yes, the rest by the models; trust: mapped subjects by the field "
                         "only; off: recorded and compared, not used (default: the policy's, else hint)")
     r.add_argument("--min-doc-chars", type=int, default=50, help="shorter after cleaning = document removed")
+    r.add_argument("--decision-unit", choices=list(DECISION_UNITS), default="paragraph",
+                   help="paragraph (default): removed paragraphs are cut out; line: the strictest paragraph "
+                        "(remove > review > keep > pass) decides the whole line, kept whole or dropped")
+    r.add_argument("--output-mode", choices=["detail", "simple"], default="detail",
+                   help="detail (default): labels, rewrites, summary (+ clean); simple: one small row per line as "
+                        "the schema says (decisions file) + summary, no --write-clean")
+    r.add_argument("--schema", default=None, help="simple mode's schema (default output/simple_schema.json)")
     r.add_argument("--chunk-lines", type=int, default=64)
     r.add_argument("--limit", type=int, default=None, help="first N lines per file")
     r.add_argument("--overwrite", action="store_true", help="redo files that are already done")
@@ -1989,7 +2263,25 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--topic-field", default=None, help="default: the one the run used")
     d.add_argument("--topic-mode", choices=list(TOPIC_MODES), default=None)
     d.add_argument("--min-doc-chars", type=int, default=50)
+    d.add_argument("--decision-unit", choices=list(DECISION_UNITS), default=None,
+                   help="default: the one the run used")
+    d.add_argument("--output-mode", choices=["detail", "simple"], default="detail")
+    d.add_argument("--schema", default=None, help="simple mode's schema (default output/simple_schema.json)")
     d.add_argument("--chunk-lines", type=int, default=256)
+
+    x = sub.add_parser("export", help="a simple-mode output from a finished detail run, no models")
+    x.add_argument("run", help="output folder of a detail-mode 'run' or 'redecide'")
+    x.add_argument("--output-dir", required=True, help="a new folder")
+    x.add_argument("--schema", default=None, help="default output/simple_schema.json")
+    x.add_argument("--decision-unit", choices=list(DECISION_UNITS), default=None,
+                   help="default: the one the run used")
+    x.add_argument("--policy", default=None, help="default: the policy recorded in the run")
+    x.add_argument("--review-as", choices=["keep", "remove"], default=None, help="default: the run's")
+    x.add_argument("--compress", choices=["none", "zst"], default=None)
+    x.add_argument("--text-field", default="text")
+    x.add_argument("--id-field", default="id")
+    x.add_argument("--min-doc-chars", type=int, default=50)
+    x.add_argument("--chunk-lines", type=int, default=256)
     return ap
 
 
@@ -2009,7 +2301,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         format="%(asctime)s %(levelname)s %(message)s")
     try:
         return {"run": cmd_run, "sample": cmd_sample, "eval": cmd_eval, "report": cmd_report,
-                "redecide": cmd_redecide, "review": cmd_review}[args.cmd](args)
+                "redecide": cmd_redecide, "review": cmd_review, "export": cmd_export}[args.cmd](args)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

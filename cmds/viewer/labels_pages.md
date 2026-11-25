@@ -7,8 +7,7 @@ click **Labelling runs (nli_label.py) →** on the home page, or open `http://12
 |---|---|
 | **Labels** (`/label/`) | Every `nli_label.py` output folder in the project folder (found by its `summary.json`, or `progress.json` while it runs): state, documents, removed tokens, documents per action. And the **Start a run** box. |
 | **Run** (`/label/run/?run=out_label_seed`) | Token composition (documents and paragraphs by action), the label table (decision, threshold, positive paragraphs and tokens). Click a label to list its documents. The document list filters by document action and by "has a paragraph that is remove / review / keep / pass". |
-| **Try the policy** (`/label/try/`) | Step through 60 cases (every label yes / near miss + edge cases) and run each text through the policy with the model service: the same flow view, compared with the expected result. The **cases** list picks another case set, e.g. `labels/russia_llm_cases_v1.json` for the Russia-side project (it also shows "also fine" actions and your first decision). Guide: `cmds\labeling\cases.md`, `cmds\labeling
-ussia_llm.md` |
+| **Try the policy** (`/label/try/`) | Step through 60 cases (every label yes / near miss + edge cases) and run each text through the policy with the model service: the same flow view, compared with the expected result. The **cases** list picks another case set, e.g. `labels/russia_llm_cases_v1.json` for the Russia-side project (it also shows "also fine" actions and your first decision). Guide: `cmds\labeling\cases.md`, `cmds\labeling\russia_llm.md` |
 | **Document** (`/label/doc/?run=…&file=…&line=…`) | The text, each labelled paragraph coloured by its action (red remove, amber review, green keep, grey pass), keywords highlighted. Click a paragraph to see its **flow**: level 0 gate → level 1 subjects → level 2 framing → decision, every score as a bar with its threshold, "not scored" where the cascade skipped a level, and the rule that decided. |
 
 ## Starting a run from the viewer
@@ -293,3 +292,15 @@ py -3.12 nli_label.py redecide dataset\out_label_docs_ru_judge --output-dir data
 ```
 
 (`redecide` writes a new folder; the viewer shows it as the newest run for that corpus.)
+
+## Output modes: the schema, the non-English setting, simple runs, line unit
+
+Added 2026-11-25. The settings themselves are described in `cmds\labeling\output_modes.md`.
+
+| Page | What you can do |
+|---|---|
+| **Simple-mode output** (`/label/output/`, from the Labels page) | Edit `output\simple_schema.json`, or another schema in `output\`: the fields (name, source, order; add, delete, ↑ ↓), which lines get a row (`include`), `omit_empty`, `evidence`, and the **reason vocabulary** (add, edit, delete). There is also a JSON tab. It is checked while you type, with nli_label.py's own rules. The **Preview** builds rows from a finished detail run with the edited schema. Save keeps a backup in `output\.backup\`; "save as" makes a new schema |
+| **Non-English keywords** (`/label/non-english/`) | Edit `policy\non_english.json`: scripts on or off, their Unicode ranges, adding a script, `check` / `remove` for keywords and markers, `score_when_removed`. Backup in `policy\.backup\`. The policy editor's General section has the `non_english_file` setting and a link here |
+| **A simple-mode run** (`/label/run/?run=…`, marked **simple** on the Labels page) | Totals from the per-file summaries, untouched lines included. The rows of a file, filtered by decision, reason or keyword, as they were written. Click a line number to see its source text with keywords (blue) and markers (red) marked, and its stored **evidence** (when the schema had `evidence: decided` or `all`) |
+| **Explain this line** (on an opened line) | Checks the line again through the model service, with the **policy recorded in the run** and the run's unit, review-as and judge band, and shows the flow trace per paragraph. The model service must be running (see Notes) |
+| **A line-unit run** (`--decision-unit line`) | The run page says "decision unit: line". The document page shows the line decision, the paragraph that decided it (★, opened first), and "nothing is cut, the whole line is kept / dropped" in the "What is cut" view. The flow shows a **Non-English hit** step when a paragraph had one |

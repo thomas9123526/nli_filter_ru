@@ -97,6 +97,27 @@ class TryLabelBody(BaseModel):
     use_judge: bool = True
     topics: Optional[List[Optional[str]]] = None  # each text's topic (the corpus' topic field), for --topic-mode tests
     topic_mode: Optional[str] = None             # hint | trust | off (default: the policy's)
+    decision_unit: Optional[str] = None          # paragraph | line (Explain this line: the run's)
+    review_as: Optional[str] = None              # keep | remove (the run's)
+    uncertain_band: Optional[List[float]] = None  # the run's judge band
+
+
+class ConfigBody(BaseModel):
+    data: Dict[str, Any]
+
+
+class SaveConfigBody(BaseModel):
+    path: str
+    data: Dict[str, Any]
+    base_sha: Optional[str] = None
+    save_as: Optional[str] = None
+
+
+class SchemaPreviewBody(BaseModel):
+    data: Dict[str, Any]
+    run: str
+    file: Optional[str] = None
+    limit: int = 30
 
 
 class AddTopicBody(BaseModel):
@@ -785,9 +806,142 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
 
     @app.get("/api/labels/policies", tags=["labels"])
     def label_policies():
-        """policy/*.json files of the project (for the start form)."""
+        """policy/*.json files of the project that are policies (for the start form; not the non-English configs)."""
         pol = project / "policy"
-        return {"policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json")) if pol.is_dir() else []}
+        return {"policies": sorted(f"policy/{p.name}" for p in pol.glob("*.json") if not _is_non_english_file(p))
+                if pol.is_dir() else []}
+
+    def _is_non_english_file(p: Path) -> bool:
+        try:
+            d = json.loads(p.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            return False
+        return isinstance(d, dict) and "scripts" in d and "labels" not in d
+
+    # ---- config editors (/label/output: the simple-mode schema; /label/non-english: the non-English config) ------
+    CONFIG_KINDS = {"schema": ("output", "the simple-mode schema (output/<name>.json)"),
+                    "non_english": ("policy", "the non-English config (policy/<name>.json with \"scripts\")")}
+
+    def _config_file(kind: str, rel: str) -> Path:
+        if kind not in CONFIG_KINDS:
+            raise HTTPException(404, f"no config kind {kind}")
+        folder = CONFIG_KINDS[kind][0]
+        rel = (rel or "").replace("\\", "/")
+        if not re.fullmatch(rf"{folder}/[A-Za-z0-9_.-]+\.json", rel):
+            raise HTTPException(400, f"{CONFIG_KINDS[kind][1]}: {folder}/<name>.json (letters, digits, _ . -)")
+        return project / rel
+
+    def _check_config(kind: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        info: Dict[str, Any] = {}
+        try:
+            if kind == "schema":
+                import nli_simple
+                sc = nli_simple.Schema(data, "x")
+                info = {"file": f"<name>.{sc.kind}.jsonl.zst", "evidence": sc.evidence,
+                        "sources": list(nli_simple.SOURCES) + ["input.<field>"],
+                        "include_values": list(nli_simple.INCLUDE_VALUES),
+                        "evidence_values": list(nli_simple.EVIDENCE_VALUES)}
+            else:
+                import nli_label
+                ne = nli_label.NonEnglish(data, "x")
+                info = {"enabled": sorted(ne.ranges), "modes": list(nli_label.NON_ENGLISH_MODES)}
+        except ValueError as exc:
+            msg = str(exc)
+            msg = msg.split(": ", 1)[1] if msg.startswith("x: ") else msg
+            errors = [m for m in msg.split("; ") if m]
+        return {"ok": not errors, "errors": errors, "info": info}
+
+    @app.get("/api/labels/config/{kind}/files", tags=["labels"])
+    def config_files(kind: str):
+        if kind not in CONFIG_KINDS:
+            raise HTTPException(404, f"no config kind {kind}")
+        folder = project / CONFIG_KINDS[kind][0]
+        out = []
+        for p in sorted(folder.glob("*.json")) if folder.is_dir() else []:
+            if kind == "non_english" and not _is_non_english_file(p):
+                continue
+            out.append(f"{CONFIG_KINDS[kind][0]}/{p.name}")
+        return {"files": out}
+
+    @app.get("/api/labels/config/{kind}/raw", tags=["labels"])
+    def config_raw(kind: str, path: str):
+        f = _config_file(kind, path)
+        if not f.is_file():
+            raise HTTPException(404, f"no file {path}")
+        raw = f.read_bytes()
+        try:
+            data = json.loads(raw.decode("utf-8-sig"))
+        except ValueError as exc:
+            raise HTTPException(400, f"{path} is not valid JSON: {exc}")
+        return {"path": path.replace("\\", "/"), "data": data, "sha": hashlib.sha1(raw).hexdigest(),
+                "check": _check_config(kind, data)}
+
+    @app.post("/api/labels/config/{kind}/check", tags=["labels"])
+    def config_check(kind: str, body: ConfigBody):
+        if kind not in CONFIG_KINDS:
+            raise HTTPException(404, f"no config kind {kind}")
+        return _check_config(kind, body.data)
+
+    @app.post("/api/labels/config/{kind}/save", tags=["labels"])
+    def config_save(kind: str, body: SaveConfigBody, request: Request):
+        """Save an edited config (refused when nli_label.py would refuse it, or when the file changed since it was
+        loaded). The old file goes to <folder>/.backup/."""
+        save_guard(request)
+        target = _config_file(kind, body.save_as or body.path)
+        if body.save_as:
+            if target.exists():
+                raise HTTPException(409, f"{body.save_as} exists already: pick another name")
+        else:
+            if not target.is_file():
+                raise HTTPException(404, f"no file {body.path}")
+            if body.base_sha and hashlib.sha1(target.read_bytes()).hexdigest() != body.base_sha:
+                raise HTTPException(409, f"{body.path} was changed by someone else since you loaded it: reload the page")
+        chk = _check_config(kind, body.data)
+        if not chk["ok"]:
+            raise HTTPException(400, "; ".join(chk["errors"][:12]))
+        backup = None
+        if target.is_file():
+            bdir = target.parent / ".backup"
+            bdir.mkdir(exist_ok=True)
+            b = bdir / f"{target.stem}.{time.strftime('%Y%m%d-%H%M%S')}.json"
+            shutil.copy2(target, b)
+            backup = f"{CONFIG_KINDS[kind][0]}/.backup/{b.name}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(".json.tmp")
+        with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(body.data, ensure_ascii=False, indent=2) + "\n")
+        tmp.replace(target)
+        return {"path": f"{CONFIG_KINDS[kind][0]}/{target.name}", "sha": hashlib.sha1(target.read_bytes()).hexdigest(),
+                "backup": backup}
+
+    @app.post("/api/labels/config/schema/preview", tags=["labels"])
+    def schema_preview(body: SchemaPreviewBody):
+        """Simple-mode rows built with this (edited) schema from a finished detail run's first lines."""
+        chk = _check_config("schema", body.data)
+        if not chk["ok"]:
+            raise HTTPException(400, "; ".join(chk["errors"][:6]))
+        try:
+            return labels.schema_preview(body.run, body.data, body.file, max(1, min(body.limit, 200)))
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(404, str(exc))
+
+    @app.get("/api/labels/simple/{name}/rows", tags=["labels"])
+    def simple_rows(name: str, file: str, decision: Optional[str] = None, reason: Optional[str] = None,
+                    keyword: Optional[str] = None, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
+        """A simple-mode run's rows of one file, filtered by decision / reason / keyword, with the counts."""
+        try:
+            return labels.simple_rows(name, file, decision, reason, keyword, offset, limit)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(404, str(exc))
+
+    @app.get("/api/labels/simple/{name}/line", tags=["labels"])
+    def simple_line(name: str, file: str, line: int = Query(..., ge=1)):
+        """One line of a simple-mode run: its row, the source text with the keywords found in it, the evidence."""
+        try:
+            return labels.simple_line(name, file, line)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(404, str(exc))
 
     # ---- policy editor (/label/policy): read the JSON as it is, check it like nli_label.py does, save with a backup ----
     def _policy_file(rel: str) -> Path:
@@ -1274,6 +1428,14 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             if body.topic_mode not in ("hint", "trust", "off"):
                 raise HTTPException(400, "topic_mode must be hint, trust or off")
             req["topic_mode"] = body.topic_mode
+        if body.decision_unit:
+            if body.decision_unit not in ("paragraph", "line"):
+                raise HTTPException(400, "decision_unit must be paragraph or line")
+            req["decision_unit"] = body.decision_unit
+        if body.review_as:
+            req["review_as"] = body.review_as
+        if body.uncertain_band and len(body.uncertain_band) == 2:
+            req["uncertain_band"] = list(body.uncertain_band)
         if body.policy_data is not None:
             req["policy_data"] = body.policy_data
         else:

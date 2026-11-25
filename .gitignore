@@ -41,3 +41,5 @@ keywords/*.tmp
 # nli_playground.py run logs
 .playground_jobs/
 
+output/.backup/
+output/*.tmp
