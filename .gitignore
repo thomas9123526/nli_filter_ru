@@ -21,6 +21,7 @@ viewer/.viewer_edits/
 .viewer_edits/
 out**
 !cmds/labeling/outputs.md
+!cmds/labeling/output_modes.md
 !output/
 !viewer/frontend/app/label/output/
 pkgs/**
