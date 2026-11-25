@@ -78,6 +78,21 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
 .steps .to { color: var(--wire); }
 .foot { color: var(--muted); font-size: 13px; margin-top: 28px; max-width: 75ch; }
 
+/* "Configure": where each step is set (policy key, file, nli_label.py argument) and the viewer page that edits it */
+.cfg { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.cfg-h { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.cfg ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.cfg li { display: grid; grid-template-columns: minmax(150px, 34%) minmax(0, 1fr); gap: 10px; }
+.cfg-k { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.tbl { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+table.ref { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 720px; }
+table.ref th, table.ref td { text-align: left; padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+table.ref thead th { border-top: 0; font-size: 12px; color: var(--muted); font-weight: 600; }
+table.ref td:first-child { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+table.ref tr.sec td { background: var(--accent-soft); font-family: var(--sans); font-weight: 600; font-size: 13px; color: var(--accent); }
+@media (max-width: 760px) { .cfg li { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+
 @media (max-width: 760px) {
   .stage { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .exits { padding: 8px 0 0 14px; }
@@ -89,6 +104,9 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
   <h1>Russia-side policy flow</h1>
   <p class="lede">How <span class="file">nli_label.py</span> applies <span class="file">policy/russia_llm_policy_v2.json</span> to one document:
     where the markers, the gate, Level 1, Level 2, <code>reports_or_debunks</code> and the exceptions act, and which action each step can give.</p>
+  <p class="lede" style="margin-top:6px">Each step ends with <strong>Configure</strong>: the policy key, file or <code>nli_label.py</code> argument that
+    changes it, and the viewer page that edits it. The links open the viewer at <code>localhost:8000</code> (it must be running).
+    The full list is in the <a href="#reference">reference table</a> at the end.</p>
 
   <div class="flow">
     <!-- 1 keyword scan -->
@@ -97,6 +115,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
         <h3><span class="tag">Document</span> Keyword scan</h3>
         <p>Looks for the words in <span class="file">keywords/russia_v3.txt</span> + <span class="file">keywords/ukraine.txt</span>, plus the marker terms.
           Cheap: no model runs here.</p>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">keywords_file</span><span>the keyword lists (policy key) · edit the lists: <a href="http://localhost:8000/label/files/" target="_blank" rel="noopener">keyword lists &amp; place names</a></span></li><li><span class="cfg-k">markers</span><span>marker terms (policy key) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</span></li><li><span class="cfg-k">company_names_file · --no-rules</span><span>cheap rules that mark incidental hits (language menus, company names); <code>--no-rules</code> turns them off · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a> / <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</span></li><li><span class="cfg-k">--text-field · --id-field</span><span>which input fields hold the text and the id · <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>no hit: document <span class="badge b-pass">untouched</span>, copied as it is</span></div>
@@ -109,6 +128,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
       <div class="box">
         <h3><span class="tag">Document</span> Split into paragraphs</h3>
         <p>Blocks of 200–2,000 characters. Only paragraphs with a keyword hit or a marker term go on; every other paragraph stays as it is.</p>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">paragraphs.min_chars / max_chars</span><span>paragraph size (policy keys) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>paragraphs without a hit are not labelled</span></div>
@@ -125,6 +145,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
           <code>keywords</code> / <code>markers</code> set to <code>remove</code>, the paragraph is
           <span class="badge b-remove">remove</span> here (reason <code>non_english_keyword</code> / <code>non_english_marker</code>), not
           scored unless <code>score_when_removed</code>, and no exception can lower it. With <code>check</code> it goes on as usual.</p>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">non_english_file</span><span>switches the step on (policy key; no line = off) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</span></li><li><span class="cfg-k">scripts · keywords · markers · score_when_removed</span><span>in <code>policy/non_english.json</code> · <a href="http://localhost:8000/label/non-english/" target="_blank" rel="noopener">non-English page</a></span></li><li><span class="cfg-k">Arabic keywords / markers</span><span>the lists must contain such terms for anything to happen · <a href="http://localhost:8000/label/files/" target="_blank" rel="noopener">keyword lists &amp; place names</a>, <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a> (markers)</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>remove setting: paragraph <span class="badge b-remove">remove</span>, straight to the document step</span></div>
@@ -142,6 +163,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
           <li><strong>Gate label</strong> <code>involves_russia_ukraine</code> ≥ <code>0.3</code>: “This text mentions Russia, Ukraine, Russians or Ukrainians.”</li>
           <li><strong>A Level-2 remove label</strong> (<code>hostility_*</code>, <code>violence_call</code>) is already positive (<code>narrative_opens_gate: true</code>). Hate is never let through just because the gate model said no.</li>
         </ol>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">labels.involves_russia_ukraine</span><span>the gate label: threshold, hypothesis (level 0) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Labels; test it on the <a href="http://localhost:8000/label/try/" target="_blank" rel="noopener">Try page</a></span></li><li><span class="cfg-k">markers · narrative_opens_gate · narrative_keywords</span><span>what opens the gate without the gate label · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>none of the three: paragraph <span class="badge b-pass">pass</span> (the keyword was incidental)</span></div>
@@ -164,7 +186,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
             <div class="lbl"><span class="k">war</span><span class="t">0.8</span><span class="badge b-keep">keep</span></div>
             <div class="lbl"><span class="k">economy</span><span class="t">0.8</span><span class="badge b-keep">keep</span></div>
             <div class="lbl"><span class="k">culture</span><span class="t">0.8</span><span class="badge b-keep">keep</span></div>
-            <p style="font-size:12px;margin-top:6px">politics is <code>review</code> in your local copy (not committed). With a topic field, <code>topic_map</code> can set these from the corpus.</p>
+            <p style="font-size:12px;margin-top:6px">The decisions shown are from 2026-11-23; check the current ones in the policy editor. With a topic field, <code>topic_map</code> can set these from the corpus.</p>
           </div>
           <div class="lvl">
             <h4>Level 2 · framing</h4>
@@ -177,6 +199,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
             <div class="lbl"><span class="k">reports_or_debunks</span><span class="t">0.6</span><span class="badge b-soft">softener</span></div>
           </div>
         </div>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">labels.&lt;key&gt;</span><span>add, delete or change a label: level, decision, threshold, hypothesis, protected · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Labels</span></li><li><span class="cfg-k">run_if</span><span>when Level 1 / Level 2 run (any listed label positive, or <code>@marker</code>) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Run if</span></li><li><span class="cfg-k">topic_field · topic_mode · topic_map</span><span>a corpus topic field answers subjects without the model · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Topics; <code>--topic-field</code>, <code>--topic-mode</code> in the <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></span></li><li><span class="cfg-k">--fast-model · --judge-model · --uncertain-band</span><span>which models score, and when the judge re-scores (default modernbert, deberta, 0.6–0.95) · <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (judge on / off; the rest in the command box)</span></li><li><span class="cfg-k">--all-labels</span><span>score every label on every gated paragraph (sample runs; the decision is the same)</span></li><li><span class="cfg-k">--batch-size · --chunk-lines · --max-length</span><span>speed and memory only (H200: 256 / 256 / 512; cmds/h200/nli_label_h200.md)</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>scores only: no action yet</span></div>
@@ -194,6 +217,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
         <p>The softener has no action of its own; it only changes those labels.</p>
         <p>Without a <code>reports_or_debunks</code> block in the policy, this step is skipped: every positive hostility or
           violence label is <span class="badge b-remove">remove</span>, news reports and fact-checks included.</p>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">labels.reports_or_debunks</span><span>its threshold, hypothesis and <code>softens</code> patterns (e.g. <code>hostility_*</code>) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Labels</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>not positive: hostility / violence stay <span class="badge b-remove">remove</span></span></div>
@@ -216,6 +240,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
           <li>Nothing positive, but it is about Russia / Ukraine → the policy's <code>"no_subject"</code>, here <span class="badge b-keep">keep</span> (plain facts).
             It can be set to <code>review</code> or <code>remove</code>; the reason stays <code>no_subject</code>.</li>
         </ol>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">conflict · no_subject</span><span>rules 2 and 6 (keep / review / remove) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</span></li><li><span class="cfg-k">labels.&lt;key&gt;.decision</span><span>which rule a label feeds (remove / review / keep / flag) · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Labels</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>one of <span class="badge b-remove">remove</span> <span class="badge b-review">review</span> <span class="badge b-keep">keep</span></span></div>
@@ -232,6 +257,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
           (it is unclear whose country “our” is).</p>
         <p>Applies to <span class="badge b-pass">pass</span>, <span class="badge b-keep">keep</span> and <span class="badge b-review">review</span> results.
           A <span class="badge b-remove">remove</span> by a <strong>protected</strong> label is never lowered (recorded as <code>exception_blocked</code>).</p>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">exceptions[]</span><span>key, decision, priority, phrases or hypothesis + threshold, <code>skip_quoted</code>, scope · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Exceptions</span></li><li><span class="cfg-k">labels.&lt;key&gt;.protected</span><span>a removal no exception can lower · <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Labels</span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>no phrase, or only inside quotes: result unchanged</span></div>
@@ -256,6 +282,7 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
           <strong>pass</strong>; never edited.</p>
         <p>The clean copy (<code>--write-clean</code>) then rewrites place names to the Russian spelling (Kyiv → Kiev), from
           <span class="file">policy/place_names_ru.csv</span>.</p>
+        <div class="cfg"><div class="cfg-h">Configure</div><ul><li><span class="cfg-k">--decision-unit paragraph | line</span><span>cut paragraphs, or keep / drop whole lines · <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</span></li><li><span class="cfg-k">--review-as keep | remove</span><span>what the clean copy does with review · <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></span></li><li><span class="cfg-k">--write-clean · --min-doc-chars</span><span>write the clean copy; shorter than 50 characters = removed · <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></span></li><li><span class="cfg-k">--output-mode detail | simple · --schema</span><span>what is written: detail outputs, or one small row per line · <a href="http://localhost:8000/label/output/" target="_blank" rel="noopener">simple-mode schema</a>; mode in the <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</span></li><li><span class="cfg-k">rewrite_place_names · place_names_file · place_name_exceptions_file</span><span>the clean copy's renaming (policy keys; <code>--no-rewrite</code> turns it off) · <a href="http://localhost:8000/label/files/" target="_blank" rel="noopener">keyword lists &amp; place names</a></span></li></ul></div>
       </div>
       <div class="exits">
         <div class="exit"><span class="arrow">→</span><span>detail mode: <code>&lt;file&gt;.labels.jsonl.zst</code>, <code>.clean.jsonl.zst</code>, <code>.rewrites.jsonl.zst</code></span></div>
@@ -263,6 +290,52 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
       </div>
     </div>
   </div>
+
+  <h2 id="reference">Reference: every setting and where to change it</h2>
+  <p class="lede">Policy keys are in <span class="file">policy/russia_llm_policy_v2.json</span> (edit: <a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>). Arguments go on the
+    <code>nli_label.py run</code> command line; the <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> has boxes for some and a command box for the rest. Every run records what it used in its
+    <code>summary.json</code>.</p>
+  <div class="tbl"><table class="ref">
+    <thead><tr><th>Setting</th><th>Kind</th><th>What it changes</th><th>Default / now</th><th>Change it in the viewer</th></tr></thead>
+    <tbody>
+      <tr class="sec"><td colspan="5">Policy (policy file)</td></tr>
+      <tr><td>keywords_file</td><td>policy key + files</td><td>which words make a document checked</td><td>keywords/russia_v3.txt + ukraine.txt</td><td><a href="http://localhost:8000/label/files/" target="_blank" rel="noopener">keyword lists &amp; place names</a></td></tr>
+      <tr><td>markers</td><td>policy key</td><td>slurs that open the gate and always get the full check</td><td>9 terms</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</td></tr>
+      <tr><td>paragraphs.min_chars / max_chars</td><td>policy key</td><td>paragraph size</td><td>200 / 2000</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</td></tr>
+      <tr><td>labels.&lt;key&gt;</td><td>policy key</td><td>level, decision, threshold, hypothesis, softens, protected</td><td>15 labels</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Labels</td></tr>
+      <tr><td>run_if</td><td>policy key</td><td>when Level 1 / Level 2 run</td><td>gate or @marker</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Run if</td></tr>
+      <tr><td>narrative_opens_gate · narrative_keywords</td><td>policy key</td><td>hate opens the gate without the gate label</td><td>true</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</td></tr>
+      <tr><td>conflict</td><td>policy key</td><td>L1 remove + keep both positive</td><td>review</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</td></tr>
+      <tr><td>no_subject</td><td>policy key</td><td>gate open, nothing positive</td><td>see the policy</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General</td></tr>
+      <tr><td>exceptions</td><td>policy key</td><td>top-priority overrides (e.g. ambiguous_our_country → review)</td><td>1</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Exceptions</td></tr>
+      <tr><td>topic_field · topic_mode · topic_map</td><td>policy key</td><td>a corpus topic field answers subjects</td><td>none</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, Topics</td></tr>
+      <tr><td>non_english_file</td><td>policy key + file</td><td>non-English keywords / markers: check or remove</td><td>off</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a> → <a href="http://localhost:8000/label/non-english/" target="_blank" rel="noopener">non-English page</a></td></tr>
+      <tr><td>rewrite_place_names · place_names_file · place_name_exceptions_file</td><td>policy key + files</td><td>the clean copy's renaming</td><td>on, place_names_ru.csv</td><td><a href="http://localhost:8000/label/files/" target="_blank" rel="noopener">keyword lists &amp; place names</a></td></tr>
+      <tr><td>company_names_file</td><td>policy key + file</td><td>company names that make a hit incidental</td><td>–</td><td><a href="http://localhost:8000/label/policy/" target="_blank" rel="noopener">policy editor</a>, General (JSON tab)</td></tr>
+      <tr class="sec"><td colspan="5">nli_label.py run: what is decided and written</td></tr>
+      <tr><td>--policy</td><td>argument</td><td>the policy file</td><td>policy/russia_policy.json (always give it)</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></td></tr>
+      <tr><td>--decision-unit</td><td>argument</td><td>paragraph (cut) or line (whole line)</td><td>paragraph</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--review-as</td><td>argument</td><td>review in the clean copy: keep or remove</td><td>keep</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></td></tr>
+      <tr><td>--write-clean</td><td>argument</td><td>write the clean copy</td><td>off</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></td></tr>
+      <tr><td>--min-doc-chars</td><td>argument</td><td>shorter after cleaning = removed</td><td>50</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--output-mode · --schema</td><td>argument + file</td><td>detail outputs, or simple rows shaped by the schema</td><td>detail · output/simple_schema.json</td><td><a href="http://localhost:8000/label/output/" target="_blank" rel="noopener">simple-mode schema</a>; mode: <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--compress</td><td>argument</td><td>.jsonl.zst or plain .jsonl</td><td>zst</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--no-rewrite · --place-names · --place-name-exceptions</td><td>argument</td><td>place names for this run only</td><td>the policy's</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--no-rules</td><td>argument</td><td>no language-menu / company-name rules</td><td>rules on</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--topic-field · --topic-mode</td><td>argument</td><td>the corpus topic field for this run</td><td>the policy's</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a></td></tr>
+      <tr><td>--text-field · --id-field · --group-field</td><td>argument</td><td>input fields; a field to break the report down by</td><td>text · id · none</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--all-labels</td><td>argument</td><td>score every label (sample runs)</td><td>off</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr class="sec"><td colspan="5">nli_label.py run: models and speed</td></tr>
+      <tr><td>--fast-model · --judge-model</td><td>argument</td><td>the models; <code>--judge-model none</code> = no judge</td><td>modernbert · deberta</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (judge on / off)</td></tr>
+      <tr><td>--uncertain-band</td><td>argument</td><td>fast scores sent to the judge</td><td>0.6 0.95</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--batch-size · --chunk-lines · --max-length</td><td>argument</td><td>speed and memory only</td><td>32 · 64 · 512 (H200: 256 · 256 · 512)</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (command box)</td></tr>
+      <tr><td>--device · --dtype · --shard · --limit · --overwrite</td><td>argument</td><td>GPUs, precision, splitting, test slices, redo</td><td>auto</td><td><a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (limit, overwrite; rest in the command box)</td></tr>
+      <tr class="sec"><td colspan="5">After a run (no models)</td></tr>
+      <tr><td>redecide</td><td>command</td><td>apply another policy / unit to the stored scores</td><td>–</td><td>run page: Apply another policy; <a href="http://localhost:8000/label/compare/" target="_blank" rel="noopener">compare runs</a></td></tr>
+      <tr><td>export</td><td>command</td><td>simple-mode output from a detail run</td><td>–</td><td>command line</td></tr>
+      <tr><td>test sets</td><td>files</td><td>cases and documents with expected results</td><td>labels/russia_llm_*_v1.json</td><td><a href="http://localhost:8000/label/try/" target="_blank" rel="noopener">Try page</a> (cases), <a href="http://localhost:8000/label/docs/" target="_blank" rel="noopener">documents test set</a>, <a href="http://localhost:8000/label/" target="_blank" rel="noopener">Start-a-run form</a> (Run a test set)</td></tr>
+    </tbody>
+  </table></div>
 
   <h2>Four paragraphs through the flow</h2>
   <div class="traces">
@@ -286,5 +359,5 @@ ol.rules li::marker { color: var(--accent); font-weight: 600; }
 
   <p class="foot">The traces show the intended path; real scores can differ (the “orcs” report paragraph was cut in the docs test because
     <code>reports_or_debunks</code> scored 0.47, below 0.6). Source: <code>resolve()</code> and <code>apply_exceptions()</code> in nli_label.py,
-    policy/russia_llm_policy_v2.json as of 2026-11-23.</p>
+    policy/russia_llm_policy_v2.json as of 2026-11-23; non-English step, decision unit and the Configure lines added 2026-11-25.</p>
 </div>

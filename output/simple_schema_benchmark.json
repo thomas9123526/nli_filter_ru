@@ -1,0 +1,33 @@
+{
+  "about": "Simple-mode schema for the benchmark corpus (dataset/corpus_benchmark): every line gets a row, with the benchmark's expected decision and label next to the result, and the evidence (paragraphs and scores) of every checked line.",
+  "file": "decisions.jsonl.zst",
+  "include": ["remove", "review", "keep", "pass", "untouched", "error"],
+  "omit_empty": true,
+  "evidence": "all",
+  "fields": [
+    {"name": "id", "from": "id"},
+    {"name": "ln", "from": "line"},
+    {"name": "src", "from": "file"},
+    {"name": "decision", "from": "decision"},
+    {"name": "reason", "from": "reason_text"},
+    {"name": "expected", "from": "input.expected_action"},
+    {"name": "expected_label", "from": "input.label"},
+    {"name": "labels", "from": "labels"},
+    {"name": "keyword_hint", "from": "keyword_counts"},
+    {"name": "case", "from": "input.case"},
+    {"name": "variant", "from": "input.variant"}
+  ],
+  "reason_text": {
+    "hostility_*": "insult",
+    "violence_call": "violence",
+    "opinion_about_*": "opinion",
+    "history": "history",
+    "claim_ukraine_in_nato": "false_claim",
+    "ambiguous_our_country": "our_country",
+    "gate_negative": "not_related",
+    "no_subject": "facts",
+    "untouched": "no_keyword",
+    "non_english_keyword": "non_english",
+    "non_english_marker": "non_english"
+  }
+}
