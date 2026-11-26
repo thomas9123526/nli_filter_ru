@@ -35,6 +35,8 @@ from . import runs as runs_mod
 from .results import Dataset
 from .golden import GoldenStore
 from .labels import LabelRuns
+from . import kwstats as kwstats_mod
+from . import translate as translate_mod
 from .storage import StorageError, clean_path
 
 __all__ = ["create_app", "EDIT_HEADER"]
@@ -100,6 +102,7 @@ class TryLabelBody(BaseModel):
     decision_unit: Optional[str] = None          # paragraph | line (Explain this line: the run's)
     review_as: Optional[str] = None              # keep | remove (the run's)
     uncertain_band: Optional[List[float]] = None  # the run's judge band
+    reuse_scores: bool = False                   # the Experiment page: reuse pairs scored before (model service cache)
 
 
 class ConfigBody(BaseModel):
@@ -132,6 +135,14 @@ class SaveCasesBody(BaseModel):
 
 class CheckPolicyBody(BaseModel):
     data: Dict[str, Any]                          # the whole policy, as it would be saved
+
+
+class LabSaveBody(BaseModel):
+    data: Dict[str, Any]                          # the Experiment page's draft policy
+    save_as: Optional[str] = None                 # policy/<name>.json, a new file (never overwrites), or
+    replace: Optional[str] = None                 # policy/<name>.json to overwrite (with a backup), only with
+    confirm: Optional[str] = None                 # the file name typed again (e.g. russia_llm_policy_v2.json)
+    base_sha: Optional[str] = None                # replace: refused when the file changed since the page loaded it
 
 
 class SavePolicyBody(BaseModel):
@@ -327,6 +338,8 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     golden = GoldenStore(project / "golden")
     app.state.golden = golden
     app.state.playground = pg
+    app.include_router(kwstats_mod.router)  # /api/labels/kwstats/... (before /api/labels/{name} and the frontend mount)
+    translate_mod.install(app, cfg)  # /api/translate, /api/translate/settings, /api/translate/test
 
     def filters(decision, reason, q, kw, rule, min_score, max_score, mismatch, judged) -> Dict[str, Any]:
         return {"decision": decision or None, "reason": reason or None, "q": q or None, "kw": kw or None,
@@ -820,13 +833,16 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
 
     # ---- config editors (/label/output: the simple-mode schema; /label/non-english: the non-English config) ------
     CONFIG_KINDS = {"schema": ("output", "the simple-mode schema (output/<name>.json)"),
-                    "non_english": ("policy", "the non-English config (policy/<name>.json with \"scripts\")")}
+                    "non_english": ("policy", "the non-English config (policy/<name>.json with \"scripts\")"),
+                    "expected_rules": ("labels", "the Expected vs result rules (labels/expected_rules.json)")}
 
     def _config_file(kind: str, rel: str) -> Path:
         if kind not in CONFIG_KINDS:
             raise HTTPException(404, f"no config kind {kind}")
         folder = CONFIG_KINDS[kind][0]
         rel = (rel or "").replace("\\", "/")
+        if kind == "expected_rules" and rel != "labels/expected_rules.json":
+            raise HTTPException(400, "the Expected vs result rules are labels/expected_rules.json")
         if not re.fullmatch(rf"{folder}/[A-Za-z0-9_.-]+\.json", rel):
             raise HTTPException(400, f"{CONFIG_KINDS[kind][1]}: {folder}/<name>.json (letters, digits, _ . -)")
         return project / rel
@@ -835,7 +851,13 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         errors: List[str] = []
         info: Dict[str, Any] = {}
         try:
-            if kind == "schema":
+            if kind == "expected_rules":
+                from .expected_rules import check as check_rules, ACTIONS as RULE_ACTIONS
+                errs = check_rules(data)
+                if errs:
+                    raise ValueError("; ".join(errs))
+                info = {"actions": list(RULE_ACTIONS), "profiles": list(data.get("profiles") or {})}
+            elif kind == "schema":
                 import nli_simple
                 sc = nli_simple.Schema(data, "x")
                 info = {"file": f"<name>.{sc.kind}.jsonl.zst", "evidence": sc.evidence,
@@ -861,8 +883,20 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         for p in sorted(folder.glob("*.json")) if folder.is_dir() else []:
             if kind == "non_english" and not _is_non_english_file(p):
                 continue
+            if kind == "expected_rules" and p.name != "expected_rules.json":
+                continue
             out.append(f"{CONFIG_KINDS[kind][0]}/{p.name}")
         return {"files": out}
+
+    @app.get("/api/labels/expected-rules", tags=["labels"])
+    def expected_rules(run: Optional[str] = None):
+        """labels/expected_rules.json as the viewer uses it (profiles, aliases, default, a problem if the file is
+        refused); with ?run= also that run's n / ok under every profile. Edited through
+        /api/labels/config/expected_rules/raw|check|save."""
+        out = labels.rules.info()
+        if run:
+            out["preview"] = labels.expected_profiles(run)
+        return out
 
     @app.get("/api/labels/config/{kind}/raw", tags=["labels"])
     def config_raw(kind: str, path: str):
@@ -928,18 +962,20 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
 
     @app.get("/api/labels/simple/{name}/rows", tags=["labels"])
     def simple_rows(name: str, file: str, decision: Optional[str] = None, reason: Optional[str] = None,
-                    keyword: Optional[str] = None, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
-        """A simple-mode run's rows of one file, filtered by decision / reason / keyword, with the counts."""
+                    keyword: Optional[str] = None, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
+                    expect: Optional[str] = None, profile: Optional[str] = None):
+        """A simple-mode run's rows of one file, filtered by decision / reason / keyword (and expect=wrong / right on a
+        corpus with expected results), with the counts."""
         try:
-            return labels.simple_rows(name, file, decision, reason, keyword, offset, limit)
+            return labels.simple_rows(name, file, decision, reason, keyword, offset, limit, expect, profile)
         except (KeyError, ValueError) as exc:
             raise HTTPException(404, str(exc))
 
     @app.get("/api/labels/simple/{name}/line", tags=["labels"])
-    def simple_line(name: str, file: str, line: int = Query(..., ge=1)):
+    def simple_line(name: str, file: str, line: int = Query(..., ge=1), profile: Optional[str] = None):
         """One line of a simple-mode run: its row, the source text with the keywords found in it, the evidence."""
         try:
-            return labels.simple_line(name, file, line)
+            return labels.simple_line(name, file, line, profile)
         except (KeyError, ValueError) as exc:
             raise HTTPException(404, str(exc))
 
@@ -1023,6 +1059,76 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         rel = f"policy/{target.name}"
         return {"path": rel, "sha": hashlib.sha1(target.read_bytes()).hexdigest(), "backup": backup,
                 "warnings": chk["warnings"]}
+
+    # ---- the Experiment page (/label/lab): a draft of the whole policy, saved only on an explicit confirm ----------
+    @app.get("/api/labels/lab/base", tags=["labels"])
+    def lab_base(run: Optional[str] = None, file: Optional[str] = None, line: Optional[int] = None,
+                 para: Optional[int] = None, policy: Optional[str] = None):
+        """Where an experiment starts: the text of a run's line (and the paragraph asked for), the policy that run
+        recorded (policy_data; else its policy file, else the Russia-side policy) and the run's settings."""
+        out: Dict[str, Any] = {"text": None, "paragraph": None, "problem": None, "settings": {}}
+        pol_path = policy
+        if run:
+            try:
+                d = labels.folder(run)
+            except (KeyError, ValueError) as exc:
+                raise HTTPException(404, str(exc))
+            s = json.loads((d / "summary.json").read_text(encoding="utf-8")) if (d / "summary.json").is_file() else {}
+            out["settings"] = s.get("settings") or {}
+            pol_path = pol_path or ((s.get("policy") or {}).get("path"))
+            if s.get("policy_data") and not policy:
+                out["policy_data"], out["policy_from"] = s["policy_data"], f"recorded by run {run}"
+            if file and line:
+                text, problem, src = labels.source_text(d, file, int(line))
+                out.update(text=text, problem=problem, source={"run": run, "file": file, "line": line, "input": src})
+                if text and para is not None:
+                    row = None
+                    try:
+                        row = next((r for r in labels._rows(d, file) if r.get("line") == line), None)
+                    except KeyError:  # a simple run: the evidence file has the paragraphs, when the schema wrote it
+                        ev = labels._simple_file(d, file, "evidence")
+                        row = next((r for r in labels._jsonl(ev) if r.get("line") == line), None) if ev else None
+                    paras = (row or {}).get("paragraphs") or []
+                    if 0 <= para < len(paras):
+                        a, b = paras[para]["span"]
+                        out["paragraph"] = text[a:b]
+        rel = (pol_path or "policy/russia_llm_policy_v2.json").replace("\\", "/")
+        m = re.search(r"policy/[A-Za-z0-9_.-]+\.json$", rel)
+        rel = m.group(0) if m else "policy/russia_llm_policy_v2.json"
+        f = project / rel
+        if f.is_file():
+            raw = f.read_bytes()
+            out["policy_path"], out["policy_sha"] = rel, hashlib.sha1(raw).hexdigest()
+            if "policy_data" not in out:
+                out["policy_data"], out["policy_from"] = json.loads(raw.decode("utf-8-sig")), f"the file {rel}"
+            out["file_differs"] = json.loads(raw.decode("utf-8-sig")) != out["policy_data"]
+        elif "policy_data" not in out:
+            raise HTTPException(404, f"no policy {rel}")
+        out["policies"] = sorted(f"policy/{p.name}" for p in (project / "policy").glob("*.json")
+                                 if not _is_non_english_file(p))
+        return out
+
+    @app.post("/api/labels/lab/check", tags=["labels"])
+    def lab_check(body: ConfigBody):
+        """The draft checked like nli_label.py checks a policy (errors stop a run; warnings = missing files)."""
+        return _check_policy(body.data)
+
+    @app.post("/api/labels/lab/save", tags=["labels"])
+    def lab_save(body: LabSaveBody, request: Request):
+        """Save the Experiment page's draft, only on an explicit confirm: save_as = a new policy file (never overwrites);
+        replace = overwrite a policy file, only when confirm repeats its file name, with a backup in policy/.backup/,
+        refused when the file changed since the page loaded it."""
+        save_guard(request)
+        if bool(body.save_as) == bool(body.replace):
+            raise HTTPException(400, "either save_as (a new file) or replace (with confirm)")
+        if body.save_as:
+            return label_policy_save(SavePolicyBody(path=body.save_as, data=body.data, save_as=body.save_as), request)
+        target = _policy_file(body.replace or "")
+        if not body.confirm or body.confirm.strip() != target.name:
+            raise HTTPException(400, f"type the file name {target.name} to confirm the replace")
+        if not body.base_sha:
+            raise HTTPException(400, "base_sha is needed to replace (the version the page loaded)")
+        return label_policy_save(SavePolicyBody(path=body.replace, data=body.data, base_sha=body.base_sha), request)
 
     # ---- documents test sets (/label/docs): labels/*docs*.json with "docs" (multi-paragraph test documents) ------
     DOC_ACTIONS = ("remove", "review", "keep", "pass", "none")
@@ -1434,6 +1540,8 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             req["decision_unit"] = body.decision_unit
         if body.review_as:
             req["review_as"] = body.review_as
+        if body.reuse_scores:
+            req["reuse_scores"] = True
         if body.uncertain_band and len(body.uncertain_band) == 2:
             req["uncertain_band"] = list(body.uncertain_band)
         if body.policy_data is not None:
@@ -1494,20 +1602,21 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     def label_docs(name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
                    para_action: Optional[str] = None, gated: bool = True,
                    offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
-                   expect: Optional[str] = None):
+                   expect: Optional[str] = None, profile: Optional[str] = None):
         """Documents of one file of a run, filtered by document action, label or paragraph action; for a test corpus
         with expected results, each row has "expect" (expected vs got) and expect=wrong / right filters them."""
-        return labels.docs(name, file, action, label, para_action, gated, offset, limit, expect)
+        return labels.docs(name, file, action, label, para_action, gated, offset, limit, expect, profile)
 
     @app.get("/api/labels/{name}/expected", tags=["labels"])
-    def label_expected(name: str):
-        """For a run on a test corpus with expected results: how many lines match, and the ones that do not."""
-        return {"expected": labels.expected_summary(name)}
+    def label_expected(name: str, profile: Optional[str] = None):
+        """For a run on a test corpus with expected results: how many lines match, and the ones that do not (detail
+        and simple runs; profile = a profile of labels/expected_rules.json, else its default)."""
+        return {"expected": labels.expected_summary(name, profile)}
 
     @app.get("/api/labels/{name}/doc", tags=["labels"])
-    def label_doc(name: str, file: str, line: int = Query(..., ge=1)):
+    def label_doc(name: str, file: str, line: int = Query(..., ge=1), profile: Optional[str] = None):
         """One document: its labels row (paragraphs, scores, actions), the source text and the policy."""
-        return labels.doc(name, file, line)
+        return labels.doc(name, file, line, profile)
 
     # ---- the "Start a run" form: what it can offer, and "Run this test set" ------------------------------------
     def _test_set_tool():
@@ -1543,7 +1652,7 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         dsd = project / "dataset"
         from nli_formats import INPUT_SUFFIXES
         for d in sorted(dsd.iterdir()) if dsd.is_dir() else []:
-            if d.name.startswith(".") or labels.is_run_folder(d):
+            if d.name.startswith(".") or labels.is_run_folder(d) or (d / "kwstats.json").is_file():
                 continue
             if d.is_dir():
                 n = sum(1 for q in d.rglob("*") if q.is_file() and q.name.lower().endswith(INPUT_SUFFIXES)

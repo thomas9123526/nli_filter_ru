@@ -73,6 +73,26 @@ Other settings: place names are rewritten to their Russian form (next section);
 `"narrative_opens_gate": true` (hate that never names a country still reaches the hate labels); markers are common
 slurs on both sides ("orcs", "рашисты", "хохлы", "укропы" …), so a paragraph with one always gets the full check.
 
+### Several gates (OR)
+
+A policy may have any number of level-0 labels (`"level": 0, "decision": "gate"`), each with its own hypothesis and
+threshold. They are **OR-combined**: the gate is open when a marker term is in the paragraph, or **any** gate label is
+at or above its threshold, or (`narrative_opens_gate`) a narrative fires. All below and no marker → `pass`, reason
+`gate_negative`.
+
+- **Order and cost:** the first gate (file order) is scored on every candidate paragraph; the second only where the
+  first said no (and no marker); the third only where both said no, and so on. A second gate costs pairs only on the
+  paragraphs the first one let pass. `--all-labels` still scores every gate everywhere.
+- **run_if:** `"@gate"` = any gate open. With several gates, a run_if that names one gate but not the others is
+  refused (it would ignore what the other gates open): use `["@gate", "@marker"]`, or list every gate.
+- **Adding one:** in the policy editor (`/label/policy/`) add a level-0 label, then tick `@gate` in run_if (instead of
+  the single gate key); or try it first on the Experiment page (`/label/lab/`). The labels row records which gate
+  opened a paragraph (`opened_by_gate`, only when there are several).
+- **Existing runs:** `redecide` with a gate added counts its scores as missing (No) until a new `run`; the summary
+  lists it as changed.
+- A policy with one gate gives exactly the results it gave before (checked byte for byte on `out_label_ru_v2` and the
+  benchmark run).
+
 `"no_subject": "keep"`: what a paragraph gets when the gate is open but no level-1 / level-2 label is positive (plain
 facts about Russia or Ukraine). `keep` is the default and the agreed principle; `review` sends all of them to people
 (a large queue), `remove` cuts them. The reason in the outputs stays `no_subject` whatever the value. A change can be

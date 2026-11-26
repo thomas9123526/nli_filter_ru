@@ -524,3 +524,25 @@ mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent);
   border: 1px solid var(--border); border-radius: 8px; background: var(--panel); margin-top: 6px; }
 .doc-text mark.mark-kw { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
 .doc-text mark.mark-marker { background: var(--filter-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* ---- text tools: [Copy ▾] [中文] [Русский] and the translation side panel ---- */
+.text-tools { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; position: relative; }
+.text-tools .tt-copy { display: inline-flex; position: relative; }
+.text-tools .tt-copy .tt-more { padding-left: 4px; padding-right: 4px; }
+.text-tools .btn.on { outline: 1px solid var(--accent); }
+.tt-menu { position: absolute; top: 100%; left: 0; z-index: 40; display: flex; flex-direction: column; min-width: 220px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.18); padding: 4px; }
+.tt-menu button { text-align: left; background: none; border: 0; color: var(--text); padding: 6px 8px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 13px; }
+.tt-menu button:hover { background: var(--panel-2); }
+.tt-flash { font-size: 12px; color: var(--accent); }
+.tt-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100vw); z-index: 60; overflow: auto;
+  background: var(--panel); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0,0,0,.18); padding: 14px 16px; }
+.tt-body { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.tt-pair { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.tt-body.side .tt-pair { grid-template-columns: 1fr 1fr; }
+.tt-orig, .tt-tr { white-space: pre-wrap; line-height: 1.55; font-size: 14px; padding: 4px 6px; border-radius: 4px; display: block; }
+.tt-orig { color: var(--text); opacity: .75; }
+@media (max-width: 700px) { .tt-body.side .tt-pair { grid-template-columns: 1fr; } }
+/* the row a Back / "back to the run" returned to */
+.flash-row, .flash-row td { animation: flashrow 2s ease-out; }
+@keyframes flashrow { from { background: rgba(255, 200, 0, .35); } to { background: transparent; } }

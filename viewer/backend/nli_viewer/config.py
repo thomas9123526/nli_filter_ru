@@ -74,6 +74,7 @@ class ViewerConfig:
     project_dir: str = ".."             # folder with nli_filter.py, hypotheses/, keywords/ (relative to the config)
     progress_stale_seconds: float = 120.0  # a running nli_filter.py whose progress file is older: "no update"
     auto_datasets: Optional[str] = None  # a folder (e.g. "../dataset"): its run folders become datasets (discover.py)
+    config_path: Optional[str] = None   # the file this config was loaded from (translate.py reads its "translate" block)
 
 
 def _expand(value: Any) -> Any:
@@ -116,7 +117,7 @@ def load_config(path: str) -> ViewerConfig:
         datasets.append(DatasetConfig(**{k: v for k, v in d.items() if k in DatasetConfig.__dataclass_fields__}))
     if not datasets and not data.get("auto_datasets"):
         raise ValueError(f"{p}: no datasets")
-    cfg = ViewerConfig(datasets=datasets, base_dir=str(p.parent))
+    cfg = ViewerConfig(datasets=datasets, base_dir=str(p.parent), config_path=str(p))
     for k in ("cache_dir", "cache_max_gb", "cors_origins", "frontend_dir", "edits_dir", "edit_zstd_level",
               "edit_allow_remote", "playground_url", "project_dir", "progress_stale_seconds", "auto_datasets"):
         if k in data:

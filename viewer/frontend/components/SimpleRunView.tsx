@@ -12,6 +12,9 @@ import { Bars, Crumbs, ErrorBox, Loading, Stat } from "./ui";
 import { ProgressBadge } from "./LabelsView";
 import { actionClass } from "./LabelRunView";
 import { TryTrace } from "./TryTrace";
+import { ExpectBadge, ExpectedPanel } from "./ExpectedPanel";
+import { TextTools } from "./TextTools";
+import { useRestoreScroll, useUrlState } from "@/lib/urlState";
 
 const PAGE = 50;
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
@@ -29,8 +32,8 @@ function Marked({ text, hits }: { text: string; hits: SimpleLineResp["hits"] }) 
   return <div className="doc-text" style={{ whiteSpace: "pre-wrap" }}>{parts}</div>;
 }
 
-function LinePanel({ run, file, line, onClose }: { run: string; file: string; line: number; onClose: () => void }) {
-  const res = useApi(`simpleline:${run}:${file}:${line}`, (s) => api.simpleLine(run, { file, line }, s));
+function LinePanel({ run, file, line, profile, onClose }: { run: string; file: string; line: number; profile?: string; onClose: () => void }) {
+  const res = useApi(`simpleline:${run}:${file}:${line}:${profile || ""}`, (s) => api.simpleLine(run, { file, line, profile }, s));
   const [ex, setEx] = useState<LabelTryResp | null>(null);
   const [exErr, setExErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -60,7 +63,11 @@ function LinePanel({ run, file, line, onClose }: { run: string; file: string; li
     <div className="panel" style={{ marginBottom: 16 }} data-testid="simple-line">
       <div className="row" style={{ flexWrap: "wrap" }}>
         <h2 style={{ margin: 0 }}>{file} · line {line}</h2>
+        {d?.expect ? <span data-testid="simple-line-expect"><ExpectBadge v={d.expect} /></span> : null}
         <span className="spacer" />
+        {d?.text ? <TextTools text={d.text} source={{ run, file, line, id: (d.row?.id as string) ?? null }} row={d.row ?? undefined} testid="simple-tools" /> : null}
+        {d?.text ? <Link className="btn small" data-testid="simple-lab" href={href("/label/lab", { run, file, line })}
+          title="Open the Experiment page with this line">Experiment →</Link> : null}
         <button className="btn small primary" disabled={!d?.text || busy} onClick={explain} data-testid="simple-explain"
           title="check this line again through the model service, with the policy and settings this run recorded">{busy ? "Checking…" : "Explain this line"}</button>
         <button className="btn small ghost" onClick={onClose}>close ✕</button>
@@ -110,17 +117,24 @@ function LinePanel({ run, file, line, onClose }: { run: string; file: string; li
 export function SimpleRunView({ run, d }: { run: string; d: LabelRunResp }) {
   const st = d.summary.stats;
   const set = (d.summary.settings || {}) as Record<string, unknown>;
-  const [file, setFile] = useState(d.files[0]?.name || "");
-  const [decision, setDecision] = useState("");
-  const [reason, setReason] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [offset, setOffset] = useState(0);
-  const [open, setOpen] = useState<number | null>(null);
-  const rows = useApi(file ? `simplerows:${run}:${file}:${decision}:${reason}:${keyword}:${offset}` : null,
-    (s) => api.simpleRows(run, { file, decision, reason, keyword, offset, limit: PAGE }, s));
-  useEffect(() => { setOpen(null); }, [file, decision, reason, keyword, offset]);
+  // the view is kept in the URL (Back and copied links show it again)
+  const [u, setU] = useUrlState({ file: "", decision: "", reason: "", keyword: "", expect: "", offset: "0", open: "", profile: "" });
+  const file = u.file || d.files[0]?.name || "";
+  const { decision, reason, keyword, expect, profile } = u;
+  const offset = parseInt(u.offset, 10) || 0;
+  const open = u.open ? parseInt(u.open, 10) : null;
+  const setOpen = (v: number | null) => setU({ open: v === null ? "" : String(v) });
+  const setFile = (v: string) => setU({ file: v, offset: "0", open: "" });
+  const setDecision = (v: string) => setU({ decision: v, offset: "0", open: "" });
+  const setReason = (v: string) => setU({ reason: v, offset: "0", open: "" });
+  const setKeyword = (v: string) => setU({ keyword: v, offset: "0", open: "" });
+  const setExpect = (v: string) => setU({ expect: v, offset: "0", open: "" });
+  const setOffset = (v: number) => setU({ offset: String(v), open: "" });
+  const rows = useApi(file ? `simplerows:${run}:${file}:${decision}:${reason}:${keyword}:${offset}:${expect}:${profile}` : null,
+    (s) => api.simpleRows(run, { file, decision, reason, keyword, offset, limit: PAGE, expect, profile }, s));
   const r = rows.data;
-  const reset = () => setOffset(0);
+  useRestoreScroll(!!r);
+  const reset = () => { /* the setters go back to the first page */ };
   return (
     <>
       <div className="page-head"><div>
@@ -151,6 +165,9 @@ export function SimpleRunView({ run, d }: { run: string; d: LabelRunResp }) {
               <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>non-English hits: {Object.entries((st as unknown as { non_english: Record<string, number> }).non_english).map(([k, v]) => `${k} ${v}`).join(", ")}</div>) : null}
           </div>
         </div></>) : null}
+      <ExpectedPanel run={run} profile={profile} setProfile={(p) => setU({ profile: p })}
+        onFile={(x) => setU({ file: x, expect: "", offset: "0", open: "" })}
+        onOpen={(x, ln) => setU({ file: x, expect: "", decision: "", reason: "", keyword: "", offset: "0", open: String(ln) })} />
 
       <div className="panel flush">
         <div className="panel-head" style={{ flexWrap: "wrap" }}>
@@ -166,25 +183,35 @@ export function SimpleRunView({ run, d }: { run: string; d: LabelRunResp }) {
           <select value={keyword} onChange={(e) => { setKeyword(e.target.value); reset(); }} data-testid="simple-keyword">
             <option value="">every keyword</option>
             {Object.entries(r?.counts.keyword || {}).map(([k, v]) => <option key={k} value={k}>{k} ({num(v)} lines)</option>)}</select>
+          {r?.expected || expect ? (
+            <span className="seg" data-testid="simple-expect-filter">
+              <button className={expect === "" ? "on" : ""} onClick={() => setExpect("")}>expected: any</button>
+              <button className={expect === "wrong" ? "on" : ""} onClick={() => setExpect("wrong")}>✗ not as expected</button>
+              <button className={expect === "right" ? "on" : ""} onClick={() => setExpect("right")}>✓ as expected</button>
+            </span>) : null}
+          {r?.expected ? <span className="faint" style={{ fontSize: 12 }}>{r.expected.ok} / {r.expected.n} rows of this file as expected</span> : null}
           <span className="faint" style={{ fontSize: 12 }}>{r ? `${num(r.total)} rows` : ""}</span>
         </div>
         <ErrorBox error={rows.error} onRetry={rows.reload} />
         {rows.loading && !r ? <Loading what="Loading rows" /> : null}
+        {r && open !== null && r.can_open && !r.rows.some((x) => x.line === open) ? (
+          <div className="panel-body"><LinePanel run={run} file={file} line={open} profile={profile} onClose={() => setOpen(null)} /></div>) : null}
         {r && !r.can_open ? <div className="panel-body faint">The schema has no &quot;line&quot; field: rows cannot be opened.</div> : null}
         {r ? (
           <div className="table-wrap"><table data-testid="simple-rows">
-            <thead><tr><th>Line</th><th>Decision</th><th>Reason</th><th>Keywords</th><th>Row as written</th></tr></thead>
+            <thead><tr><th>Line</th><th>Decision</th>{r.expected ? <th>Expected</th> : null}<th>Reason</th><th>Keywords</th><th>Row as written</th></tr></thead>
             <tbody>{r.rows.map((x, i) => (
               <Fragment key={i}>
-                <tr className={open !== null && open === x.line ? "active" : ""}>
+                <tr className={open !== null && open === x.line ? "active" : ""} data-line={x.line ?? undefined} id={x.line !== null ? `line-${x.line}` : undefined}>
                   <td>{x.line !== null && r.can_open ? <button className="linklike" onClick={() => setOpen(open === x.line ? null : x.line)}>{x.line}</button> : (x.line ?? "–")}</td>
                   <td>{x.decision ? <span className={`badge ${actionClass(x.decision)}`}>{x.decision}</span> : null}</td>
+                  {r.expected ? <td>{x.expect ? <ExpectBadge v={x.expect} /> : <span className="faint">–</span>}</td> : null}
                   <td>{x.reason}</td>
                   <td>{Object.entries(x.keywords).slice(0, 8).map(([k, v]) => <span key={k} className="chip">{k}{v > 1 ? ` ×${v}` : ""}</span>)}</td>
                   <td className="mono faint" style={{ fontSize: 11.5, maxWidth: 420, overflowWrap: "anywhere" }}>{JSON.stringify(x.row)}</td>
                 </tr>
                 {open !== null && open === x.line ? (
-                  <tr><td colSpan={5}><LinePanel run={run} file={file} line={x.line} onClose={() => setOpen(null)} /></td></tr>) : null}
+                  <tr><td colSpan={r.expected ? 6 : 5}><LinePanel run={run} file={file} line={x.line} profile={profile} onClose={() => setOpen(null)} /></td></tr>) : null}
               </Fragment>))}</tbody>
           </table></div>) : null}
         {r && r.total > PAGE ? (

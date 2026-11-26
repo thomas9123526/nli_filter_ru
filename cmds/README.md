@@ -21,6 +21,7 @@
 | | `wheels_check.md` | Are the `pkgs` wheels enough for another computer with torch (Python 3.10 / 3.12, Windows / Ubuntu): checked, install command |
 | | `python_launcher.md` | What `py -3.12` is, why some notes use it, where it does not work (Linux, Store / Anaconda Python), and the venv way that works everywhere |
 | | `pycharm.md` | PyCharm: `nli_viewer` imports shown as errors (mark `viewer\backend` as Sources Root) |
+| | `docker_beginner.md` | Docker for beginners (docs only): the ideas, which parts could use it, checks on the H200s (toolkit, Apptainer), offline save / load, disk cleaning (Windows `docker_data.vhdx`), worked vLLM example for Hunyuan-MT-7B and the viewer setting |
 | `h200/` | `linux_h200.md` | Running on the 8 x H200 Ubuntu machine (`run_shards.sh`) |
 | | `h200_readiness.md` | Review of the scripts for multi-GPU runs |
 | | `nli_label_h200.md` | **`nli_label.py` on 8 x H200**: every argument with its default and H200 setting, where the time goes, sizing a run before the full corpus, `run_label_shards.sh`, checklist |

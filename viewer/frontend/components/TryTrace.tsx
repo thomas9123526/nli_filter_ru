@@ -57,8 +57,10 @@ export function TryTrace({ res, p, text, row, docAction, expected }: {
   const labels = pol.labels as unknown as Record<string, Lab>;
   const keys = Object.keys(labels);
   const lv = (n: number) => keys.filter((k) => labels[k].level === n);
-  const gateKey = lv(0)[0];
+  const gateKeys = lv(0);
+  const gateKey = p.opened_by_gate || gateKeys[0];
   const gateScore = gateKey ? p.scores[gateKey] : undefined;
+  const many = gateKeys.length > 1;
   const isPos = (k: string) => p.scores[k] !== undefined && p.scores[k] !== null && p.scores[k] >= labels[k].threshold;
   const pos = keys.filter((k) => labels[k].level > 0 && isPos(k));
   const softeners = pos.filter((k) => labels[k].softens?.length);
@@ -127,11 +129,13 @@ export function TryTrace({ res, p, text, row, docAction, expected }: {
       {neRemoved && !(p.levels || []).length ? null : <>
       <Step n={3} tag="L0" title="Gate" state={gateOpen ? undefined : "decided"}
         side={gateOpen ? <span className="badge accent">open</span> : <span className="badge neutral">pass</span>}>
-        {gateKey ? <Scores keys={[gateKey]} p={p} labels={labels} /> : null}
-        <div className="trace-p">
+        {gateKeys.length ? <Scores keys={gateKeys} p={p} labels={labels} /> : null}
+        <div className="trace-p" data-testid="trace-gates">
           {p.marker ? "A marker term is in the paragraph: the gate is open without the model."
-            : p.opened_by?.length ? <>The gate label said no, but {list(p.opened_by)} opened it (narrative_opens_gate).</>
+            : p.opened_by?.length ? <>{many ? "Every gate label" : "The gate label"} said no, but {list(p.opened_by)} opened it (narrative_opens_gate).</>
+            : gateOpen && many ? <>{gateKeys.length} gates, OR-combined: opened by <strong>{gateKey}</strong> ({gateScore?.toFixed(4)} ≥ {gateKey ? labels[gateKey].threshold : "?"}){gateKey !== gateKeys[0] ? "; the gates before it said no" : ""}.</>
             : gateOpen ? <>Gate label {gateScore?.toFixed(4)} ≥ {gateKey ? labels[gateKey].threshold : "?"}: open.</>
+            : many ? <>All {gateKeys.length} gate labels below their thresholds (later gates are scored only where the earlier ones said no), no marker: the keyword was incidental → <strong>pass</strong>.</>
             : <>Gate label {gateScore?.toFixed(4)} below {gateKey ? labels[gateKey].threshold : "?"}, no marker: the keyword was incidental → <strong>pass</strong>.</>}
         </div>
       </Step>

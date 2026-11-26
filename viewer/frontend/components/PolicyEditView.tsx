@@ -288,14 +288,15 @@ function RunIf({ d, edit }: Ed) {
     <section className="panel">
       <h2>run_if</h2>
       <p className="faint" style={{ marginTop: 0, fontSize: 13 }}>A level is scored on a paragraph when <strong>any</strong> ticked item is true (a label positive, or
-        <code> @marker</code> = a marker term or a hate label opened the gate). Nothing ticked = the level always runs. The Try page scores every label anyway.</p>
+        <code> @marker</code> = a marker term or a hate label opened the gate; <code>@gate</code> = any level-0 gate label is yes, needed when the
+        policy has several gates, which are OR-combined). Nothing ticked = the level always runs. The Try page scores every label anyway.</p>
       {["1", "2"].map((lv) => {
         const on = d.run_if?.[lv];
         return (
           <div key={lv} className="row" style={{ marginTop: 8, alignItems: "flex-start" }} data-testid={`pol-runif-${lv}`}>
             <strong style={{ width: 70 }}>level {lv}</strong>
             <div className="row" style={{ flexWrap: "wrap", gap: 4 }}>
-              {[...keys.filter((k) => Number(d.labels[k].level) < Number(lv) + 1), "@marker"].map((k) => (
+              {[...keys.filter((k) => Number(d.labels[k].level) < Number(lv) + 1), "@gate", "@marker"].map((k) => (
                 <label key={k} className="chip" style={{ cursor: "pointer" }}>
                   <input type="checkbox" checked={!!on?.includes(k)} onChange={(e) => edit((x) => {
                     const cur = new Set(x.run_if?.[lv] || []);

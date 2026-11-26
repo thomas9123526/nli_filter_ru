@@ -253,6 +253,39 @@ none, and these pages look as before.
   document action, the selected paragraph's expected vs got, and every paragraph as ¶1 keep → keep ✓ …
 - Matching rules (as in `tools\compare_cases.py` / `compare_docs.py`): the "also fine" actions count; pass, untouched
   and "none" (a paragraph that was never labelled) count as the same, because all three leave the text as it is.
+  What counts as the same can be changed: see "What counts as expected" below.
+- **Simple-mode runs** (`--output-mode simple`) get the same panel, at line level: each corpus line with
+  `expected_action` against its row's strictest action (the row's `paragraphs` field, else `level`, else `decision`;
+  in the paragraph unit the document action is mapped: edited / removed → remove, kept → keep …). The lines table has
+  the same ✗ / ✓ filter and an Expected column; a click on a wrong line opens it on the page (text, evidence, Explain
+  this line). Needs a `line` field in the run's schema (else the panel says so). When the schema's `include` leaves
+  `untouched` out, lines without a row count as untouched (the panel says so). Test documents
+  (`expected_paragraphs`) are checked at line level only on simple runs.
+- **Which runs have a panel:** every file of the run is checked for expected fields, not only the first one. Within a
+  file, a shortcut for big real corpora: when none of its first 3 lines has `expected_action` /
+  `expected_doc_action`, the file counts as having none (expected results only on later lines are not seen).
+- A corpus without expected results: no panel, no filter, no error.
+
+### What counts as expected: `labels\expected_rules.json` (`/label/expected-rules/`)
+
+    {"default": "strict",
+     "profiles": {"strict": {"same": [["pass", "untouched", "none"]]},
+                  "quick":  {"same": [["keep", "pass", "untouched", "none"]], "note": "text kept = match"}},
+     "aliases": {"flag": "remove"}}
+
+- **Profiles**: each has groups of actions that count as equal (`same`). `quick` makes keep = pass = untouched (the
+  text stays in) for a quick review. As many profiles as wanted; `default` is used when a page does not choose one.
+- **Aliases**: an expected value replaced before comparing, e.g. the benchmark's 14 `flag` lines → `remove`. Without
+  an alias they stay mismatches. The shipped file has no alias (decide it on the editor page).
+- **On the panel**: a switch strict / quick / …; the counts and the wrong lines change at once, and a match made by a
+  rule says so ("untouched ≈ keep (quick)", "flag → remove (alias)"). The choice is in the URL (`&profile=quick`).
+- **The editor** `/label/expected-rules/` (linked from the panel and from `/label/`): profiles (add, rename, delete),
+  their groups (one tick per action; an action is in at most one group), the aliases, the default profile, a JSON tab;
+  checked while typing, saved with a backup in `labels\.backup\`, refused when the file changed since it was loaded.
+  The preview shows a chosen run's n / ok under every saved profile. A saved change is used at once (no restart).
+- A missing file = the built-in strict rule. A broken file is not used (the panels say why) and strict applies.
+- API: `GET /api/labels/expected-rules[?run=]`; edit through `/api/labels/config/expected_rules/raw|check|save`;
+  `profile=` on `/api/labels/{run}/expected`, `/docs`, `/doc` and `/api/labels/simple/{run}/rows|line`.
 
 ## The Labels panel on the run page
 
@@ -304,3 +337,82 @@ Added 2026-11-25. The settings themselves are described in `cmds\labeling\output
 | **A simple-mode run** (`/label/run/?run=…`, marked **simple** on the Labels page) | Totals from the per-file summaries, untouched lines included. The rows of a file, filtered by decision, reason or keyword, as they were written. Click a line number to see its source text with keywords (blue) and markers (red) marked, and its stored **evidence** (when the schema had `evidence: decided` or `all`) |
 | **Explain this line** (on an opened line) | Checks the line again through the model service, with the **policy recorded in the run** and the run's unit, review-as and judge band, and shows the flow trace per paragraph. The model service must be running (see Notes) |
 | **A line-unit run** (`--decision-unit line`) | The run page says "decision unit: line". The document page shows the line decision, the paragraph that decided it (★, opened first), and "nothing is cut, the whole line is kept / dropped" in the "What is cut" view. The flow shows a **Non-English hit** step when a paragraph had one |
+
+## The URL keeps the view; Back returns to it
+
+On the run page the file, the filters (action, label, paragraph action, expected, profile), the page of rows and the
+opened ▸ lines are in the URL (`…&action=removed&offset=40&open=45`), so a copied link shows the same view and the
+browser's **Back** from a document page returns to it, scrolled to where you were (the position is remembered per URL
+in this browser tab). The same on the simple run page (file, decision / reason / keyword / expected filters, page,
+opened line), the compare page (change filter, page) and the corpus page (file, position). The document page's crumb
+"back to the run" returns to the same view too (`back=` in its URL) and marks the row you came from (`from_line=`).
+Old links without these parameters still work.
+
+## Copy and translate any shown text
+
+Next to every text the Labelling pages show (run page ▸ line text, document page, simple run line, corpus page lines,
+Try page, compare page "text ▸", documents test set and case editors, Experiment page): **[Copy ▾] [中文] [Русский]**.
+
+- **Copy**: the text; ▾ more: the selected paragraph (document page), **with source** (the text, then
+  `— file · line N · id X · run R`), the row as JSON, the translation. "Copied (1,234 characters)" for a moment; long
+  texts are copied whole (the corpus page loads a shortened line in full first). Works on 127.0.0.1 / localhost
+  (clipboard API) and from another computer over plain http:// (a select-and-copy fallback).
+- **中文 / Русский**: the translation in a side panel, paragraph by paragraph (on the document page with the remove /
+  review / keep colours), "translated by qwen" or "by hunyuan (fallback)", "show original" side by side. For reading
+  only: labels and decisions always come from the original. Settings and the providers' test buttons:
+  `/label/translate/`; details in `cmds\viewer\translate.md`.
+
+## Keyword statistics (`/label/kwstats/`)
+
+Which keywords and markers of a policy hit in a corpus, how often and where, and a GPU-time forecast; no models
+(`nli_label.py kwstats`, guide `cmds\labeling\keyword_stats.md`). Linked from `/label/` ("Keyword statistics →").
+
+- **Start:** the form "Keyword statistics of a corpus" (on `/label/` and `/label/kwstats/`): corpus, policy, output
+  folder (in `dataset/`), topic field, units by folder or file, `--limit`. It runs through the model service like a
+  run; `python nli_playground.py --no-models` is enough.
+- **List:** `/label/kwstats/`: the scans (folders with `kwstats.json` in the project or `dataset/`); shards that are
+  not merged yet are marked.
+- **One scan** `/label/kwstats/?run=<folder>`: totals and the forecast; the written report (as `report.md`); the
+  rank-frequency chart (hover any term, click to open it); the top / bottom 50; the term table (search, sort by every
+  count, CSV); the heatmap of terms × folder (any level), file or topic, zero cells hatched; the never-hit terms
+  overall or per unit (CSV); histograms of hits and terms per line; co-occurring pairs, duplicates and overlaps.
+  Every chart downloads as SVG or PNG.
+- API: `/api/labels/kwstats/runs`, `/form`, `/{name}`, `/{name}/terms`, `/heatmap`, `/never`, `/pairs`, `/rankfreq`,
+  `/term/{id}`, `/report.md`; `POST /api/labels/kwstats/start`.
+
+## Several gates in the flow
+
+A policy may have several level-0 gate labels; they are OR-combined (`cmds\labeling\russia_llm.md`, "Several
+gates"). The document page's Flow shows "Level 0 · gates (2, OR)" with every gate's score bar and "opened by gate2" /
+"all below their thresholds"; the Try trace says which gate opened the paragraph. A gate scored only where the earlier
+gates said no shows "not scored" elsewhere. The policy editor's run_if has **@gate** (any gate open).
+
+## The Experiment page (`/label/lab/`)
+
+For trying any change of the policy or of the run settings on real lines, without touching the policy files.
+
+- **Opened from** "Experiment →" on the document page (with the selected paragraph), the run page rows, the simple
+  run's line view and the corpus page lines (label area); or `/label/` → "Experiment →" (the Russia-side policy, no
+  text yet). The Try buttons stay as they were.
+- **The base**: the policy the run recorded (`policy_data` in its summary), else its policy file; a badge says when
+  the file differs from what the run used. The run's settings (judge, band, unit, review_as).
+- **The draft** (left): labels and gates (add, remove, level, decision, threshold, hypothesis, softens, protected),
+  Run if (with `@gate`, `@marker`), no_subject, conflict, narrative_opens_gate, the non-English file, markers,
+  exceptions and everything else as JSON; run settings: judge on / off, uncertain band, decision unit, review as,
+  all labels. The fast model is the model service's (restart it with another to compare models). Checked while typing
+  with nli_label.py's rules.
+- **Texts** (right): the opening line or paragraph; paste more, or add lines the run did not get as expected.
+  **Run draft and base** labels every text with both, through the model service; pairs scored for the base are
+  reused for the draft (only new or reworded hypotheses are scored again). Per text: base → draft with "changed",
+  per paragraph base / draft actions (a change marked), and both flow traces side by side for the chosen paragraph.
+- **Draft vs base**: a readable list ("added label X …", "threshold of Y: 0.8 → 0.7", "run_if 1: … → …").
+- **The draft stays in this browser** (it survives a reload; "Discard draft" starts again from the base).
+- **Saving only on an explicit confirm**: "Save as new policy…" (a name; never overwrites), or "Replace
+  policy/<file>…", which shows the changes and asks to type the file name; the old file goes to `policy\.backup\`,
+  refused when the file changed since. Never saved automatically or on leaving the page.
+- **Apply to the whole run**: `redecide` into a new folder (stored scores; new or reworded hypotheses count as not
+  scored), then the compare page. Nothing in `policy\` changes.
+- **Different from `/label/try/`**: Try keeps the case sets and their expected actions; Experiment has no case sets and
+  works on real lines with the whole draft policy.
+- API: `GET /api/labels/lab/base`, `POST /api/labels/lab/check`, `POST /api/labels/lab/save` (save_as, or replace +
+  confirm + base_sha); `reuse_scores` on `POST /api/labels/try`.

@@ -3,6 +3,19 @@
   "cache_dir": ".viewer_cache",          // decompressed copies + indexes; can grow to cache_max_gb
   "cache_max_gb": 20,
   "cors_origins": ["http://localhost:3000"],   // only needed when the UI runs on another port (npm run dev)
+  // Translate buttons (for reading only): OpenAI-compatible providers, tried in order (cmds/viewer/translate.md).
+  // The key comes from the environment variable named by api_key_env (unset: no key sent); never put it here.
+  "translate": {
+    "targets": ["zh", "ru"],
+    "providers": [
+      {"name": "qwen", "kind": "openai", "base_url": "http://192.168.170.108:8000/v1", "model": "qwen3-4b",
+       "api_key_env": "QWEN_API_KEY", "timeout": 60, "no_think": true},
+      {"name": "hunyuan", "kind": "openai", "base_url": "http://127.0.0.1:8001/v1", "model": "Hunyuan-MT-7B",
+       "prompt": "hunyuan", "timeout": 120},
+      {"name": "hunyuan_local", "kind": "local", "base_url": "http://127.0.0.1:8002/v1", "model": "Hunyuan-MT-7B",
+       "prompt": "hunyuan", "timeout": 180, "enabled": false}
+    ]
+  },
   "datasets": [
     {
       // local disk (Windows or Linux path)

@@ -1,6 +1,7 @@
 "use client";
 // Try page, "Edit cases": change the case set (labels/*cases*.json) in place. Edits stay on the page until Save; Save
 // writes the file (the old one goes to labels/.backup/) and rebuilds the case corpus.
+import { TextTools } from "./TextTools";
 import { useState } from "react";
 import type { LabelCase, LabelCaseText } from "@/lib/types";
 import { actionClass } from "./LabelRunView";
@@ -151,7 +152,7 @@ export function CaseInsertForm({ where, group, groups, labelKeys, existingIds, s
         const yes = t.labels_yes || [];
         return (
           <div key={k} className="case-editor-grid" style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-            <label className="wide">text {k + 1}
+            <label className="wide">text {k + 1} {t.text.trim() ? <TextTools text={t.text} testid={`case-tools-${k}`} /> : null}
               <textarea className="mono try-text" value={t.text} onChange={(e) => setT(k, { text: e.target.value })} data-testid={`new-text-${k + 1}`} /></label>
             <label>expected
               <select value={t.expected_action || "keep"} onChange={(e) => setT(k, { expected_action: e.target.value, acceptable: acc.filter((a) => a !== e.target.value) })}>

@@ -7,6 +7,8 @@ import { api, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
 import { DocText } from "./LabelDocView";
 import { ErrorBox, Loading } from "./ui";
+import { backHere } from "@/lib/urlState";
+import { TextTools } from "./TextTools";
 
 export function LineText({ run, file, line }: { run: string; file: string; line: number }) {
   const router = useRouter();
@@ -23,11 +25,13 @@ export function LineText({ run, file, line }: { run: string; file: string; line:
               <span><i className="swatch lpara keep" />keep</span><span><i className="swatch lpara pass" />pass</span>
               <span className="faint">plain = not checked (no keyword)</span></span>
             <span className="spacer" />
-            <Link className="btn small ghost" href={href("/label/doc", { run, file, line })}>open the document page →</Link>
+            {d.text ? <TextTools text={d.text} source={{ file, line, id: d.row.id ?? null, run }} row={d.row} /> : null}
+            <Link className="btn small ghost" href={href("/label/doc", { run, file, line })}
+              onClick={(e) => { e.preventDefault(); router.push(href("/label/doc", { run, file, line, back: backHere(line) })); }}>open the document page →</Link>
           </div>
           {d.problem ? <div className="alert warn">{d.problem}</div> : null}
           {d.text !== null ? <div className="line-text-body"><DocText d={d} sel={-1}
-            onSel={(i) => router.push(href("/label/doc", { run, file, line, para: i }))} /></div>
+            onSel={(i) => router.push(href("/label/doc", { run, file, line, para: i, back: backHere(line) }))} /></div>
             : <div className="faint">the source text is not available</div>}
         </>) : null}
     </div>

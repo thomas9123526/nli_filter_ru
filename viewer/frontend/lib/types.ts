@@ -452,7 +452,7 @@ export type LabelRunResp = {
              redecide?: { from?: string; stored: number; missing: number; changed: string[] } };
 };
 export type ExpectVerdict = {
-  kind: "text" | "document"; expected: string; acceptable: string[]; got: string; ok: boolean; note: string;
+  kind: "text" | "document"; expected: string; acceptable: string[]; got: string; ok: boolean; note: string; rule?: string;
   paragraphs?: { span: [number, number]; expected: string; acceptable: string[]; note: string; got: string; ok: boolean }[];
 };
 export type LabelDocRow = {
@@ -463,10 +463,17 @@ export type LabelDocRow = {
 export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number;
   expected?: { n: number; ok: number } };
 export type ExpectedSummary = { n: number; ok: number; wrong: { file: string; line: number; id: string | null; expected: string;
-  acceptable: string[]; got: string; note: string; paragraphs_wrong: number }[] } | null;
+  acceptable: string[]; got: string; note: string; paragraphs_wrong: number; no_row?: boolean }[];
+  profile?: string; profiles?: string[]; default?: string; notes?: Record<string, string>; rules_problem?: string | null;
+  simple?: boolean; unit?: string; note?: string; problem?: string } | null;
+export type ExpectedRulesData = { about?: string; default?: string; profiles: Record<string, { same: string[][]; note?: string }>;
+  aliases?: Record<string, string>; [k: string]: unknown };
+export type ExpectedRulesInfo = { path: string; exists: boolean; problem: string | null; default: string;
+  profiles: Record<string, { same: string[][]; note: string }>; aliases: Record<string, string>; actions: string[];
+  preview?: { run: string; profiles: Record<string, { n: number; ok: number }>; default: string } | null };
 export type LabelParagraph = {
   span: [number, number]; action: string; reason: string; labels: string[]; scores: Record<string, number>;
-  tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[]; opened_by?: string[];
+  tokens: number; marker?: boolean; flags?: string[]; judged?: string[]; levels?: number[]; opened_by?: string[]; opened_by_gate?: string;
   exception?: string; action_before?: string; exception_phrases?: string[]; exception_blocked?: string;
   exception_scores?: Record<string, number>; from_field?: string[];
   non_english?: { term: string; kind: "keyword" | "marker"; script: string }[];
@@ -508,7 +515,7 @@ export type LabelLinesResp = { results: LabelLineResult[]; skipped: { line: numb
   pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null } | null; policy: FlowPolicyData | null };
 export type LabelTryResp = {
   rows: LabelDocResp["row"][]; clean: (string | null)[]; rewrites: { start: number; old: string; new: string }[][];
-  seconds: number; pairs: { fast: number; judge: number }; models: { fast: string; judge: string | null };
+  seconds: number; pairs: { fast: number; judge: number; reused?: number }; models: { fast: string; judge: string | null };
   policy: FlowPolicyData;
 };
 
@@ -538,13 +545,14 @@ export type NonEnglishData = { about?: string; scripts: Record<string, { enabled
 export type SchemaPreviewResp = { run: string; file: string; files: string[]; rows: Record<string, unknown>[];
   read: number; included: number; evidence_rows: number; unit: string };
 export type SimpleRowsResp = { file: string; total: number; offset: number; limit: number;
-  rows: { row: Record<string, unknown>; line: number | null; decision: string | null; reason: string | null; keywords: Record<string, number> }[];
+  rows: { row: Record<string, unknown>; line: number | null; decision: string | null; reason: string | null; keywords: Record<string, number>;
+          expect?: ExpectVerdict }[];
   counts: { decision: Record<string, number>; reason: Record<string, number>; keyword: Record<string, number> };
-  fields: Record<string, string>; evidence: string; can_open: boolean; unit: string };
+  fields: Record<string, string>; evidence: string; can_open: boolean; unit: string; expected?: { n: number; ok: number } };
 export type SimpleLineResp = { name: string; file: string; line: number; input: string | null; text: string | null;
   problem: string | null; row: Record<string, unknown> | null; evidence: (LabelDocResp["row"] & { decision?: string }) | null;
   hits: { start: number; end: number; kw: string | null; marker?: boolean }[]; policy: FlowPolicyData;
-  policy_data: PolicyData | null; policy_path: string | null; settings: Record<string, unknown> };
+  policy_data: PolicyData | null; policy_path: string | null; settings: Record<string, unknown>; expect?: ExpectVerdict };
 
 // ---- comparing two runs (/label/compare, GET /api/labels/compare) ----
 export type CompareParagraph = { action: string; reason: string; labels: string[]; exception?: string } | null;

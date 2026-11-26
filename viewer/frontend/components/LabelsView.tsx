@@ -6,6 +6,7 @@ import { api, useApi } from "@/lib/api";
 import { href, num, pct } from "@/lib/format";
 import type { LabelProgress } from "@/lib/types";
 import { StartRunForm } from "./StartRunForm";
+import { KwstatsStartForm } from "./KwstatsView";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
@@ -51,9 +52,14 @@ export function LabelsView() {
         <Link className="btn small" href="/label/folders" data-testid="folders-link">Clean up run folders →</Link>
         <Link className="btn small" href="/label/output" data-testid="output-link">Simple-mode output →</Link>
         <Link className="btn small" href="/label/non-english" data-testid="non-english-link">Non-English keywords →</Link>
+        <Link className="btn small" href="/label/kwstats" data-testid="kwstats-link">Keyword statistics →</Link>
+        <Link className="btn small" href="/label/expected-rules" data-testid="expected-rules-link">Expected-result rules →</Link>
+        <Link className="btn small" href="/label/lab" data-testid="lab-link">Experiment →</Link>
+        <Link className="btn small" href="/label/translate" data-testid="translate-link">Translation settings →</Link>
         <span className="faint" style={{ fontSize: 12 }}>every level-0 / 1 / 2 label and edge case, one text at a time, with its flow</span>
       </div>
       <StartRunForm onChanged={refresh} />
+      <div style={{ marginTop: 12 }}><KwstatsStartForm /></div>
 
       <ErrorBox error={runs.error} onRetry={runs.reload} />
       {runs.loading && !runs.data ? <Loading what="Finding runs" /> : null}

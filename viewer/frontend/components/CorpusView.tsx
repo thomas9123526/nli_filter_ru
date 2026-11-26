@@ -5,6 +5,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { TextTools } from "./TextTools";
+import { useRestoreScroll } from "@/lib/urlState";
 import { ApiError, api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
 import type { CorpusLine } from "@/lib/types";
@@ -115,6 +117,7 @@ function FileLines({ area, ds, file, member: wanted, start, target, editTarget }
   const res = useApi(`lines:${ds}:${file}:${wanted}:${start}:${version}`,
     (s) => api.corpusLines(ds, { path: file, member: wanted, start, count: PAGE, preview: PREVIEW }, s));
   const data = res.data;
+  useRestoreScroll(!!data);
   const member = data?.member || null;  // .zip / .rar: the member shown (the first one unless chosen)
   const status = useApi(data ? `es:${ds}:${file}:${member || ""}` : null, (s) => api.editStatus(ds, file, s, member));
   const total = data?.total_lines ?? 0;
@@ -330,6 +333,11 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         {editable && l.text !== null && mode !== "edit" ? <button className="btn small" onClick={() => load("edit")} data-testid={`edit-${l.line}`}>{pending ? "Edit again" : "Edit"}</button> : null}
         {!editable && l.text !== null ? <button className="btn small" disabled title={`Editing is off: ${editProblem || "this file cannot be edited"}`}>Edit</button> : null}
         <span className="spacer" />
+        {l.text !== null ? <TextTools text={line.text || ""} source={{ file, line: l.line, id: l.id === null || l.id === undefined ? null : String(l.id) }}
+          row={l.extra ? { line: l.line, id: l.id, ...l.extra } : undefined} testid={`tools-${l.line}`}
+          full={l.truncated && !full ? async () => (await api.corpusLines(ds, { path: file, member, start: l.line, count: 1 })).lines[0]?.text || "" : undefined} /> : null}
+        {area === "label" && l.text !== null ? <Link className="btn small ghost" data-testid={`lab-${l.line}`} title="open this line on the Experiment page"
+          href={href("/label/lab", { ds, path: file, member, line: l.line })}>Experiment</Link> : null}
         {l.truncated && mode === "view" && !pending ? <button className="btn small ghost" onClick={() => load("full")}>Show all ({num(l.text_length)} chars)</button> : null}
         {mode === "full" ? <button className="btn small ghost" onClick={() => setMode("view")}>Show less</button> : null}
         {pending && mode !== "edit" ? <button className="btn small ghost" onClick={onDiscard}>Discard change</button> : null}

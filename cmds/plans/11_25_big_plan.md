@@ -20,6 +20,10 @@ The estimate is about 17–19 hours:
 
 ### 1. "Expected vs result" for simple-mode runs (about 30 min)
 
+**DONE 2026-11-25.** Simple runs get the panel, the filter, per-row verdicts and the opened line's verdict; every file
+of a run is checked for expected fields. On the benchmark, a simple export of the detail run gives the same counts in
+both units (strict 66 / 288, quick 171 / 288). Tests: `viewer\backend\tests\test_expected_simple.py`, `test_ui_11_25.py`.
+
 **Why.** The panel exists only for detail runs (`/label/run/?run=out_label_ru_v2`). A simple run such as
 `out_label_benchmark_simple` has no labels files, only `<name>.decisions.jsonl.zst`. Its page (`SimpleRunView`) skips
 the expected check, so there is no total and no filter for mismatches. The benchmark schema puts `expected` next to
@@ -65,6 +69,10 @@ the expected check, so there is no total and no filter for mismatches. The bench
   detail run of the same corpus and unit, and the mismatching lines can be listed and opened.
 
 ### 2. Keyword and marker statistics over a corpus (about 3–3½ h)
+
+**DONE 2026-11-25.** `nli_label.py kwstats` (code in `nli_kwstats.py`), `/label/kwstats/`, `report.md`,
+`cmds\labeling\keyword_stats.md`. Benchmark scan in `dataset\kwstats_benchmark` (hand counts match). Tests:
+`tests\test_kwstats.py`, `viewer\backend\tests\test_kwstats_api.py`.
 
 **Why.**
 - **What the user wants to see:** which of the terms nli_label searches for actually hit, how often and where, and
@@ -155,6 +163,12 @@ section in `cmds\viewer\labels_pages.md`.
 never-hit terms and the report, and the numbers match a hand count on a few terms.
 
 ### 3. Translate texts in the viewer: Qwen endpoint first, Hunyuan-MT-7B when it fails (about 3–3½ h)
+
+**DONE 2026-11-25, except the real Hunyuan-MT-7B run.** The model is not downloaded (D: had about 35 GB free) and this
+PC's Python has CPU-only torch. The fallback path is tested with fake servers, and with `tools\serve_translate_local.py`
+on a stub model. Settings page `/label/translate/`; docs `cmds\viewer\translate.md`, which include the licence: not for
+the excluded regions, and the outputs must not train other models. Tests:
+`viewer\backend\tests\test_translate.py`.
 
 **Why.** Sometimes a source text must be read in another language, at first **Chinese or Russian**. Decided on
 2026-11-25:
@@ -264,6 +278,10 @@ Checked that day:
 
 ### 4. Configurable "same as expected" rules for Expected vs result (about 1–1½ h)
 
+**DONE 2026-11-25.** `labels\expected_rules.json` has two profiles, strict and quick, and no alias yet: `flag` stays a
+mismatch until `flag → remove` is added. Editor at `/label/expected-rules/`; a profile switch on every panel. Tests:
+`test_expected_simple.py`.
+
 **Why.** On `/label/run/?run=out_label_benchmark_detail` the panel compares each line's result with the corpus'
 `expected_action`. What counts as a match is **hard-coded** today (`viewer\backend\nli_viewer\labels.py`, `_same()`):
 `pass`, `untouched` and `none` are the same; everything else must match exactly, or be listed in the line's
@@ -334,6 +352,10 @@ saved in the editor (e.g. the `flag` alias) shows in the counts without a restar
 
 ### 5. Back button returns to where you were (about 1–1½ h)
 
+**DONE 2026-11-25.** `lib\urlState.ts` (`useUrlState`, `useRestoreScroll`) on the run, simple run, compare and corpus
+pages; the document page's crumb uses `back=`. A Chrome DevTools test checks that Back keeps the same filter, page,
+opened line and scroll.
+
 **Why.**
 - **What happens today** (reported 2026-11-25): on `/label/run/?run=…`, open a line's text (▸) → "open the document
   page" → browser **Back**. The run page comes back, but at the top, with the first file, no filters, the first page
@@ -374,6 +396,8 @@ and scroll position. The same on the simple run page.
 
 ### 6. Copy button on every text shown (about 45 min – 1 h)
 
+**DONE 2026-11-25.** `components\TextTools.tsx` (Copy ▾ + 中文 / Русский), on every place listed below.
+
 **Why.** The user wants to copy a line's text with one click wherever the viewer shows it (asked 2026-11-25). Today
 only the Try page has a copy button ("Copy for analysis").
 
@@ -411,6 +435,10 @@ only the Try page has a copy button ("Copy for analysis").
 the "with source" copy carries file, line and id.
 
 ### 7. Multiple gates, OR-combined (about 2–2½ h)
+
+**DONE 2026-11-25.** A one-gate policy gives byte-identical labels files: a redecide of `out_label_ru_v2` and of the
+benchmark run, old code vs new. With several gates, a run_if that names only some of them is refused (use `@gate`).
+Tests: `tests\test_label_gates.py`.
 
 **Why.** One gate label is not enough for some cases; the user needs a second one now and wants the code to allow any
 number (asked 2026-11-25). Several gates combine with **OR**: the paragraph passes the gate when **any** gate label
@@ -476,6 +504,10 @@ The viewer's flow views (document page `Flow`, Try `TryTrace`) and the flow diag
 
 ### 8. Experiment page: a full-settings sandbox, saved only on confirm (about 3½–4 h)
 
+**DONE 2026-11-25.** `/label/lab/`. The base and the draft run through the model service, and pairs scored before are
+reused (`reuse_scores`). Saving needs an explicit confirm. Tests: `viewer\backend\tests\test_lab.py`,
+`test_ui_11_25.py`.
+
 **Why.**
 - "Try this paragraph" (document page) and "Try" (run page) open `/label/try/`: the case-testing page built around
   the case sets (`labels/*.json`).
@@ -535,6 +567,8 @@ Try).
 - nothing reaches `policy\` until "Save as new" or a confirmed replace.
 
 ### 9. A beginner's guide to Docker for this project, docs only (about 45 min – 1 h)
+
+**DONE 2026-11-25.** `cmds\setup\docker_beginner.md`.
 
 **Why.** The user is new to Docker and wants to understand it first (asked 2026-11-25). **Nothing is implemented:** no
 Dockerfile, no image, no change to how the project runs. Background in `cmds\conversation\2026-11-25.md` ("do we need

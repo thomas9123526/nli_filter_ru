@@ -9,7 +9,7 @@ Use the **same models** for `eval` as for the real `run` (`--fast-model`, `--jud
 thresholds belong to a model setup. Scores are cached per setup in `<first labels file>.scores.json`.
 When the setup matches the run the labels were sampled from (`labels\seed.jsonl`: ModernBERT, no judge, so
 `--judge-model none`), `eval` reuses that run's scores and needs no model at all. With another setup (e.g. the default
-DeBERTa judge) it scores the labelled paragraphs once: 182 × 25 pairs ≈ 1 hour on this CPU.
+DeBERTa judge) it scores the labelled paragraphs once: 175 × 25 pairs ≈ 1 hour on this CPU.
 
 ## The table
 

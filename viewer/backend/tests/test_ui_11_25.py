@@ -1,0 +1,232 @@
+"""Rendered pages (headless Chrome / Edge, like test_ui.py) of plan 11_25: Expected vs result on a simple run with the
+profile switch and filter, the expected-rules editor, the run page restored from a full state URL, Copy / Translate
+buttons on the shown texts, the flow with two gates, the Experiment page and the translation settings page."""
+import copy
+import json
+import socket
+import sys
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+from nli_viewer.api import create_app
+from nli_viewer.config import ViewerConfig
+from test_ui import dom, pytestmark  # noqa: F401 - same skip rule (built frontend + a browser)
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+POLICY = {
+    "country": "Russia", "keywords_file": None, "markers": ["special military operation"],
+    "paragraphs": {"min_chars": 20, "max_chars": 400}, "conflict": "review",
+    "labels": {
+        "involves": {"level": 0, "decision": "gate", "threshold": 0.5, "hypothesis": "GATE"},
+        "culture": {"level": 1, "decision": "remove", "threshold": 0.8, "hypothesis": "CULTURE"},
+        "science": {"level": 1, "decision": "keep", "threshold": 0.8, "hypothesis": "SCIENCE"},
+    },
+    "run_if": {"1": ["involves", "@marker"]},
+}
+LINES = [("A long paragraph about Russian ballet and every film the theatre made, long enough here.", "remove"),
+         ("A long paragraph about Russian algorithm research in physics, also long enough here.", "keep"),
+         ("No keyword at all in this line.", "keep"),
+         ("Another long paragraph on Russian ballet and the theatre, long enough to count.", "flag")]
+GATE2_TEXT = "Moscow ballet notes: a long paragraph on the theatre and its film, long enough here."
+
+
+class Fake:
+    CUES = {"GATE": ["russia"], "GATE2": ["ballet"], "CULTURE": ["ballet"], "SCIENCE": ["physics"]}
+
+    def __init__(self):
+        self.fast_pairs = self.judge_pairs = 0
+
+    def score(self, premises, hyps):
+        return [(0.95, None, 0.95) if any(c in p.lower() for c in self.CUES.get(h, [])) else (0.05, None, 0.05)
+                for p, h in zip(premises, hyps)]
+
+
+@pytest.fixture(scope="module")
+def srv(tmp_path_factory):
+    import uvicorn
+    import nli_label
+    proj = tmp_path_factory.mktemp("p1125")
+    for d in ("policy", "output", "labels", "dataset/corpus", "dataset/corpus2"):
+        (proj / d).mkdir(parents=True)
+    (proj / "policy" / "p.json").write_text(json.dumps(POLICY), encoding="utf-8")
+    two = copy.deepcopy(POLICY)
+    two["labels"]["gate2"] = {"level": 0, "decision": "gate", "threshold": 0.5, "hypothesis": "GATE2"}
+    two["run_if"] = {"1": ["@gate", "@marker"]}
+    (proj / "policy" / "two.json").write_text(json.dumps(two), encoding="utf-8")
+    (proj / "output" / "simple_schema.json").write_text((ROOT / "output" / "simple_schema.json").read_text(encoding="utf-8"),
+                                                        encoding="utf-8")
+    (proj / "labels" / "expected_rules.json").write_text(json.dumps(
+        {"default": "strict", "aliases": {"flag": "remove"},
+         "profiles": {"strict": {"same": [["pass", "untouched", "none"]]},
+                      "quick": {"same": [["keep", "pass", "untouched", "none"]], "note": "text kept = match"}}}), encoding="utf-8")
+    inp = proj / "dataset" / "corpus" / "b_test.jsonl"
+    inp.write_text("".join(json.dumps({"id": f"t{i}", "text": t, "expected_action": e}) + "\n"
+                           for i, (t, e) in enumerate(LINES, 1)), encoding="utf-8")
+    big = proj / "dataset" / "corpus2" / "big.jsonl"  # 60 lines: two pages on the run page
+    big.write_text("".join(json.dumps({"id": f"b{i}", "text": f"Line {i}: a long paragraph about Russian ballet, film {i}."}) + "\n"
+                           for i in range(1, 61)), encoding="utf-8")
+    g2 = proj / "dataset" / "corpus2" / "g2.jsonl"
+    g2.write_text(json.dumps({"id": "g1", "text": GATE2_TEXT}) + "\n", encoding="utf-8")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(nli_label, "build_scorer", lambda args: (Fake(), None, None))
+        pol = str(proj / "policy" / "p.json")
+        out = proj / "dataset"
+        assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out / "o_detail"), "--policy", pol]) == 0
+        assert nli_label.main(["run", "--compress", "none", str(inp), "--output-dir", str(out / "o_simple"), "--policy", pol,
+                               "--output-mode", "simple", "--schema", str(proj / "output" / "simple_schema.json")]) == 0
+        assert nli_label.main(["run", "--compress", "none", str(big), "--output-dir", str(out / "o_big"), "--policy", pol]) == 0
+        assert nli_label.main(["run", "--compress", "none", str(g2), "--output-dir", str(out / "o_two"),
+                               "--policy", str(proj / "policy" / "two.json")]) == 0
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    cfgf = proj / "viewer_config.json"
+    cfgf.write_text(json.dumps({"datasets": [], "translate": {"targets": ["zh", "ru"], "providers": [
+        {"name": "qwen", "kind": "openai", "base_url": "http://127.0.0.1:9/v1", "model": "qwen-test", "timeout": 2}]}}),
+        encoding="utf-8")
+    cfg = ViewerConfig(datasets=[], cache_dir=str(tmp_path_factory.mktemp("c1125")), project_dir=str(proj),
+                       playground_url="http://127.0.0.1:9", config_path=str(cfgf), base_dir=str(proj))
+    server = uvicorn.Server(uvicorn.Config(create_app(cfg), host="127.0.0.1", port=port, log_level="warning"))
+    t = threading.Thread(target=server.run, daemon=True)
+    t.start()
+    for _ in range(100):
+        if server.started:
+            break
+        time.sleep(0.1)
+    yield f"http://127.0.0.1:{port}"
+    server.should_exit = True
+    t.join(timeout=10)
+
+
+def test_simple_run_expected_panel_profiles_and_filter(srv, tmp_path):
+    page = dom(srv + "/label/run/?run=o_simple", tmp_path)
+    for tid in ("expected-panel", "expected-count", "expected-profile", "expected-wrong", "simple-expect-filter"):
+        assert f'data-testid="{tid}"' in page, tid
+    assert "3 / 4 as expected" in page  # strict + the flag alias: only untouched vs keep is wrong
+    quick = dom(srv + "/label/run/?run=o_simple&profile=quick", tmp_path)
+    assert "4 / 4 as expected" in quick
+    wrong = dom(srv + "/label/run/?run=o_simple&expect=wrong&open=3", tmp_path)
+    assert 'data-testid="simple-line"' in wrong and 'data-testid="simple-line-expect"' in wrong
+    assert 'data-testid="simple-tools"' in wrong and 'data-testid="translate-zh"' in wrong and 'data-testid="simple-lab"' in wrong
+
+
+def test_detail_run_rule_shown_and_rules_editor(srv, tmp_path):
+    page = dom(srv + "/label/run/?run=o_detail&profile=quick&expect=right", tmp_path)
+    assert "untouched ≈ keep (quick)" in page and "flag → remove (alias)" in page
+    ed = dom(srv + "/label/expected-rules/?run=o_detail", tmp_path)
+    for tid in ("rules-bar", "rules-ok", "rules-default", "profile-strict", "profile-quick", "alias-from", "rules-preview"):
+        assert f'data-testid="{tid}"' in ed, tid
+    assert "3 / 4" in ed and "4 / 4" in ed
+
+
+def test_run_page_view_from_url(srv, tmp_path):
+    page = dom(srv + "/label/run/?run=o_big&action=removed&offset=40&open=45", tmp_path)
+    assert "41–60 of 60" in page.replace("&nbsp;", " ")
+    assert 'data-testid="line-text-45"' in page and 'data-testid="copy-text"' in page
+    assert 'data-line="45"' in page and 'data-testid="row-lab"' in page
+    old = dom(srv + "/label/run/?run=o_big", tmp_path)  # an old link without the new parameters
+    assert "1–40 of 60" in old.replace("&nbsp;", " ")
+
+
+def test_doc_page_tools_back_link_and_two_gates(srv, tmp_path):
+    back = "/label/run/?run=o_big&offset=40&from_line=45"
+    doc = dom(srv + f"/label/doc/?run=o_big&file=big&line=45&back={back.replace('&', '%26').replace('?', '%3F')}", tmp_path)
+    assert 'data-testid="doc-tools"' in doc and 'data-testid="lab-this"' in doc
+    assert "offset=40" in doc and "from_line=45" in doc  # the crumb goes back to the same view
+    two = dom(srv + "/label/doc/?run=o_two&file=g2&line=1", tmp_path)
+    assert "gates (2, OR)" in two and "opened by gate2" in two
+
+
+def test_experiment_and_translate_pages(srv, tmp_path):
+    lab = dom(srv + "/label/lab/?run=o_detail&file=b_test&line=1&para=0", tmp_path)
+    for tid in ("lab-draft", "lab-diff", "lab-save", "lab-texts", "lab-text-0", "lab-run", "lab-new-label", "runif-1"):
+        assert f'data-testid="{tid}"' in lab, tid
+    assert "recorded by run o_detail" in lab and "no change yet" in lab and "Russian ballet" in lab
+    tr = dom(srv + "/label/translate/", tmp_path)
+    assert 'data-testid="provider-qwen"' in tr and "qwen-test" in tr and 'data-testid="translate-try"' in tr
+    home = dom(srv + "/label/", tmp_path)
+    for tid in ("kwstats-link", "expected-rules-link", "lab-link", "translate-link"):
+        assert f'data-testid="{tid}"' in home, tid
+
+
+def test_back_returns_to_the_same_view(srv, tmp_path):
+    """Run page (filter, page 2, an opened line, scrolled) -> "open the document page" -> browser Back: the same URL
+    state, the opened line and the scroll position (Chrome over the DevTools protocol)."""
+    import asyncio
+    import subprocess
+    import urllib.request
+    websockets = pytest.importorskip("websockets")
+    from test_ui import BROWSER
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    dbg = s.getsockname()[1]
+    s.close()
+    proc = subprocess.Popen([BROWSER, "--headless=new", "--disable-gpu", f"--remote-debugging-port={dbg}",
+                             f"--user-data-dir={tmp_path / 'cdp'}", "about:blank"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    async def main():
+        tabs = None
+        for _ in range(100):
+            try:
+                tabs = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{dbg}/json").read())
+                break
+            except Exception:  # noqa: BLE001 - the browser is starting
+                await asyncio.sleep(0.2)
+        ws_url = next(t for t in tabs if t["type"] == "page")["webSocketDebuggerUrl"]
+        async with websockets.connect(ws_url, max_size=None) as ws:
+            n = 0
+
+            async def call(method, **params):
+                nonlocal n
+                n += 1
+                await ws.send(json.dumps({"id": n, "method": method, "params": params}))
+                while True:
+                    m = json.loads(await ws.recv())
+                    if m.get("id") == n:
+                        return m.get("result", {})
+
+            async def js(expr):
+                r = await call("Runtime.evaluate", expression=expr, returnByValue=True, awaitPromise=True)
+                return r.get("result", {}).get("value")
+
+            async def wait_for(expr, secs=15):
+                for _ in range(int(secs * 5)):
+                    if await js(expr):
+                        return True
+                    await asyncio.sleep(0.2)
+                return False
+
+            await call("Page.enable")
+            await call("Emulation.setDeviceMetricsOverride", width=1300, height=700, deviceScaleFactor=1, mobile=False)
+            await call("Page.navigate", url=srv + "/label/run/?run=o_big&action=removed")
+            assert await wait_for("!!document.querySelector('[data-testid=label-docs]')")
+            await js("[...document.querySelectorAll('button')].find(b => b.textContent.includes('next'))?.click()")
+            assert await wait_for("location.search.includes('offset=40') && !!document.querySelector('[data-line=\"45\"]')")
+            await js("document.querySelector('[data-testid=toggle-45]').click()")
+            assert await wait_for("!!document.querySelector('[data-testid=line-text-45] a.btn')")
+            await js("document.querySelector('[data-line=\"45\"]').scrollIntoView({block: 'center'})")
+            await asyncio.sleep(0.6)
+            y = await js("window.scrollY")
+            assert y > 100
+            await js("[...document.querySelectorAll('[data-testid=line-text-45] a')].find(a => a.textContent.includes('document page')).click()")
+            assert await wait_for("location.pathname.startsWith('/label/doc')")
+            assert await wait_for("!!document.querySelector('[data-testid=doc-tools]')")
+            await js("history.back()")
+            assert await wait_for("location.pathname.startsWith('/label/run') && !!document.querySelector('[data-testid=line-text-45]')")
+            await asyncio.sleep(1.0)
+            state = await js("({s: location.search, y: window.scrollY})")
+            assert "offset=40" in state["s"] and "open=45" in state["s"] and "action=removed" in state["s"]
+            assert abs(state["y"] - y) < 80, (state, y)
+
+    try:
+        asyncio.run(main())
+    finally:
+        proc.terminate()

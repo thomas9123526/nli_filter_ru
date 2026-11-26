@@ -91,7 +91,7 @@ Field sources:
 | `file` | the input file's name |
 | `decision` | line unit: remove / review / keep / pass / untouched. Paragraph unit: the document action (edited, removed, kept …) |
 | `level` | the line's strictest decision, in both units |
-| `reason` | the deciding paragraph's technical reason (`remove_label`, `gate_negative`, `non_english_keyword` …) |
+| `reason` | the deciding paragraph's technical reason (`remove_label`, `gate_negative` = every gate below its threshold, `non_english_keyword` …) |
 | `reason_text` | what decided, through the vocabulary: the deciding label (`hostility_russians` → insult), the exception key, or the technical reason |
 | `labels` | the line's positive labels |
 | `keyword_counts` | every keyword and marker of the line, as listed and in lower case, with its count |
@@ -114,6 +114,7 @@ both by the run and by the viewer.
 | Why a line was removed or reviewed | live: "Explain this line" | ✅ stored | ✅ |
 | Why a line was kept (a possible miss) | live | live | ✅ |
 | `redecide`, threshold tuning | ❌ | ❌ (needs a detail run) | ✅ |
+| Expected vs result (a corpus with `expected_action`) | ✅ line level (needs a `line` field) | ✅ line level | ✅ also per paragraph |
 
 **Which to use:**
 - Test sets, policy tuning and samples (`--limit 20000`): **detail**.

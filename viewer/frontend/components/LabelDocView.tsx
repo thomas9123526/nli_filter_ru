@@ -7,10 +7,12 @@ import { api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
 import type { FlowPolicyData, LabelDocResp, LabelParagraph, LabelPolicyLabel } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading, ScoreBar } from "./ui";
+import { safeBack } from "@/lib/urlState";
+import { TextTools } from "./TextTools";
 import { actionClass } from "./LabelRunView";
 
 const REASONS: Record<string, string> = {
-  gate_negative: "The gate label is below its threshold and there is no marker term: the keyword was incidental, the paragraph passes untouched.",
+  gate_negative: "Every gate label is below its threshold and there is no marker term: the keyword was incidental, the paragraph passes untouched.",
   narrative: "A level-2 narrative label is yes and nothing softens it: narratives win over 'keep' subjects.",
   conflict: "A 'remove' label and a 'keep' label are both yes: the policy's conflict rule decides.",
   remove_label: "A 'remove' subject label is yes and no 'keep' label is.",
@@ -76,7 +78,12 @@ function Exceptions({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
 export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
   const pol = policy.labels;
   const byLevel = (n: number) => Object.keys(pol).filter((k) => pol[k].level === n);
-  const runIf = (n: number) => (policy.run_if[String(n)] || []).map((k) => (k === "@marker" ? "a marker term" : k)).join(" or ");
+  const runIf = (n: number) => (policy.run_if[String(n)] || []).map((k) => (k === "@marker" ? "a marker term" : k === "@gate" ? "any gate" : k)).join(" or ");
+  const gates = byLevel(0);
+  const gateNote = p.marker ? "marker term in the paragraph: the gate is skipped"
+    : p.opened_by?.length ? `${gates.length > 1 ? "every gate" : "the gate"} said no, but a narrative claim (${p.opened_by.join(", ")}) opened it`
+    : gates.length > 1 ? (p.opened_by_gate ? `${gates.length} gates, OR: opened by ${p.opened_by_gate}` : p.reason === "gate_negative" ? `${gates.length} gates, OR: all below their thresholds` : `${gates.length} gates, OR`)
+    : undefined;
   const used = (n: number) => (p.levels ? p.levels.includes(n) : true);
   return (
     <div className="flow">
@@ -87,7 +94,7 @@ export function Flow({ policy, p }: { policy: FlowPolicy; p: LabelParagraph }) {
           <div style={{ marginTop: 4 }}>{p.non_english.map((h) => <span key={h.kind + h.term} className="chip">{h.term} <span className="faint">{h.kind}, {h.script}</span></span>)}</div>
           {p.reason.startsWith("non_english") && !(p.levels || []).length ? <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>not scored (score_when_removed is off)</div> : null}
         </div><div className="flow-arrow">↓</div></>) : null}
-      <Level title="Level 0 · gate" keys={byLevel(0)} p={p} pol={pol} used={used(0)} note={p.marker ? "marker term in the paragraph: the gate is skipped" : p.opened_by?.length ? `the gate said no, but a narrative claim (${p.opened_by.join(", ")}) opened it` : undefined} />
+      <Level title={gates.length > 1 ? `Level 0 · gates (${gates.length}, OR)` : "Level 0 · gate"} keys={gates} p={p} pol={pol} used={used(0)} note={gateNote} />
       <div className="flow-arrow">↓</div>
       <Level title="Level 1 · subject" keys={byLevel(1)} p={p} pol={pol} used={used(1)} note={runIf(1) ? `runs when ${runIf(1)} is yes` : undefined} />
       <div className="flow-arrow">↓</div>
@@ -217,7 +224,8 @@ export function LabelDocView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: run, href: href("/label/run", { run, file }) }, { label: `line ${line}` }]} />
+          <Crumbs items={[{ label: "Labelling", href: "/label" },
+            { label: run, href: safeBack(sp.get("back")) || href("/label/run", { run, file, from_line: line }) }, { label: `line ${line}` }]} />
           <h1>{file} · line {line} {d ? <span className={`badge big ${actionClass(d.row.action)}`}>{d.row.action}</span> : null}</h1>
           {d ? <div className="sub">{num(d.row.tokens)} tokens (est.){d.row.tokens_removed ? `, ${num(d.row.tokens_removed)} removed` : ""}
             {d.row.rewrites ? `, ${d.row.rewrites} place name(s) rewritten` : ""}{d.row.id ? ` · id ${d.row.id}` : ""}</div> : null}
@@ -245,6 +253,10 @@ export function LabelDocView() {
                   <span><i className="swatch lpara keep" />keep</span><span><i className="swatch lpara pass" />pass</span></span>) : null}
               {view === "cut" && d.row.decision ? <span className="badge warn">line unit: nothing is cut; the whole line is {d.row.action === "removed" ? "dropped" : "kept"}</span> : null}
               {view === "cut" ? <span className="faint" style={{ fontSize: 12 }}>struck through = not in the clean copy{d.clean?.review_as === "remove" ? " (review paragraphs too: --review-as remove)" : "; review paragraphs stay (--review-as keep)"}</span> : null}
+              <span className="spacer" />
+              {d.text ? <TextTools text={view === "clean" && d.clean?.text ? d.clean.text : d.text} source={{ run, file, line, id: d.row.id ?? null }} row={d.row}
+                paragraph={paras[sel] ? d.text.slice(paras[sel].span[0], paras[sel].span[1]) : undefined}
+                paragraphs={paras.map((p) => ({ span: p.span, action: p.action }))} testid="doc-tools" /> : null}
               {view === "clean" && d.clean?.rewrites?.length ? <span className="faint" style={{ fontSize: 12 }}>marked = place name rewritten (hover: old → new)</span> : null}
             </div>
             {d.problem ? <div className="alert" style={{ margin: 12 }}>{d.problem}</div> : null}
@@ -257,6 +269,8 @@ export function LabelDocView() {
             <div className="row" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Flow</h2>
               {paras[sel] ? <a className="btn small" data-testid="try-this" href={href("/label/try", { run, file, line, para: sel })}
                 title="Open the Try page with this paragraph and the run's policy">Try this paragraph →</a> : null}
+              {d.text ? <a className="btn small" data-testid="lab-this" href={href("/label/lab", { run, file, line, para: paras[sel] ? sel : undefined })}
+                title="Open the Experiment page with this paragraph: change any setting of the policy, compare with the run's policy; nothing is saved unless you confirm">Experiment →</a> : null}
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
                 <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)} title={d.row.decided_by === i ? "this paragraph decided the line" : undefined}>
                   ¶{i + 1}{d.row.decided_by === i ? " ★" : ""} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}

@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
 import logging
 import os
@@ -48,7 +49,7 @@ import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nli_filter as nf  # noqa: E402
@@ -260,6 +261,38 @@ MAX_LABEL_TEXTS = 20
 MAX_LABEL_CHARS = 20000
 
 
+class CachedScorer:
+    """Wraps a scorer: (premise, hypothesis) pairs scored before with the same models and judge band are taken from
+    a small in-memory table (the Experiment page runs the same text with a draft and the base policy: only new or
+    reworded hypotheses are scored again). "reuse_scores": true in a /label request turns it on."""
+    TABLE: "collections.OrderedDict[Tuple[str, ...], Tuple[Any, ...]]" = collections.OrderedDict()
+    MAX = 50000
+
+    def __init__(self, inner: Any, key: Tuple[str, ...]):
+        self.inner, self.key = inner, key
+        self.reused = 0
+
+    @property
+    def fast_pairs(self) -> int:
+        return self.inner.fast_pairs
+
+    @property
+    def judge_pairs(self) -> int:
+        return self.inner.judge_pairs
+
+    def score(self, premises: List[str], hyps: List[str]):
+        keys = [self.key + (hashlib.sha1(p.encode("utf-8")).hexdigest(), h) for p, h in zip(premises, hyps)]
+        todo = [i for i, k in enumerate(keys) if k not in self.TABLE]
+        if todo:
+            res = self.inner.score([premises[i] for i in todo], [hyps[i] for i in todo])
+            for i, r in zip(todo, res):
+                self.TABLE[keys[i]] = tuple(r)
+                if len(self.TABLE) > self.MAX:
+                    self.TABLE.popitem(last=False)
+        self.reused += len(keys) - len(todo)
+        return [self.TABLE[k] for k in keys]
+
+
 def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
     """POST /label: nli_label.py's policy labels on a few texts (the viewer's policy Try page).
     {"texts": [str], "policy": "policy/russia_policy.json" | "policy_data": {...}, "all_labels": true,
@@ -295,6 +328,8 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
     t0 = time.perf_counter()
     with pg.lock:  # the models are shared: one request at a time
         scorer = nf.CascadeScorer(pg.fast, pg.judge if use_judge else None, (float(lo), float(hi)))
+        if req.get("reuse_scores"):
+            scorer = CachedScorer(scorer, (pg.fast.name, pg.judge.name if use_judge else "", str(lo), str(hi)))
         lab = nli_label.Labeller(policy, matcher, rules, scorer,
                                  policy.rewriter(),
                                  all_labels=bool(req.get("all_labels", True)), marker_matcher=markers,
@@ -306,7 +341,8 @@ def label_texts(pg: "Playground", req: Dict[str, Any]) -> Dict[str, Any]:
         outs = lab.process(records)
     return {"rows": [o.row for o in outs], "clean": [(o.clean or {}).get("text") for o in outs],
             "rewrites": [o.rewrites for o in outs], "seconds": round(time.perf_counter() - t0, 3),
-            "pairs": {"fast": scorer.fast_pairs, "judge": scorer.judge_pairs},
+            "pairs": {"fast": scorer.fast_pairs, "judge": scorer.judge_pairs,
+                      **({"reused": scorer.reused} if isinstance(scorer, CachedScorer) else {})},
             "models": {"fast": pg.fast.name, "judge": pg.judge.name if use_judge else None},
             "policy": policy.summary()}
 

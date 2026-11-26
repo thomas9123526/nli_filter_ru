@@ -1,0 +1,9 @@
+{
+  "about": "How Expected vs result decides that a result matches the expected action. Edited at /label/expected-rules/ in the viewer.",
+  "default": "strict",
+  "profiles": {
+    "strict": {"same": [["pass", "untouched", "none"]], "note": "only pass = untouched = none (the rule before this file)"},
+    "quick": {"same": [["keep", "pass", "untouched", "none"]], "note": "text kept = match"}
+  },
+  "aliases": {}
+}

@@ -32,6 +32,8 @@ class LabelRuns:
         self.stale = stale_seconds
         self.extra: Dict[str, Path] = {}  # runs outside the project folder, named after their dataset
         self._exp_cache: Dict[tuple, Dict[int, Dict[str, Any]]] = {}  # (corpus file, mtime) -> expected per line
+        from .expected_rules import Rules
+        self.rules = Rules(self.project)  # labels/expected_rules.json: what counts as "same as expected"
         if str(self.project) not in sys.path:
             sys.path.insert(0, str(self.project))
 
@@ -271,8 +273,9 @@ class LabelRuns:
         return p if p.is_file() else None
 
     def expected(self, d: Path, file: str) -> Dict[int, Dict[str, Any]]:
-        """{line: expected fields} from the run's input file; {} for a corpus without expected results (real data:
-        only its first lines are read)."""
+        """{line: expected fields} from the run's input file; {} for a corpus without expected results. Shortcut for big
+        real corpora: a file whose first 3 lines have no expected_action / expected_doc_action counts as having none
+        (expected results only on later lines are not seen)."""
         src = self._local_source(d, file)
         if src is None:
             return {}
@@ -300,14 +303,21 @@ class LabelRuns:
         self._exp_cache[key] = out
         return out
 
-    @staticmethod
-    def _same(actions) -> set:
-        out = {str(a).strip() for a in actions if a}
-        if out & {"pass", "untouched", "none"}:
-            out |= {"pass", "untouched", "none"}  # all three leave the text as it is
-        return out
+    def _same(self, actions, profile: Optional[str] = None) -> set:
+        """Every action that counts as one of `actions` (labels/expected_rules.json: aliases, then the profile's
+        "same" groups; without the file pass = untouched = none)."""
+        return self.rules.same(actions, profile)
 
-    def verdict(self, row: Dict[str, Any], e: Dict[str, Any], para_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    def text_verdict(self, got: str, e: Dict[str, Any], profile: Optional[str] = None) -> Dict[str, Any]:
+        """Expected vs got for a case text, got = the line's strictest action."""
+        exp = [*str(e["expected_action"]).split(" or "), *(e.get("acceptable") or [])]
+        ok = got in self._same(exp, profile)
+        why = self.rules.why(got, exp, profile) if ok else ""
+        return {"kind": "text", "expected": e["expected_action"], "acceptable": e.get("acceptable") or [],
+                "got": got, "ok": ok, "note": e.get("note") or "", **({"rule": why} if why else {})}
+
+    def verdict(self, row: Dict[str, Any], e: Dict[str, Any], para_cfg: Dict[str, Any],
+                profile: Optional[str] = None) -> Dict[str, Any]:
         """Expected vs got for one line: a case text (strictest paragraph action) or a test document (its document
         action and every paragraph's action)."""
         paras = row.get("paragraphs") or []
@@ -317,12 +327,11 @@ class LabelRuns:
                 if any(p.get("action") == a for p in paras):
                     got = a
                     break
-            ok_set = self._same([*str(e["expected_action"]).split(" or "), *(e.get("acceptable") or [])])
-            return {"kind": "text", "expected": e["expected_action"], "acceptable": e.get("acceptable") or [],
-                    "got": got, "ok": got in ok_set, "note": e.get("note") or ""}
+            return self.text_verdict(got, e, profile)
         got_doc = row.get("action")
-        res: Dict[str, Any] = {"kind": "document", "expected": e.get("expected_doc_action"), "acceptable": [],
-                               "got": got_doc, "ok": got_doc == e.get("expected_doc_action"), "note": "",
+        exp_doc = e.get("expected_doc_action")
+        res: Dict[str, Any] = {"kind": "document", "expected": exp_doc, "acceptable": [],
+                               "got": got_doc, "ok": got_doc in self._same([exp_doc], profile), "note": "",
                                "paragraphs": []}
         exp_paras = e.get("expected_paragraphs") or []
         if exp_paras and e.get("_text"):
@@ -333,7 +342,7 @@ class LabelRuns:
                 for (s0, s1), x in zip(spans, exp_paras):
                     p = by_span.get((s0, s1))
                     got = p["action"] if p else "none"
-                    ok = got in self._same([x.get("expected_action"), *(x.get("acceptable") or [])])
+                    ok = got in self._same([x.get("expected_action"), *(x.get("acceptable") or [])], profile)
                     res["paragraphs"].append({"span": [s0, s1], "expected": x.get("expected_action"),
                                               "acceptable": x.get("acceptable") or [], "note": x.get("note") or "",
                                               "got": got, "ok": ok})
@@ -343,13 +352,27 @@ class LabelRuns:
     def _para_cfg(self, d: Path) -> Dict[str, Any]:
         return ((_read_json(d / "summary.json") or {}).get("policy") or {}).get("paragraphs") or {}
 
-    def expected_summary(self, name: str) -> Optional[Dict[str, Any]]:
-        """Over all files of a run: how many lines match their expected result, and the ones that do not."""
+    def _files(self, d: Path) -> List[str]:
+        return [sp.name[:-len(".summary.json")] for sp in sorted(d.glob("*.summary.json"))
+                if not sp.name.startswith("summary.")]
+
+    def is_simple(self, d: Path) -> bool:
+        return ((_read_json(d / "summary.json") or {}).get("settings") or {}).get("output_mode") == "simple"
+
+    def _profile_info(self, profile: Optional[str]) -> Dict[str, Any]:
+        info = self.rules.info()
+        return {"profile": self.rules.pick(profile), "profiles": list(info["profiles"]), "default": info["default"],
+                "notes": {k: v["note"] for k, v in info["profiles"].items()}, "rules_problem": info["problem"]}
+
+    def expected_summary(self, name: str, profile: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Over all files of a run: how many lines match their expected result, and the ones that do not. None when no
+        file of the run has expected results (every file is checked, not only the first)."""
         d = self.folder(name)
-        files = [sp.name[:-len(".summary.json")] for sp in sorted(d.glob("*.summary.json"))
-                 if not sp.name.startswith("summary.")]
-        if not files or not self.expected(d, files[0]):
+        files = self._files(d)
+        if not any(self.expected(d, f) for f in files):
             return None
+        if self.is_simple(d):
+            return self.simple_expected(name, profile)
         cfg = self._para_cfg(d)
         n = ok = 0
         wrong = []
@@ -361,18 +384,106 @@ class LabelRuns:
                 e = exp.get(r.get("line"))
                 if e is None:
                     continue
-                v = self.verdict(r, e, cfg)
+                v = self.verdict(r, e, cfg, profile)
                 n += 1
                 ok += bool(v["ok"])
                 if not v["ok"]:
                     wrong.append({"file": f, "line": r.get("line"), "id": r.get("id"), "expected": v["expected"],
                                   "acceptable": v["acceptable"], "got": v["got"], "note": v["note"] or e.get("note", ""),
                                   "paragraphs_wrong": sum(1 for p in v.get("paragraphs", []) if not p["ok"])})
-        return {"n": n, "ok": ok, "wrong": wrong}
+        return {"n": n, "ok": ok, "wrong": wrong, **self._profile_info(profile)}
+
+    def expected_profiles(self, name: str) -> Optional[Dict[str, Any]]:
+        """n / ok of a run under every profile (the preview on the rules editor)."""
+        out = {}
+        for prof in self.rules.profiles():
+            s = self.expected_summary(name, prof)
+            if s is None:
+                return None
+            out[prof] = {"n": s["n"], "ok": s["ok"]}
+        return {"run": name, "profiles": out, "default": self.rules.default()}
+
+    # ---- expected results of a simple-mode run (line level, from the decisions file) ----------------------------
+    def _simple_got_fn(self, d: Path):
+        """A function decisions row -> the line's strictest action (remove / review / keep / pass / untouched / error).
+        Read from the row's paragraphs field (strictest paragraph action), else its level field, else its decision
+        field (line unit: the line's decision; paragraph unit: the document action mapped like
+        nli_simple.ACTION_LEVEL)."""
+        import nli_simple
+        s = _read_json(d / "summary.json") or {}
+        nm = self._schema_names(s)
+        f_par, f_lvl, f_dec = nm.get("paragraphs"), nm.get("level"), nm.get("decision")
+
+        def got(r: Dict[str, Any]) -> str:
+            if f_par and isinstance(r.get(f_par), list) and r.get(f_par):
+                acts = {p[2] for p in r[f_par] if isinstance(p, list) and len(p) > 2}
+                for a in ("remove", "review", "keep", "pass"):
+                    if a in acts:
+                        return a
+            if f_lvl and r.get(f_lvl):
+                return str(r[f_lvl])
+            if f_dec and r.get(f_dec):
+                v = str(r[f_dec])
+                return nli_simple.ACTION_LEVEL.get(v, v)
+            return "?"
+        return got
+
+    def _absent(self, s: Dict[str, Any]):
+        """(what a line without a row counts as, the include values left out)."""
+        include = set(((s.get("schema") or {}).get("include")) or ["remove", "review", "keep", "pass", "untouched",
+                                                                     "error"])
+        missing = [a for a in ("remove", "review", "keep", "pass", "untouched", "error") if a not in include]
+        absent = "untouched" if "untouched" in missing else (missing[0] if len(missing) == 1 else "not in output")
+        return absent, missing
+
+    def simple_expected(self, name: str, profile: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Expected vs result of a simple-mode run, at line level: each corpus line with expected_action against its
+        row's strictest action (lines without a row: see _absent)."""
+        d = self.folder(name)
+        s = _read_json(d / "summary.json") or {}
+        st = s.get("settings") or {}
+        nm = self._schema_names(s)
+        info = dict(self._profile_info(profile), simple=True, unit=st.get("decision_unit") or "paragraph")
+        if not nm.get("line"):
+            return {"n": 0, "ok": 0, "wrong": [], **info,
+                    "problem": "the run's schema has no line field (from: line), so its rows cannot be matched to the "
+                               "corpus lines: add {\"name\": \"ln\", \"from\": \"line\"} to the schema"}
+        if not (nm.get("level") or nm.get("decision") or nm.get("paragraphs")):
+            return {"n": 0, "ok": 0, "wrong": [], **info,
+                    "problem": "the run's schema has no decision / level field: nothing to compare"}
+        absent, missing = self._absent(s)
+        got_of = self._simple_got_fn(d)
+        n = ok = 0
+        wrong = []
+        for f in self._files(d):
+            exp = self.expected(d, f)
+            if not exp:
+                continue
+            seen: Dict[int, Dict[str, Any]] = {}
+            p = self._simple_file(d, f, st.get("decisions_file") or "decisions")
+            if p is not None:
+                for r in self._jsonl(p):
+                    if r.get(nm["line"]) in exp:
+                        seen[r[nm["line"]]] = r
+            for line, e in sorted(exp.items()):
+                if "expected_action" not in e:
+                    continue  # test documents: simple runs are checked at line level only
+                r = seen.get(line)
+                got = got_of(r) if r is not None else absent
+                v = self.text_verdict(got, e, profile)
+                n += 1
+                ok += bool(v["ok"])
+                if not v["ok"]:
+                    wrong.append({"file": f, "line": line, "id": (r or {}).get(nm.get("id") or "id"),
+                                  "expected": v["expected"], "acceptable": v["acceptable"], "got": got,
+                                  "note": v["note"], "paragraphs_wrong": 0, **({"no_row": True} if r is None else {})})
+        return {"n": n, "ok": ok, "wrong": wrong, **info,
+                **({"note": f"lines without a row (the schema's include leaves out {', '.join(missing)}) count as "
+                            f"'{absent}'"} if missing else {})}
 
     def docs(self, name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
              para_action: Optional[str] = None, gated: bool = True, offset: int = 0, limit: int = 50,
-             expect: Optional[str] = None) -> Dict[str, Any]:
+             expect: Optional[str] = None, profile: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)
         counts: Dict[str, int] = {}
         out, total = [], 0
@@ -380,7 +491,7 @@ class LabelRuns:
         cfg = self._para_cfg(d) if exp else {}
         exp_n = exp_ok = 0
         for r in self._rows(d, file):
-            v = self.verdict(r, exp[r.get("line")], cfg) if r.get("line") in exp else None
+            v = self.verdict(r, exp[r.get("line")], cfg, profile) if r.get("line") in exp else None
             if v is not None:
                 exp_n += 1
                 exp_ok += bool(v["ok"])
@@ -503,7 +614,8 @@ class LabelRuns:
                     yield json.loads(raw)
 
     def simple_rows(self, name: str, file: str, decision: Optional[str] = None, reason: Optional[str] = None,
-                    keyword: Optional[str] = None, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
+                    keyword: Optional[str] = None, offset: int = 0, limit: int = 50,
+                    expect: Optional[str] = None, profile: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)
         s = _read_json(d / "summary.json") or {}
         st = s.get("settings") or {}
@@ -520,7 +632,18 @@ class LabelRuns:
         reasons: collections.Counter = collections.Counter()
         keywords: collections.Counter = collections.Counter()
         out, total = [], 0
+        exp = self.expected(d, file) if f_ln else {}
+        got_of = self._simple_got_fn(d) if exp else None
+        exp_n = exp_ok = 0
         for r in self._jsonl(p):
+            v = None
+            e = exp.get(r.get(f_ln)) if exp else None
+            if e is not None and "expected_action" in e:
+                v = self.text_verdict(got_of(r), e, profile)
+                exp_n += 1
+                exp_ok += bool(v["ok"])
+            if expect in ("wrong", "right") and (v is None or v["ok"] != (expect == "right")):
+                continue
             dv = r.get(f_lvl) if f_lvl and r.get(f_lvl) is not None else r.get(f_dec) if f_dec else None
             rv = r.get(f_rsn) if f_rsn else None
             kv = r.get(f_kw) if f_kw else None
@@ -537,14 +660,15 @@ class LabelRuns:
             total += 1
             if offset <= total - 1 < offset + limit:
                 out.append({"row": r, "line": r.get(f_ln) if f_ln else None, "decision": dv, "reason": rv,
-                            "keywords": kv if isinstance(kv, dict) else {}})
+                            "keywords": kv if isinstance(kv, dict) else {}, **({"expect": v} if v is not None else {})})
         return {"file": file, "rows": out, "total": total, "offset": offset, "limit": limit,
                 "counts": {"decision": dict(decisions.most_common()), "reason": dict(reasons.most_common()),
                            "keyword": dict(keywords.most_common(60))},
                 "fields": nm, "evidence": st.get("evidence") or "none",
-                "can_open": bool(f_ln), "unit": st.get("decision_unit") or "paragraph"}
+                "can_open": bool(f_ln), "unit": st.get("decision_unit") or "paragraph",
+                **({"expected": {"n": exp_n, "ok": exp_ok, "rows_only": True}} if exp else {})}
 
-    def simple_line(self, name: str, file: str, line: int) -> Dict[str, Any]:
+    def simple_line(self, name: str, file: str, line: int, profile: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)
         s = _read_json(d / "summary.json") or {}
         st = s.get("settings") or {}
@@ -558,6 +682,11 @@ class LabelRuns:
         if evp is not None:
             ev = next((r for r in self._jsonl(evp) if r.get("line") == line), None)
         text, problem, src = self.source_text(d, file, line)
+        e = self.expected(d, file).get(line)
+        expect = None
+        if e is not None and "expected_action" in e:
+            got = self._simple_got_fn(d)(row) if row is not None else self._absent(s)[0]
+            expect = self.text_verdict(got, e, profile)
         hits: List[Dict[str, Any]] = []
         if text and s.get("policy_data"):
             try:
@@ -572,6 +701,7 @@ class LabelRuns:
             except Exception as exc:  # noqa: BLE001 - only the highlighting is missing
                 problem = problem or f"keywords not highlighted: {exc}"
         return {"name": name, "file": file, "line": line, "input": src, "row": row, "evidence": ev, "text": text,
+                **({"expect": expect} if expect is not None else {}),
                 "problem": problem, "hits": sorted(hits, key=lambda h: h["start"]),
                 "policy": {"labels": (s.get("policy") or {}).get("labels") or {}, "run_if": (s.get("policy") or {}).get("run_if") or {},
                            "conflict": (s.get("policy") or {}).get("conflict")},
@@ -610,7 +740,7 @@ class LabelRuns:
         return {"run": name, "file": f, "files": files, "rows": rows, "read": read, "included": included,
                 "evidence_rows": evidence, "unit": (s.get("settings") or {}).get("decision_unit") or "paragraph"}
 
-    def doc(self, name: str, file: str, line: int) -> Dict[str, Any]:
+    def doc(self, name: str, file: str, line: int, profile: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)
         row = next((r for r in self._rows(d, file) if r.get("line") == line), None)
         if row is None:
@@ -652,7 +782,7 @@ class LabelRuns:
         pol = s.get("policy") or {}
         clean = self.clean_view(d, file, row, tf, s.get("settings") or {})
         e = self.expected(d, file).get(line)
-        expect = self.verdict(row, e, pol.get("paragraphs") or {}) if e is not None else None
+        expect = self.verdict(row, e, pol.get("paragraphs") or {}, profile) if e is not None else None
         return {"name": name, "file": file, "input": src, "row": row, "text": text, "problem": problem,
                 **({"expect": expect} if expect is not None else {}),
                 "clean": clean,

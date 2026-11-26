@@ -1,6 +1,7 @@
 "use client";
 // Policy Try page: step through the cases (labels/cases_v1.json) one by one, run the policy's labels on a case's
 // text with the model service, and compare the flow (gate → level 1 → level 2 → decision) with what is expected.
+import { TextTools } from "./TextTools";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
@@ -352,6 +353,8 @@ export function LabelTryView() {
               <div className="row" style={{ marginTop: 10 }}>
                 {c.texts.length > 1 ? <span className="seg">{c.texts.map((_, k) => <button key={k} className={k === ti ? "on" : ""} onClick={() => pickText(k)} title={runLinked ? `line ${k + 1} of ${caseFileName(c.id)}` : undefined}>text {k + 1}</button>)}</span> : null}
                 <span className="faint" style={{ fontSize: 12 }}>{t?.from}</span>
+                <span className="spacer" />
+                {text ? <TextTools text={text} source={fromRun ? { run: fromRun, file: fromFile, line: fromLine } : { file: c.id, line: ti + 1 }} testid="try-tools" /> : null}
               </div>
               <textarea className="mono try-text" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} data-testid="try-text" />
               <div className="row" style={{ fontSize: 13 }}>

@@ -5,7 +5,7 @@ import type {
   BatchResp, BrowseEntry, CorpusLines, HypothesesData, PlaygroundInfo, PlaygroundRun, ProgressResp, RunDefaults, RunJob, DatasetInfo, DecisionsResp, EditEntry, EditResp, EditStatus, FileRow, FindMatch, Overview,
   LineChange, RecordResp, SimResp, KeywordStatsResp, LinesResp, GoldenSummary,
   LabelRunRow, LabelRunResp, LabelDocsResp, LabelDocResp, LabelCasesResp, LabelLinesResp, SaveCasesResp, ExpectedSummary, LabelTryResp, PolicyCheck, PolicyData, PolicyRawResp, CompareResp,
-  ConfigCheck, ConfigRawResp, SchemaPreviewResp, SimpleRowsResp, SimpleLineResp } from "./types";
+  ConfigCheck, ConfigRawResp, SchemaPreviewResp, SimpleRowsResp, SimpleLineResp, ExpectedRulesInfo } from "./types";
 
 // Same origin by default (backend serves the UI, or `next dev` forwards /api). Override for a remote backend.
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
@@ -109,7 +109,8 @@ export const api = {
   labelPolicies: (s?: AbortSignal) => getJSON<{ policies: string[] }>("/api/labels/policies", undefined, s),
   labelRun: (run: string, s?: AbortSignal) => getJSON<LabelRunResp>(`/api/labels/${enc(run)}`, undefined, s),
   labelDocs: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocsResp>(`/api/labels/${enc(run)}/docs`, p, s),
-  labelExpected: (run: string, s?: AbortSignal) => getJSON<{ expected: ExpectedSummary }>(`/api/labels/${enc(run)}/expected`, undefined, s),
+  labelExpected: (run: string, s?: AbortSignal, profile?: string) => getJSON<{ expected: ExpectedSummary }>(`/api/labels/${enc(run)}/expected`, { profile }, s),
+  expectedRules: (run?: string, s?: AbortSignal) => getJSON<ExpectedRulesInfo>("/api/labels/expected-rules", { run }, s),
   labelDoc: (run: string, p: Params, s?: AbortSignal) => getJSON<LabelDocResp>(`/api/labels/${enc(run)}/doc`, p, s),
   labelCases: (file?: string, s?: AbortSignal) => getJSON<LabelCasesResp>("/api/labels/cases", file ? { file } : undefined, s),
   saveCases: (body: { file: string; data: LabelCasesResp; base_sha?: string }) =>
@@ -126,7 +127,7 @@ export const api = {
   addTopic: (topic: string) => postJSON<{ file: string; topics: string[]; added: string | null }>("/api/labels/topics", { topic }),
   labelTry: (body: { texts: string[]; policy?: string; all_labels?: boolean; force_gate?: boolean; use_judge?: boolean;
     topics?: (string | null)[]; topic_mode?: string; policy_data?: PolicyData; decision_unit?: string; review_as?: string;
-    uncertain_band?: number[] }) =>
+    uncertain_band?: number[]; reuse_scores?: boolean }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
   labelCompare: (p: Params, s?: AbortSignal) => getJSON<CompareResp>("/api/labels/compare", p, s),
   labelRedecide: (run: string, body: { policy?: string; policy_data?: PolicyData; output_dir: string; write_clean?: boolean; review_as?: string }) =>

@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 import { api, useApi } from "@/lib/api";
+import { formatSet, parseSet, useRestoreScroll, useUrlState } from "@/lib/urlState";
 import { href, num, pct } from "@/lib/format";
 import { Bars, Crumbs, ErrorBox, Loading, Stat } from "./ui";
 import { ProgressBadge } from "./LabelsView";
 import { RunTools } from "./RunTools";
 import { LineText } from "./LineText";
 import { SimpleRunView } from "./SimpleRunView";
+import { ExpectBadge, ExpectedPanel } from "./ExpectedPanel";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
 const PARA_ACTIONS = ["remove", "review", "keep", "pass"];
@@ -21,15 +23,21 @@ export function LabelRunView() {
   const sp = useSearchParams();
   const run = sp.get("run") || "";
   const res = useApi(run ? `labelrun:${run}` : null, (s) => api.labelRun(run, s));
-  const [file, setFile] = useState(sp.get("file") || "");
-  const [action, setAction] = useState("");
-  const [label, setLabel] = useState("");
-  const [paraAction, setParaAction] = useState("");
-  const [offset, setOffset] = useState(0);
-  const [expect, setExpect] = useState("");  // "" | "wrong" | "right" (test corpora with expected results)
+  // the view is kept in the URL (file, filters, page, opened rows, expected profile): Back and copied links show it again
+  const [u, setU] = useUrlState({ file: "", action: "", label: "", para_action: "", expect: "", offset: "0", open: "", profile: "" });
+  const file = u.file, action = u.action, label = u.label, paraAction = u.para_action, expect = u.expect, profile = u.profile;
+  const offset = parseInt(u.offset, 10) || 0;
+  const openLines = parseSet(u.open);  // rows whose full text is shown (▸)
+  const setFile = (v: string) => setU({ file: v, offset: "0", open: "" });
+  const setAction = (v: string) => setU({ action: v, offset: "0", open: "" });
+  const setLabel = (v: string) => setU({ label: v, offset: "0", open: "" });
+  const setParaAction = (v: string) => setU({ para_action: v, offset: "0", open: "" });
+  const setExpect = (v: string) => setU({ expect: v, offset: "0", open: "" });
+  const setOffset = (v: number) => setU({ offset: String(v), open: "" });
+  const setOpenLines = (x: Set<number> | ((o: Set<number>) => Set<number>)) =>
+    setU({ open: formatSet(typeof x === "function" ? x(openLines) : x) });
   const [labelsOpen, setLabelsOpen] = useState(true);  // the Labels panel (folded state kept in this browser)
   const [labelQuery, setLabelQuery] = useState("");
-  const [openLines, setOpenLines] = useState<Set<number>>(new Set());  // rows whose full text is shown (▸)
   useEffect(() => { try { setLabelsOpen(localStorage.getItem("nli.labelrun.labelsOpen") !== "0"); } catch { /* no storage */ } }, []);
   const toggleLabels = () => setLabelsOpen((o) => {
     try { localStorage.setItem("nli.labelrun.labelsOpen", o ? "0" : "1"); } catch { /* no storage */ }
@@ -37,20 +45,24 @@ export function LabelRunView() {
   });
   const f = file || res.data?.files[0]?.name || "";
   const simple = res.data?.summary.settings?.output_mode === "simple";  // simple mode: its own page
-  const docs = useApi(run && f && res.data && !simple ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}` : null,
-    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}) }, s));
-  const exp = useApi(run && res.data && !simple ? `labelexp:${run}` : null, (s) => api.labelExpected(run, s));
-  useEffect(() => { setOpenLines(new Set()); }, [run, f, action, label, paraAction, offset, expect]);  // another page of rows
+  const docs = useApi(run && f && res.data && !simple ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}:${profile}` : null,
+    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}), profile }, s));
   useEffect(() => {  // ?expand=1: every row's text open
-    if (sp.get("expand") === "1" && docs.data) setOpenLines(new Set(docs.data.rows.map((r) => r.line)));
+    if (sp.get("expand") === "1" && docs.data) setU({ expand: undefined, open: formatSet(new Set(docs.data.rows.map((r) => r.line))) } as never);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docs.data, sp]);
-  const ex = exp.data?.expected;
+  useRestoreScroll(!!docs.data && !simple);
   if (!run) return <div className="alert error">Missing ?run=</div>;
   const d = res.data;
   if (d && simple) return <SimpleRunView run={run} d={d} />;
   const st = d?.summary.stats;
   const pol = d?.summary.policy?.labels || {};
-  const reset = () => setOffset(0);
+  const reset = () => { /* the setters above go back to the first page */ };
+  const backUrl = (ln: number) => {  // the document page's "back to the run" returns to this view, at this row
+    const q = new URLSearchParams(sp.toString());
+    q.set("from_line", String(ln));
+    return `/label/run/?${q.toString()}`;
+  };
   const toggleLine = (ln: number) => setOpenLines((o) => { const x = new Set(o); if (x.has(ln)) x.delete(ln); else x.add(ln); return x; });
 
   return (
@@ -72,25 +84,8 @@ export function LabelRunView() {
         <div className="alert">Redecided from {d.summary.redecide.from}: {num(d.summary.redecide.stored)} stored scores reused,
           {" "}{num(d.summary.redecide.missing)} missing (treated as No){d.summary.redecide.changed?.length ? `; reworded: ${d.summary.redecide.changed.join(", ")}` : ""}.</div>
       ) : null}
-      {ex ? (
-        <div className="panel flush" style={{ marginBottom: 16 }} data-testid="expected-panel">
-          <div className="panel-head"><h2>Expected vs result</h2>
-            <span className={`badge ${ex.ok === ex.n ? "keep" : "warn"}`}>{ex.ok} / {ex.n} as expected ({ex.n ? Math.round(100 * ex.ok / ex.n) : 0} %)</span>
-            <span className="faint" style={{ fontSize: 12 }}>from the expected actions in the corpus (also fine counted; pass = untouched)</span></div>
-          {ex.wrong.length ? (
-            <div className="table-wrap"><table>
-              <thead><tr><th>File</th><th>Line</th><th>Expected</th><th>Got</th><th>Note</th><th></th></tr></thead>
-              <tbody>{ex.wrong.map((w) => (
-                <tr key={`${w.file}:${w.line}`}>
-                  <td><button className="linklike" onClick={() => { setFile(w.file); setExpect(""); setOffset(0); }}>{w.file}</button></td>
-                  <td><Link href={href("/label/doc", { run, file: w.file, line: w.line })}>{w.line}</Link></td>
-                  <td><span className={`badge ${actionClass(w.expected)}`}>{w.expected}</span>{w.acceptable.length ? <span className="faint"> (also {w.acceptable.join(", ")})</span> : null}</td>
-                  <td><span className={`badge ${actionClass(w.got)}`}>{w.got}</span>{w.paragraphs_wrong ? <span className="faint"> · {w.paragraphs_wrong} paragraph{w.paragraphs_wrong > 1 ? "s" : ""} not as expected</span> : null}</td>
-                  <td className="faint" style={{ fontSize: 12 }}>{w.note}</td>
-                  <td><Link className="btn small" href={href("/label/try", { run, file: w.file, line: w.line, para: 0 })}>Try</Link></td>
-                </tr>))}</tbody>
-            </table></div>) : <div className="panel-body faint">Every line matches its expected result.</div>}
-        </div>) : null}
+      {d ? <ExpectedPanel run={run} profile={profile} setProfile={(p) => setU({ profile: p })}
+        onFile={(x) => setU({ file: x, expect: "", offset: "0", open: "" })} /> : null}
       {st ? (
         <>
           <div className="stats">
@@ -180,16 +175,14 @@ export function LabelRunView() {
                   <th>Line</th><th>Action</th>{docs.data.expected ? <th>Expected</th> : null}<th>Paragraphs</th><th>Labels</th><th>Keywords</th><th className="right">Tokens removed</th><th></th></tr></thead>
                 <tbody>{docs.data.rows.map((r) => (
                   <Fragment key={r.line}>
-                  <tr>
+                  <tr data-line={r.line} id={`line-${r.line}`}>
                     <td><button className="row-toggle" data-testid={`toggle-${r.line}`} title={openLines.has(r.line) ? "hide the text" : "show the full text"}
                       onClick={() => toggleLine(r.line)}>{openLines.has(r.line) ? "▾" : "▸"}</button></td>
-                    <td><Link href={href("/label/doc", { run, file: f, line: r.line })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
+                    <td><Link href={href("/label/doc", { run, file: f, line: r.line, back: backUrl(r.line) })}>{r.line}</Link><div className="faint mono" style={{ fontSize: 11 }}>{r.id || ""}</div></td>
                     <td><span className={`badge ${actionClass(r.action)}`}>{r.action}</span></td>
                     {docs.data!.expected ? (
                       <td>{r.expect ? (<>
-                        <span className={r.expect.ok ? "badge keep" : "badge filter"} title={r.expect.note}>{r.expect.ok ? "✓" : "✗"}</span>{" "}
-                        <span className={`badge ${actionClass(r.expect.expected)}`}>{r.expect.expected}</span>
-                        {r.expect.kind === "text" ? <span className="faint"> got {r.expect.got}</span> : null}
+                        <ExpectBadge v={r.expect} />
                         {r.expect.paragraphs?.some((p) => !p.ok) ? <span className="faint"> · {r.expect.paragraphs.filter((p) => !p.ok).length} ¶ ✗</span> : null}
                       </>) : <span className="faint">–</span>}</td>) : null}
                     <td>{PARA_ACTIONS.filter((a) => r.paragraphs[a]).map((a) => <span key={a} className={`badge ${actionClass(a)}`} style={{ marginRight: 4 }}>{a} {r.paragraphs[a]}</span>)}</td>
@@ -197,7 +190,9 @@ export function LabelRunView() {
                     <td className="faint">{r.keywords.join(", ")}</td>
                     <td className="right">{r.tokens_removed ? `${num(r.tokens_removed)} / ${num(r.tokens)}` : "–"}</td>
                     <td className="right"><Link className="btn small" data-testid="row-try" title="open this document's first paragraph on the Try page (its case, the run's policy)"
-                      href={href("/label/try", { run, file: f, line: r.line, para: 0 })}>Try</Link></td>
+                      href={href("/label/try", { run, file: f, line: r.line, para: 0 })}>Try</Link>{" "}
+                      <Link className="btn small ghost" data-testid="row-lab" title="open this line on the Experiment page (change any setting, compare with the run's policy)"
+                      href={href("/label/lab", { run, file: f, line: r.line })}>Experiment</Link></td>
                   </tr>
                   {openLines.has(r.line) ? <tr className="line-text-row"><td colSpan={docs.data!.expected ? 9 : 8}><LineText run={run} file={f} line={r.line} /></td></tr> : null}
                   </Fragment>))}</tbody>

@@ -15,7 +15,7 @@ import { Crumbs, ErrorBox, Loading } from "./ui";
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
 /** Loading, checking and saving one config file (shared by both editors). */
-function useConfig<T>(kind: string, base: string, fallback: string) {
+export function useConfig<T>(kind: string, base: string, fallback: string) {
   const sp = useSearchParams();
   const router = useRouter();
   const list = useApi(`cfgfiles:${kind}`, (s) => api.configFiles(kind, s));
@@ -64,7 +64,7 @@ function useConfig<T>(kind: string, base: string, fallback: string) {
     discard: () => { setDraft(null); setCheck(raw.data?.check || null); }, setDraft };
 }
 
-function SaveBar({ c, file, placeholder, testid }: { c: ReturnType<typeof useConfig<unknown>>; file: string; placeholder: string; testid: string }) {
+export function SaveBar({ c, file, placeholder, testid, noSaveAs }: { c: ReturnType<typeof useConfig<unknown>>; file: string; placeholder: string; testid: string; noSaveAs?: boolean }) {
   return (
     <div className="panel policy-bar" data-testid={`${testid}-bar`}>
       <div className="row" style={{ flexWrap: "wrap" }}>
@@ -74,9 +74,10 @@ function SaveBar({ c, file, placeholder, testid }: { c: ReturnType<typeof useCon
         <button className="btn small primary" disabled={!c.dirty || c.saving || !c.check?.ok} onClick={() => c.save()} data-testid={`${testid}-save`}>
           {c.saving ? "Saving…" : `Save ${file}`}</button>
         <button className="btn small" disabled={!c.dirty || c.saving} onClick={c.discard}>Discard</button>
+        {noSaveAs ? null : <>
         <span className="faint" style={{ fontSize: 12 }}>or save as</span>
         <input type="text" placeholder={placeholder} value={c.saveAs} onChange={(e) => c.setSaveAs(e.target.value)} style={{ width: 200 }} />
-        <button className="btn small" disabled={!c.saveAs.trim() || c.saving || !c.check?.ok} onClick={() => c.save(c.saveAs.trim())}>Save as new</button>
+        <button className="btn small" disabled={!c.saveAs.trim() || c.saving || !c.check?.ok} onClick={() => c.save(c.saveAs.trim())}>Save as new</button></>}
       </div>
       {c.check?.errors.length ? <ul className="policy-errors" data-testid={`${testid}-errors`}>{c.check.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
       {c.msg ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }} data-testid={`${testid}-saved`}>{c.msg}</div> : null}
@@ -85,7 +86,7 @@ function SaveBar({ c, file, placeholder, testid }: { c: ReturnType<typeof useCon
   );
 }
 
-function JsonBox<T>({ data, onChange }: { data: T; onChange: (d: T) => void }) {
+export function JsonBox<T>({ data, onChange }: { data: T; onChange: (d: T) => void }) {
   const [t, setT] = useState(JSON.stringify(data, null, 2));
   const [bad, setBad] = useState<string | null>(null);
   useEffect(() => { setT(JSON.stringify(data, null, 2)); }, [data]);
@@ -299,7 +300,7 @@ export function NonEnglishEditView() {
                   <td><RangesBox value={v.ranges || []} onChange={(r) => c.edit((x) => { x.scripts[name].ranges = r; })} /></td>
                   <td><button className="btn small ghost" onClick={() => c.edit((x) => { delete x.scripts[name]; })} title="delete">✕</button></td>
                 </tr>))}
-                <tr><td /><td><input type="text" className="mono" placeholder="korean" value={newName} onChange={(e) => setNewName(e.target.value)} data-testid="ne-new-name" /></td>
+                <tr><td /><td><input type="text" className="mono" placeholder="japanese" value={newName} onChange={(e) => setNewName(e.target.value)} data-testid="ne-new-name" /></td>
                   <td className="faint" style={{ fontSize: 12 }}>a new script starts switched off; add its ranges, then tick it</td>
                   <td><button className="btn small" disabled={!/^[a-z][a-z0-9_]*$/.test(newName.trim()) || !!d.scripts[newName.trim()]} data-testid="ne-add"
                     onClick={() => { c.edit((x) => { x.scripts[newName.trim()] = { enabled: false, ranges: ["AC00-D7AF"] }; }); setNewName(""); }}>+ add</button></td></tr>

@@ -3,6 +3,7 @@
 // paragraph with its expected action. The document text and its expected document action follow from the
 // paragraphs. Checked while editing (as tools/build_russia_llm_docs.py checks: every paragraph must stay a paragraph
 // when the document is split); saved with a backup, then the corpus (dataset/test_corpus_docs_ru) is rebuilt.
+import { TextTools } from "./TextTools";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -146,6 +147,7 @@ export function DocsEditView() {
                         <label key={a} className="faint" style={{ fontSize: 12 }}><input type="checkbox" checked={(p.acceptable || []).includes(a)}
                           onChange={(e) => setP((x) => { const s = new Set(x.acceptable || []); if (e.target.checked) s.add(a); else s.delete(a); x.acceptable = [...s]; })} /> {a}</label>))}
                       <span className="spacer" />
+                      {p.text.trim() ? <TextTools text={p.text} testid={`docs-tools-${k}`} /> : null}
                       <span className={short ? "badge warn" : "faint"} style={{ fontSize: 11.5 }} title={short ? `shorter than ${minChars}: it would be joined to the next paragraph` : ""}>{p.text.trim().length} chars</span>
                       <button className="btn small ghost" disabled={k === 0} onClick={() => editDoc((x) => { const [m] = x.paragraphs.splice(k, 1); x.paragraphs.splice(k - 1, 0, m); })} title="move up">↑</button>
                       <button className="btn small ghost" disabled={k === doc.paragraphs.length - 1} onClick={() => editDoc((x) => { const [m] = x.paragraphs.splice(k, 1); x.paragraphs.splice(k + 1, 0, m); })} title="move down">↓</button>

@@ -7,7 +7,8 @@ Pipeline per document (cheap -> expensive):
   gate       keywords (keywords/russia.txt) + marker terms (policy "markers"); the cheap language-menu /
              company-name rules of nli_filter.py drop incidental hits. Documents without a hit are untouched.
   paragraphs matched documents are split into paragraphs; only paragraphs with a hit or a marker are labelled
-  level 0    gate hypothesis ("involves Russia?"); below its threshold the paragraph passes (incidental)
+  level 0    gate hypotheses ("involves Russia?"; any number, OR-combined: one at or above its threshold opens the
+             gate); all below their thresholds and no marker = the paragraph passes (incidental)
   level 1    subject hypotheses, each a separate yes/no label with its own threshold and decision
   level 2    framing hypotheses (narratives), only after politics / war / history or a marker term
   decide     per paragraph: remove / keep / review / pass  (see resolve() for the exact rule)
@@ -307,10 +308,11 @@ class Policy:
             if (lab.decision == "gate") != (lab.level == 0):
                 errors.append(f"label {key}: level 0 and decision 'gate' go together")
             self.labels[key] = lab
-        gates = [k for k, lab in self.labels.items() if lab.level == 0]
-        if len(gates) > 1:
-            errors.append(f"only one level-0 (gate) label is allowed, found {', '.join(gates)}")
-        self.gate: Optional[Label] = self.labels[gates[0]] if gates else None
+        # level-0 labels: the gates, in file order, OR-combined (any one at or above its threshold opens the gate).
+        # self.gate = the first one (scored on every candidate paragraph); the others only where the gate is still
+        # closed, so a second gate costs pairs only where the first said no.
+        self.gates: List[Label] = [lab for lab in self.labels.values() if lab.level == 0]
+        self.gate: Optional[Label] = self.gates[0] if self.gates else None
         self.run_if: Dict[int, List[str]] = {}
         for lvl, keys in (data.get("run_if") or {}).items():
             try:
@@ -319,9 +321,14 @@ class Policy:
                 errors.append(f"run_if: '{lvl}' is not a level")
                 continue
             for k in keys:
-                if k != "@marker" and k not in self.labels:
+                if k not in ("@marker", "@gate") and k not in self.labels:
                     errors.append(f"run_if {lvl}: unknown label '{k}'")
             self.run_if[lv] = list(keys)
+            named = [k for k in keys if k in self.labels and self.labels[k].level == 0]
+            if len(self.gates) > 1 and named and "@gate" not in keys and len(named) < len(self.gates):
+                errors.append(f"run_if {lvl}: lists the gate {', '.join(named)} but not "
+                              f"{', '.join(g.key for g in self.gates if g.key not in named)}; the gates are OR-combined: "
+                              "use \"@gate\" (any gate open) or list every gate")
         for lab in self.labels.values():
             for pat in lab.softens:
                 if not any(fnmatch.fnmatch(k, pat) for k in self.labels):
@@ -433,14 +440,26 @@ class Policy:
         return NameRewriter.from_files(table or here(self.place_names_file),
                                        exceptions if exceptions is not None else here(self.place_name_exceptions_file))
 
+    def gate_open(self, scores: Dict[str, Optional[float]]) -> Optional[str]:
+        """The first gate label (file order) at or above its threshold, or None (every gate below / not scored)."""
+        for g in self.gates:
+            v = scores.get(g.key)
+            if v is not None and v >= g.threshold:
+                return g.key
+        return None
+
     def runs(self, level: int, scores: Dict[str, float], marker: bool) -> bool:
-        """Whether a level's labels are scored for a paragraph, given the scores so far."""
+        """Whether a level's labels are scored for a paragraph, given the scores so far. run_if tokens: a label key,
+        @marker (a marker term), @gate (any gate label at or above its threshold)."""
         keys = self.run_if.get(level)
         if not keys:
             return True
         for k in keys:
             if k == "@marker":
                 if marker:
+                    return True
+            elif k == "@gate":
+                if self.gate_open(scores) is not None:
                     return True
             elif k in scores and scores[k] is not None and scores[k] >= self.labels[k].threshold:
                 return True
@@ -451,7 +470,7 @@ def resolve(policy: Policy, scores: Dict[str, Optional[float]], marker: bool = F
     """
     One paragraph's action from its label scores (missing / None = not scored = negative).
 
-      pass    the gate label is below its threshold and there is no marker term (the keyword was incidental)
+      pass    every gate label is below its threshold and there is no marker term (the keyword was incidental)
       remove  a level-2 'remove' label is positive and not softened (narratives win over 'keep' subjects), or
               level-1 'remove' labels are positive and no 'keep' label is
       review  a 'review' label is positive, a softened narrative is positive, or 'remove' and 'keep' labels are
@@ -463,8 +482,7 @@ def resolve(policy: Policy, scores: Dict[str, Optional[float]], marker: bool = F
     pos = {k for k, s in scores.items() if s is not None and k in policy.labels
            and policy.labels[k].level > 0 and s >= policy.labels[k].threshold}
     flags = sorted(k for k in pos if policy.labels[k].decision == "flag")
-    g = policy.gate
-    if g is not None and not marker and (scores.get(g.key) is None or scores[g.key] < g.threshold):
+    if policy.gates and not marker and policy.gate_open(scores) is None:
         return {"action": "pass", "reason": "gate_negative", "labels": sorted(pos), "flags": flags}
     softened = set()
     for k in pos:
@@ -494,10 +512,11 @@ def resolve(policy: Policy, scores: Dict[str, Optional[float]], marker: bool = F
 
 
 def action_from_labels(policy: Policy, labels: Dict[str, Optional[bool]], marker: bool = False) -> Optional[str]:
-    """The action hand labels imply (yes = 1.0, no / unknown = 0.0). None when the gate label is unknown."""
+    """The action hand labels imply (yes = 1.0, no / unknown = 0.0). None when every gate label is unknown (and no
+    gate label is yes)."""
     if policy.narrative_opens_gate and any(labels.get(lab.key) for lab in policy.level(2) if lab.decision == "remove"):
         marker = True  # a narrative claim opens the gate (as in Labeller.is_open)
-    if policy.gate is not None and labels.get(policy.gate.key) is None and not marker:
+    if policy.gates and not marker and all(labels.get(g.key) is None for g in policy.gates):
         return None
     return resolve(policy, {k: (1.0 if v else 0.0) for k, v in labels.items() if k in policy.labels},
                    marker)["action"]
@@ -785,9 +804,13 @@ class Labeller:
         else:
             if p.gate is not None:
                 self._score([(pa, pa["_text"], p.gate) for pa in paras])
+                for g in p.gates[1:]:  # the next gate only where the gate is still closed (no marker, no gate yes)
+                    self._score([(pa, pa["_text"], g) for pa in paras
+                                  if not pa["marker"] and not pa.get("narrative_keyword")
+                                  and p.gate_open(pa["scores"]) is None and g.key not in pa["scores"]])
                 if p.narrative_opens_gate:  # gate-negative paragraphs: do they make a narrative claim anyway?
                     closed = [pa for pa in paras if not pa["marker"] and (pa.get("narrative_keyword") or
-                              pa["scores"].get(p.gate.key, 0.0) < p.gate.threshold)]
+                              p.gate_open(pa["scores"]) is None)]
                     self._score([(pa, pa["_text"], lab) for pa in closed for lab in self.opening_labels()])
             for lvl in (1, 2):
                 if lvl == 1:  # the topic field answers some subjects (only where level 1 runs)
@@ -840,8 +863,9 @@ class Labeller:
         """The scores the decision may use. A paragraph that is there only because of a narrative keyword (Ukraine,
         Kyiv, NATO ...) is judged by the narrative check alone: its gate score never lets it in, so ordinary text
         about Ukraine passes unless a narrative fires."""
-        if pa.get("narrative_keyword") and self.p.gate is not None:
-            return {k: v for k, v in pa["scores"].items() if k != self.p.gate.key}
+        if pa.get("narrative_keyword") and self.p.gates:
+            gk = {g.key for g in self.p.gates}
+            return {k: v for k, v in pa["scores"].items() if k not in gk}
         return pa["scores"]
 
     def levels_used(self, scores: Dict[str, float], marker: bool) -> List[int]:
@@ -902,11 +926,12 @@ class Labeller:
                 out["marker"] = True
             if pa.get("narrative_keyword"):
                 out["narrative_keyword"] = True
-            gate = self.p.gate
             ob = self.opened_by(pa["scores"])
-            if ob and not pa["marker"] and gate is not None and (pa.get("narrative_keyword") or
-                                                                 pa["scores"].get(gate.key, 0.0) < gate.threshold):
-                out["opened_by"] = ob  # the gate said no; a narrative claim let the paragraph through
+            g_open = self.p.gate_open(pa["scores"]) if self.p.gates else None
+            if ob and not pa["marker"] and self.p.gates and (pa.get("narrative_keyword") or g_open is None):
+                out["opened_by"] = ob  # every gate said no; a narrative claim let the paragraph through
+            if len(self.p.gates) > 1 and g_open is not None and not pa.get("narrative_keyword"):
+                out["opened_by_gate"] = g_open  # several gates: the first one at or above its threshold
             if r["flags"]:
                 out["flags"] = r["flags"]
             if pa.get("judged"):
@@ -2282,6 +2307,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--id-field", default="id")
     x.add_argument("--min-doc-chars", type=int, default=50)
     x.add_argument("--chunk-lines", type=int, default=256)
+    import nli_kwstats  # keyword / marker statistics, no models (cmds/labeling/keyword_stats.md)
+    nli_kwstats.add_parser(sub)
     return ap
 
 
@@ -2294,6 +2321,11 @@ def _utf8_console() -> None:
             pass
 
 
+def cmd_kwstats(args) -> int:
+    import nli_kwstats
+    return nli_kwstats.cmd_kwstats(args)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     _utf8_console()
     args = build_parser().parse_args(argv)
@@ -2301,7 +2333,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         format="%(asctime)s %(levelname)s %(message)s")
     try:
         return {"run": cmd_run, "sample": cmd_sample, "eval": cmd_eval, "report": cmd_report,
-                "redecide": cmd_redecide, "review": cmd_review, "export": cmd_export}[args.cmd](args)
+                "redecide": cmd_redecide, "review": cmd_review, "export": cmd_export,
+                "kwstats": cmd_kwstats}[args.cmd](args)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

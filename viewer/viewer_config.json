@@ -11,6 +11,21 @@
   // summary.json); the most recent nli_filter.py run and the most recent nli_label.py run per corpus are shown, next
   // to the datasets below (these always win). Report of all run folders: python -m nli_viewer runs
   "auto_datasets": "../dataset",
+  // Translate buttons (中文 / Русский), for reading only. Providers are tried in order; see cmds/viewer/translate.md.
+  // Keys only via environment variables ("api_key_env"); unset = no Authorization header.
+  "translate": {
+    "targets": ["zh", "ru"],
+    "providers": [
+      {"name": "qwen", "kind": "openai", "base_url": "http://192.168.170.108:8000/v1", "model": "qwen3-4b",
+       "api_key_env": "QWEN_API_KEY", "timeout": 60, "no_think": true},
+      // Hunyuan-MT-7B, OpenAI-compatible on port 8001: vLLM (Linux / H200) or tools/serve_translate_local.py (this PC)
+      {"name": "hunyuan", "kind": "openai", "base_url": "http://127.0.0.1:8001/v1", "model": "Hunyuan-MT-7B",
+       "prompt": "hunyuan", "timeout": 120},
+      // the same model via tools/serve_translate_local.py on another port (transformers, Windows without WSL)
+      {"name": "hunyuan_local", "kind": "local", "base_url": "http://127.0.0.1:8002/v1", "model": "Hunyuan-MT-7B",
+       "prompt": "hunyuan", "timeout": 180, "enabled": false}
+    ]
+  },
   "datasets": [
     {
       "name": "sftp_test",

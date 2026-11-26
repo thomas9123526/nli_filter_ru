@@ -3,7 +3,9 @@
 // moved (e.g. keep → review), and every changed line with its paragraphs before and after.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { backHere, useRestoreScroll, useUrlState } from "@/lib/urlState";
+import { LineText } from "./LineText";
 import { api, useApi } from "@/lib/api";
 import { href, num } from "@/lib/format";
 import type { CompareParagraph } from "@/lib/types";
@@ -36,13 +38,17 @@ export function CompareView() {
   const router = useRouter();
   const a = sp.get("a") || "", b = sp.get("b") || "";
   const change = sp.get("change") || "";
-  const [offset, setOffset] = useState(0);
+  const [u, setU] = useUrlState({ offset: "0" });  // the page of changed lines is in the URL too (Back returns to it)
+  const offset = parseInt(u.offset, 10) || 0;
+  const setOffset = (v: number) => setU({ offset: String(v) });
+  const [openText, setOpenText] = useState<Set<string>>(new Set());
   const runs = useApi("labelruns:cmp", (s) => api.labelRuns(s));
   const res = useApi(a && b ? `cmp:${a}:${b}:${change}:${offset}` : null,
     (s) => api.labelCompare({ a, b, change: change || null, offset, limit: PAGE }, s));
   const d = res.data;
   const names = (runs.data?.runs || []).map((r) => r.name);
-  const go = (p: Record<string, string | null>) => { setOffset(0); router.replace(href("/label/compare", { a, b, change: change || null, ...p })); };
+  useRestoreScroll(!!d);
+  const go = (p: Record<string, string | null>) => { router.replace(href("/label/compare", { a, b, change: change || null, ...p })); };
 
   return (
     <>
@@ -103,20 +109,26 @@ export function CompareView() {
                 <table>
                   <thead><tr><th>Line</th><th>Document</th><th>Paragraph</th><th>A</th><th>B</th></tr></thead>
                   <tbody>
-                    {d.items.map((it) => (it.paragraphs.length ? it.paragraphs : [null]).map((p, k) => (
-                      <tr key={`${it.file}:${it.line}:${k}`}>
+                    {d.items.map((it) => { const key = `${it.file}:${it.line}`; return (<Fragment key={key}>{(it.paragraphs.length ? it.paragraphs : [null]).map((p, k) => (
+                      <tr key={`${it.file}:${it.line}:${k}`} data-line={k === 0 ? it.line : undefined}>
                         {k === 0 ? <td rowSpan={Math.max(1, it.paragraphs.length)}>
                           <span className="mono" style={{ fontSize: 12 }}>{it.file}</span> · {it.line}
                           <div className="faint mono" style={{ fontSize: 11 }}>{it.id || ""}</div>
-                          <div style={{ fontSize: 12 }}><Link href={href("/label/doc", { run: d.a, file: it.file, line: it.line })}>A</Link>{" · "}
-                            <Link href={href("/label/doc", { run: d.b, file: it.file, line: it.line })}>B</Link>{" · "}
+                          <div style={{ fontSize: 12 }}><Link href={href("/label/doc", { run: d.a, file: it.file, line: it.line })}
+                            onClick={(e) => { e.preventDefault(); router.push(href("/label/doc", { run: d.a, file: it.file, line: it.line, back: backHere(it.line) })); }}>A</Link>{" · "}
+                            <Link href={href("/label/doc", { run: d.b, file: it.file, line: it.line })}
+                            onClick={(e) => { e.preventDefault(); router.push(href("/label/doc", { run: d.b, file: it.file, line: it.line, back: backHere(it.line) })); }}>B</Link>{" · "}
+                            <button className="linklike" data-testid={`cmp-text-${it.line}`} onClick={() => setOpenText((o) => { const x = new Set(o); if (x.has(key)) x.delete(key); else x.add(key); return x; })}>
+                              text {openText.has(key) ? "▾" : "▸"}</button>{" · "}
                             <Link href={href("/label/try", { run: d.b, file: it.file, line: it.line, para: 0 })}>Try</Link></div></td> : null}
                         {k === 0 ? <td rowSpan={Math.max(1, it.paragraphs.length)}>
                           <span className={`badge ${actionClass(it.doc.a)}`}>{it.doc.a}</span> → <span className={`badge ${actionClass(it.doc.b)}`}>{it.doc.b}</span></td> : null}
                         <td className="mono" style={{ fontSize: 12 }}>{p ? `${p.span[0]}–${p.span[1]}` : "–"}</td>
                         <td>{p ? <Para p={p.a} /> : <span className="faint">same paragraphs</span>}</td>
                         <td>{p ? <Para p={p.b} /> : null}</td>
-                      </tr>)))}
+                      </tr>))}
+                      {openText.has(key) ? <tr className="line-text-row"><td colSpan={5}><LineText run={d.b} file={it.file} line={it.line} /></td></tr> : null}
+                    </Fragment>); })}
                   </tbody>
                 </table>
               </div>
