@@ -18,6 +18,12 @@ The estimate is about 3½–4 hours:
 - task 8 (a "Back to …" button on the Experiment page): about 30–45 min;
 - task 9 (quick as the default profile): about 10 min.
 
+**The benchmark keeps growing** (said 2026-11-27): the user keeps generating new files into `dataset/benchmark\`. So
+nothing may hard-code set names, line counts or field lists: the builder keeps every source field and accepts any new
+set name (with or without a side); the viewer shows whatever tags and fields a line has; counts are computed when the
+page or builder runs, not written into docs as fixed facts. The numbers above (40 files, 440 lines) are only the state
+on 2026-11-27.
+
 **Rule for every task: real corpora have no tags.** Nothing may require `clarity`; without it every page, run and
 command behaves exactly as now. The benchmark decisions are not changed.
 

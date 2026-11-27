@@ -59,3 +59,4 @@ Putin	B	person	the president of Russia
 Aeroflot	B	company	the Russia Airport
 Poltava	A	place	Ukraine
 Novosibirsk	A	place	Russia
+Petersburg 	B	place	Russia
