@@ -3,6 +3,7 @@
 // JSON. Checked while you type with nli_label.py's own rules; saved with a backup (policy/.backup/), refused when the
 // file changed since it was loaded. "Try these changes" opens the Try page with the unsaved policy.
 import Link from "next/link";
+import { addGateToRunIf, gatesToAt, partialGates } from "@/lib/policyGates";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi } from "@/lib/api";
@@ -124,8 +125,12 @@ export function PolicyEditView() {
           <button className="btn small" disabled={!saveAs.trim() || saving || !check?.ok} onClick={() => save(saveAs.trim())}>Save as new</button>
           <button className="btn small" disabled={!data || !check?.ok} onClick={tryIt} title="open the Try page (new tab) with this policy, saved or not" data-testid="policy-try">Try these changes →</button>
         </div>
-        {check?.errors.length ? <ul className="policy-errors" data-testid="policy-errors">{check.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
-        {check?.warnings.length ? <ul className="policy-warnings">{check.warnings.map((e) => <li key={e}>{e}</li>)}</ul> : null}
+        {data && partialGates(data).length ? (
+          <div className="alert" data-testid="policy-gate-fix">run_if level {partialGates(data).join(", ")} names some gates but not all. The gates are
+            OR-combined, so name every gate, or use <code>@gate</code> (any gate open).{" "}
+            <button className="btn small" onClick={() => edit(gatesToAt)} data-testid="policy-gate-fix-button">Use @gate in run_if</button></div>) : null}
+        {check?.errors.length ? <ul className="policy-errors" data-testid="policy-errors">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
+        {check?.warnings.length ? <ul className="policy-warnings">{check.warnings.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
         {msg ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }} data-testid="policy-saved">{msg}</div> : null}
         {err ? <div className="alert error" style={{ marginTop: 6 }}>{err}</div> : null}
       </div>
@@ -223,7 +228,7 @@ function Labels({ d, edit }: Ed) {
   const add = (level: number) => {
     const k = (newKey[level] || "").trim();
     if (!KEY_RE.test(k) || d.labels[k]) return;
-    edit((x) => { x.labels[k] = { level, decision: level === 0 ? "gate" : "review", threshold: 0.8, hypothesis: "This text …" }; });
+    edit((x) => { x.labels[k] = { level, decision: level === 0 ? "gate" : "review", threshold: 0.8, hypothesis: "This text …" }; if (level === 0) addGateToRunIf(x, k); });
     setNewKey((m) => ({ ...m, [level]: "" }));
   };
   return (

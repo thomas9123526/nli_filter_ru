@@ -55,7 +55,33 @@ Without editing the file: each provider has ↑ ↓ (the order auto tries them i
   when the file changed since the page loaded it ("reload the page");
 - used at once, no restart.
 
-**Test** checks the URL / model / timeout typed in the row, saved or not, so a new server can be tried before saving.
+**Test** checks the URL / model / timeout / prompt typed in the row, saved or not, so a new server can be tried before
+saving. When the server serves another model than the configured one, Test offers **use <served model>**. "more ▾"
+shows the rest of a row: prompt (generic / hunyuan), **thinking off** (Qwen3, 3.5, 3.6: `enable_thinking=false`), the
+key's environment variable name, a **link** (model card) and a **note**; the note and a "model card ↗" link are shown
+on the row.
+
+### Adding (or removing) a model
+
+"Add a translation model" at the bottom of the page, from a starting point:
+
+- **Chat model on an OpenAI-compatible server**: Qwen3.6-35B-A3B and the like, served by vLLM / SGLang / llama.cpp /
+  Ollama. Generic prompt, thinking off, timeout 60 s.
+- **Hunyuan-MT**: the Hunyuan-MT prompt, `http://127.0.0.1:8001/v1`, model `Hunyuan-MT-7B`, timeout 120 s.
+
+Then a **name** (e.g. `qwen36`; letters, digits, `_ . -`), the **URL** (ending in `/v1`), **Find models** (asks the
+server which models it serves; click one), the **model**, and optionally the key variable, link and note. "Add to the
+list" puts it last (last in auto; move it with ↑), then "Save to viewer_config.json". A key is never written into the
+file: only the name of the environment variable that holds it.
+
+Example, Qwen3.6-35B-A3B (https://huggingface.co/Qwen/Qwen3.6-35B-A3B) on a GPU server:
+
+    vllm serve Qwen/Qwen3.6-35B-A3B --served-model-name qwen3.6-35b-a3b --port 8000      # on the GPU server
+
+and on the page: name `qwen36`, URL `http://<server ip>:8000/v1`, Find models → `qwen3.6-35b-a3b`, thinking off.
+
+**Remove** on a row marks it (crossed out, "Undo remove"); it is deleted on Save. A provider can only be deleted this
+way: a save that leaves one out without naming it is refused.
 
 ### Choosing the provider for one translation
 
@@ -152,7 +178,10 @@ Other status codes:
 
 `POST /api/translate/settings/save` (the page's Save): `{"mtime": "<from the settings>", "providers": [{"name": "hunyuan",
 "enabled": true, "base_url": "http://127.0.0.1:8001/v1", "model": "Hunyuan-MT-7B", "timeout": 120}, {"name": "qwen", …}]}`:
-every provider exactly once, in the new order. Answer: `{"saved": "<file>", "backup": "<file>", "mtime": "…",
+every provider exactly once, in the new order, or named in `"remove": ["name", …]`; a new one with `"new": true`
+(name, base_url, model; optional kind, prompt, no_think, timeout, api_key_env, note, link). For an existing one, only
+the keys sent are changed. `POST /api/translate/models` `{"base_url": "http://…/v1"}` lists what a server serves
+(`{"reachable": true, "models": […]}`), for the add form. Answer: `{"saved": "<file>", "backup": "<file>", "mtime": "…",
 "providers": […]}`. **400**: a bad value or a provider missing / twice / unknown; **409**: the file changed since
 `mtime`, or the settings do not come from a file.
 

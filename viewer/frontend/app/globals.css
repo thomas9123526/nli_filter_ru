@@ -476,7 +476,7 @@ mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent);
 .policy-json { width: 100%; min-height: 70vh; box-sizing: border-box; font-size: 12.5px; }
 
 /* Try page: the flow trace (step by step, like cmds/labeling/russia_policy_flow.html) */
-.trace { display: grid; }
+.trace { display: grid; container-type: inline-size; }
 .trace-verdicts { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; margin-bottom: 10px; }
 .trace-stage { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 14px; align-items: start; }
 .trace-box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; min-width: 0; }
@@ -497,6 +497,8 @@ mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent);
 .trace-mark { font-family: var(--mono); font-size: 11px; color: var(--accent); margin-left: 6px; }
 .trace-near { font-size: 13px; margin-top: 10px; }
 @media (max-width: 760px) { .trace-stage { grid-template-columns: minmax(0, 1fr); gap: 0; } .trace-side { padding-left: 12px; } }
+/* a narrow trace (e.g. base | draft side by side on the Experiment page): the side note goes under the box */
+@container (max-width: 560px) { .trace-stage { grid-template-columns: minmax(0, 1fr); gap: 0; } .trace-side { padding-left: 12px; padding-top: 4px; } }
 
 /* compare two runs (/label/compare) */
 .cmp-table { border-collapse: collapse; font-size: 13px; }

@@ -327,7 +327,7 @@ class Policy:
             named = [k for k in keys if k in self.labels and self.labels[k].level == 0]
             if len(self.gates) > 1 and named and "@gate" not in keys and len(named) < len(self.gates):
                 errors.append(f"run_if {lvl}: lists the gate {', '.join(named)} but not "
-                              f"{', '.join(g.key for g in self.gates if g.key not in named)}; the gates are OR-combined: "
+                              f"{', '.join(g.key for g in self.gates if g.key not in named)}. The gates are OR-combined: "
                               "use \"@gate\" (any gate open) or list every gate")
         for lab in self.labels.values():
             for pat in lab.softens:

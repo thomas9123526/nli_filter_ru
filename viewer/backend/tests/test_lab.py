@@ -2,6 +2,7 @@
 the model service (with reused scores), saving only on an explicit confirm (save as new never overwrites; replace needs
 the file name typed again and the loaded version), and applying the draft to a run (redecide)."""
 import json
+import time
 import sys
 from pathlib import Path
 
@@ -126,3 +127,55 @@ def test_save_only_on_confirm(env):
     assert json.loads(f.read_text(encoding="utf-8"))["labels"]["culture"]["threshold"] == 0.7
     bad = dict(draft, conflict="maybe")
     assert c.post("/api/labels/lab/save", headers=H, json={"data": bad, "save_as": "policy/p_bad.json"}).status_code == 400
+
+
+H = {"X-Viewer-Edit": "1"}
+
+
+def _draft_body(**kw):
+    pol = json.loads(json.dumps(POLICY))
+    pol["labels"]["weather"] = {"level": 1, "decision": "keep", "threshold": 0.5, "hypothesis": "This text is about weather."}
+    return {"auto": True, "summary": "added label weather", "base": {"run": "out_r", "file": "in", "line": 1,
+            "policy_path": "policy/p.json", "policy_data": POLICY}, "policy": pol, "settings": {"unit": "paragraph"},
+            "texts": [TEXT], **kw}
+
+
+def test_drafts_auto_named_list_get_delete(env):
+    c, proj, _ = env
+    assert c.get("/api/labels/lab/drafts").json()["drafts"] == []
+    r = c.post("/api/labels/lab/drafts/save", json=_draft_body(), headers=H).json()
+    aid = r["id"]
+    assert aid.startswith("auto-") and (proj / "dataset" / "lab_drafts" / f"{aid}.json").is_file()
+    # the same page saves again into the same file
+    c.post("/api/labels/lab/drafts/save", json=_draft_body(id=aid, summary="v2"), headers=H)
+    lst = c.get("/api/labels/lab/drafts").json()["drafts"]
+    assert len(lst) == 1 and lst[0]["summary"] == "v2" and lst[0]["texts"] == 1 and lst[0]["labels"] == 3 and lst[0]["run"] == "out_r"
+    # named
+    r = c.post("/api/labels/lab/drafts/save", json=_draft_body(auto=False, name="weather_try"), headers=H)
+    assert r.status_code == 200 and r.json()["id"] == "weather_try"
+    assert c.post("/api/labels/lab/drafts/save", json=_draft_body(auto=False, name="weather_try"), headers=H).status_code == 409
+    assert c.post("/api/labels/lab/drafts/save", json=_draft_body(auto=False, name="weather_try", overwrite=True), headers=H).status_code == 200
+    d = c.get("/api/labels/lab/drafts/weather_try").json()
+    assert d["policy"]["labels"]["weather"]["threshold"] == 0.5 and d["base"]["policy_data"] == POLICY and d["texts"] == [TEXT]
+    # refusals
+    for bad in (_draft_body(auto=False, name="../x"), _draft_body(auto=False, name="auto-x"), _draft_body(id="named"),
+                _draft_body(policy={"no": 1}), _draft_body(texts=[1])):
+        assert c.post("/api/labels/lab/drafts/save", json=bad, headers=H).status_code == 400, bad.get("name") or bad.get("id")
+    assert c.post("/api/labels/lab/drafts/save", json=_draft_body()).status_code == 403   # no edit header
+    assert c.get("/api/labels/lab/drafts/nope").status_code == 404
+    assert c.post("/api/labels/lab/drafts/delete", json={"id": "weather_try"}, headers=H).json() == {"deleted": "weather_try"}
+    assert [x["id"] for x in c.get("/api/labels/lab/drafts").json()["drafts"]] == [aid]
+    assert not list((proj / "policy").glob("*weather*"))       # nothing in policy/
+
+
+def test_drafts_only_newest_autos_kept(env, monkeypatch):
+    c, proj, _ = env
+    from nli_viewer import lab_drafts
+    monkeypatch.setattr(lab_drafts, "MAX_AUTO", 3)
+    c.post("/api/labels/lab/drafts/save", json=_draft_body(auto=False, name="keep_me"), headers=H)
+    ids = []
+    for i in range(5):
+        ids.append(c.post("/api/labels/lab/drafts/save", json=_draft_body(id=f"auto-{i}"), headers=H).json()["id"])
+        time.sleep(0.02)
+    left = [x["id"] for x in c.get("/api/labels/lab/drafts").json()["drafts"]]
+    assert set(left) == {"keep_me", "auto-2", "auto-3", "auto-4"}

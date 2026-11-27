@@ -6,7 +6,7 @@
 // the file name. Different from /label/try/: no case sets, real lines, the whole policy.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, getJSON, postJSON, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
 import type { LabelTryResp, PolicyCheck, PolicyData, PolicyLabelData } from "@/lib/types";
@@ -14,6 +14,8 @@ import { Crumbs, ErrorBox, Loading } from "./ui";
 import { actionClass } from "./LabelRunView";
 import { TryTrace } from "./TryTrace";
 import { TextTools } from "./TextTools";
+import { addGateToRunIf, gatesToAt, partialGates } from "@/lib/policyGates";
+import { carryChanges, carrySettings, samePolicy, type DraftFile, type DraftInfo } from "@/lib/labDrafts";
 
 type Base = { text: string | null; paragraph: string | null; problem: string | null; settings: Record<string, unknown>;
   source?: { run: string; file: string; line: number; input: string | null }; policy_data: PolicyData; policy_from: string;
@@ -104,7 +106,8 @@ export function LabView() {
   const discard = () => {
     if (!b || !baseSettings) return;
     if (!window.confirm("Discard the draft and start again from the base?")) return;
-    try { localStorage.removeItem(storeKey); } catch { /* no storage */ }
+    try { localStorage.removeItem(storeKey); sessionStorage.removeItem(autoIdKey); } catch { /* no storage */ }
+    lastSaved.current = null;
     setRestored(false);
     setDraftState({ policy: clone(b.policy_data), settings: clone(baseSettings), texts: firstText ? [firstText] : [] });
     setResults([]);
@@ -117,9 +120,98 @@ export function LabView() {
     return () => clearTimeout(t);
   }, [draft]);
   const diff = useMemo(() => (b && draft && baseSettings ? [...policyDiff(b.policy_data, draft.policy), ...settingsDiff(baseSettings, draft.settings)] : []), [b, draft, baseSettings]);
+  // ---- drafts kept as files (dataset/lab_drafts/): saved by themselves a moment after a change, loadable elsewhere
+  const lastSaved = useRef<string | null>(null);
+  const autoIdKey = `nli.lab.autoId:${baseKey}`;
+  const [autoMsg, setAutoMsg] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<DraftInfo[] | null>(null);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsMsg, setDraftsMsg] = useState<string | null>(null);
+  const [draftsErr, setDraftsErr] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const snapshot = (d: Draft) => JSON.stringify([d.policy, d.settings, d.texts]);
+  const draftBody = (d: Draft) => ({
+    summary: diff.slice(0, 8).join("; ") + (diff.length > 8 ? ` … (${diff.length} changes)` : ""),
+    base: { run: run || undefined, file: file || undefined, line: line || undefined, para, policy_path: b?.policy_path,
+      policy_data: b?.policy_data, settings: baseSettings },
+    policy: d.policy, settings: d.settings, texts: d.texts });
+  useEffect(() => {
+    if (!draft || !b) return;
+    const snap = snapshot(draft);
+    if (lastSaved.current === null) { lastSaved.current = snap; return; }   // as loaded / restored: nothing new
+    if (snap === lastSaved.current || !diff.length) return;               // no change against the base: not kept
+    const t = setTimeout(async () => {
+      let id: string | undefined;
+      try { id = sessionStorage.getItem(autoIdKey) || undefined; } catch { /* private mode */ }
+      try {
+        const r = await postJSON<{ id: string; saved: string }>("/api/labels/lab/drafts/save", { auto: true, id, ...draftBody(draft) });
+        try { sessionStorage.setItem(autoIdKey, r.id); } catch { /* private mode */ }
+        lastSaved.current = snap;
+        setAutoMsg(`kept as ${r.id} (${r.saved.slice(11)})`);
+      } catch (e) { setAutoMsg(`not kept: ${(e as Error).message}`); }
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+  const loadList = async () => {
+    setDraftsErr(null);
+    try { setDrafts((await getJSON<{ drafts: DraftInfo[] }>("/api/labels/lab/drafts")).drafts); }
+    catch (e) { setDraftsErr((e as Error).message); }
+  };
+  const loadDraft = async (id: string, withTexts: boolean, mode: "carry" | "replace") => {
+    if (!b || !baseSettings) return;
+    setDraftsErr(null); setDraftsMsg(null);
+    try {
+      const d = await getJSON<DraftFile>(`/api/labels/lab/drafts/${encodeURIComponent(id)}`);
+      const same = samePolicy(d.base?.policy_data, b.policy_data);
+      let policy: PolicyData, how: string;
+      if (same || mode === "replace" || !d.base?.policy_data) {
+        policy = clone(d.policy);
+        how = same ? "same base: its policy as it was" : "its whole policy (replacing this base)";
+      } else {
+        const c = carryChanges(d.base.policy_data, d.policy, b.policy_data);
+        policy = c.policy;
+        how = `${c.carried} change(s) carried onto this base`;
+      }
+      const settings = carrySettings(d.base?.settings, d.settings || {}, baseSettings as unknown as Record<string, unknown>) as unknown as Settings;
+      setDraft((x) => {
+        x.policy = policy;
+        x.settings = settings;
+        if (withTexts) for (const t of d.texts || []) if (t.trim() && !x.texts.includes(t)) x.texts.push(t);
+      });
+      setResults([]);
+      setDraftsMsg(`Loaded ${d.name || d.id}: ${how}${withTexts ? `, with its ${d.texts.length} text(s)` : ""}. Run draft and base to see it.`);
+    } catch (e) { setDraftsErr((e as Error).message); }
+  };
+  const saveDraftAs = async (overwrite = false) => {
+    if (!draft) return;
+    setDraftsErr(null); setDraftsMsg(null);
+    const name = draftName.trim();
+    try {
+      const r = await postJSON<{ id: string }>("/api/labels/lab/drafts/save", { auto: false, name, overwrite, ...draftBody(draft) });
+      setDraftsMsg(`Saved as ${r.id}.`); setDraftName("");
+      if (draftsOpen) loadList();
+    } catch (e) {
+      const m = (e as Error).message;
+      if (!overwrite && m.includes("exists already") && window.confirm(`A draft named ${name} exists. Replace it?`)) return saveDraftAs(true);
+      setDraftsErr(m);
+    }
+  };
+  const deleteDraft = async (x: DraftInfo) => {
+    if (!window.confirm(`Delete the draft ${x.name || x.id}?`)) return;
+    try { await postJSON("/api/labels/lab/drafts/delete", { id: x.id }); loadList(); }
+    catch (e) { setDraftsErr((e as Error).message); }
+  };
   // running
   const [results, setResults] = useState<Result[]>([]);
   const [busy, setBusy] = useState(false);
+  // "Hide" on the Draft policy panel: the texts and traces get the whole width (remembered in this browser)
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { try { setHidden(localStorage.getItem("nli.lab.draftHidden") === "1"); } catch { /* private mode */ } }, []);
+  const toggleHidden = (v: boolean) => {
+    setHidden(v);
+    try { if (v) localStorage.setItem("nli.lab.draftHidden", "1"); else localStorage.removeItem("nli.lab.draftHidden"); } catch { /* private mode */ }
+  };
   const [sel, setSel] = useState<Record<string, number>>({});
   const runAll = async () => {
     if (!draft || !b || !baseSettings) return;
@@ -205,15 +297,67 @@ export function LabView() {
               : <span className="badge filter">{check.errors.length} problem(s)</span>) : null}
             <button className="btn small ghost danger" onClick={discard} data-testid="lab-discard">Discard draft</button>
           </div>
-          {check?.errors.length ? <ul className="policy-errors">{check.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
+          {pol && partialGates(pol).length ? (
+            <div className="alert" data-testid="lab-gate-fix">Run if level {partialGates(pol).join(", ")} names some gates but not all. The gates
+              are OR-combined, so name every gate, or use <code>@gate</code> (any gate open).{" "}
+              <button className="btn small" onClick={() => setDraft((d) => { gatesToAt(d.policy); })} data-testid="lab-gate-fix-button">Use @gate in Run if</button></div>) : null}
+          {check?.errors.length ? <ul className="policy-errors">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
           {check?.warnings.length ? <div className="faint" style={{ fontSize: 12 }}>{check.warnings.join("; ")}</div> : null}
           {b.problem ? <div className="alert">{b.problem}</div> : null}
+          <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }} data-testid="lab-drafts-bar">
+            <button className="btn small" onClick={() => { const o = !draftsOpen; setDraftsOpen(o); if (o) loadList(); }} data-testid="lab-drafts-open">
+              {draftsOpen ? "Close saved drafts ▴" : "Load a draft… ▾"}</button>
+            <input type="text" placeholder="name, e.g. ukraine_gate_try" value={draftName} onChange={(e) => setDraftName(e.target.value)}
+              style={{ width: 210 }} data-testid="lab-draft-name" />
+            <button className="btn small" disabled={!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$/.test(draftName.trim()) || draftName.trim().startsWith("auto-")}
+              onClick={() => saveDraftAs()} data-testid="lab-draft-save">Save draft as…</button>
+            <span className="faint" style={{ fontSize: 12 }} data-testid="lab-autosave">{autoMsg
+              ? `automatic copy: ${autoMsg}` : "changes are kept automatically as a draft file (dataset/lab_drafts/)"}</span>
+          </div>
+          {draftsMsg ? <div className="alert ok" style={{ marginTop: 6 }} data-testid="lab-drafts-msg">{draftsMsg}</div> : null}
+          {draftsErr ? <div className="alert error" style={{ marginTop: 6 }}>{draftsErr}</div> : null}
+          {draftsOpen ? (
+            <div style={{ marginTop: 8 }} data-testid="lab-drafts">
+              {drafts === null ? <span className="faint">loading…</span> : !drafts.length ? <span className="faint">no saved drafts yet</span> : (
+                <div className="table-wrap"><table>
+                  <thead><tr><th>Draft</th><th>Changes</th><th>From</th><th>Texts</th><th></th></tr></thead>
+                  <tbody>{drafts.map((x) => (
+                    <tr key={x.id} data-testid={`lab-draft-${x.id}`}>
+                      <td style={{ whiteSpace: "nowrap" }}>{x.name ? <strong>{x.name}</strong> : <span className="faint">automatic</span>}
+                        <div className="faint" style={{ fontSize: 11.5 }}>{x.saved}</div></td>
+                      <td style={{ fontSize: 12, maxWidth: 520 }}>{x.summary || <span className="faint">–</span>}</td>
+                      <td style={{ fontSize: 12 }}>{x.run ? <>{x.run}{x.line ? ` · line ${x.line}` : ""}</> : (x.policy_path || "–")}</td>
+                      <td style={{ fontSize: 12 }} title={x.first_text}>{x.texts}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button className="btn small primary" onClick={() => loadDraft(x.id, false, "carry")} data-testid={`lab-draft-load-${x.id}`}
+                          title="its policy changes and run settings; this page's texts stay">Load</button>{" "}
+                        <button className="btn small" onClick={() => loadDraft(x.id, true, "carry")} title="also add its texts">+ texts</button>{" "}
+                        <button className="btn small ghost" onClick={() => loadDraft(x.id, false, "replace")}
+                          title="its whole policy as it was, instead of carrying its changes onto this base">whole policy</button>{" "}
+                        <button className="btn small ghost danger" onClick={() => deleteDraft(x)} title="delete this draft file">✕</button></td>
+                    </tr>))}</tbody>
+                </table></div>)}
+              <div className="faint" style={{ fontSize: 11.5, marginTop: 4 }}>Load = the draft&apos;s changes carried onto this page&apos;s base (added labels,
+                changed thresholds / hypotheses, run_if, settings), so a newer base is kept; &quot;whole policy&quot; = its policy as it was.
+                Automatic drafts: the newest 50 are kept; named ones until deleted.</div>
+            </div>) : null}
         </div>
 
-        <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)", alignItems: "start" }}>
-          <div>
+        {hidden ? (
+          <div className="panel row" style={{ flexWrap: "wrap" }} data-testid="lab-draft-hidden">
+            <strong>Draft policy</strong>
+            <span className="faint" style={{ fontSize: 12 }}>hidden · {labelsOf.length} labels · {diff.length ? `${diff.length} change(s) vs base` : "no change yet"}
+              {check && !check.ok ? ` · ${check.errors.length} problem(s)` : ""} · Draft vs base and Save are below the texts</span>
+            <span className="spacer" />
+            <button className="btn small" onClick={() => toggleHidden(false)} data-testid="lab-draft-show">Show draft policy ▸</button>
+          </div>) : null}
+        <div className="grid" style={{ gridTemplateColumns: hidden ? "minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1.1fr)", alignItems: "start" }}>
+          <div style={hidden ? { order: 2 } : undefined}>
+            {!hidden ? (
             <div className="panel" data-testid="lab-draft">
-              <h2>Draft policy</h2>
+              <div className="row"><h2 style={{ margin: 0 }}>Draft policy</h2><span className="spacer" />
+                <button className="btn small ghost" onClick={() => toggleHidden(true)} title="hide the draft: the texts and traces get the whole width"
+                  data-testid="lab-draft-hide">◂ Hide</button></div>
               <div className="table-wrap"><table>
                 <thead><tr><th>Label</th><th>Lvl</th><th>Decision</th><th>Thr.</th><th>Hypothesis</th><th></th></tr></thead>
                 <tbody>{labelsOf.map(([k, l]) => (
@@ -238,7 +382,7 @@ export function LabView() {
                     })}>✕</button></td>
                   </tr>))}</tbody>
               </table></div>
-              <NewLabel onAdd={(k, l) => setDraft((d) => { d.policy.labels[k] = l; })} existing={Object.keys(pol.labels || {})} />
+              <NewLabel onAdd={(k, l) => setDraft((d) => { d.policy.labels[k] = l; if (l.level === 0) addGateToRunIf(d.policy, k); })} existing={Object.keys(pol.labels || {})} />
               <h3 style={{ marginTop: 12 }}>Run if</h3>
               <div className="faint" style={{ fontSize: 12 }}>per level: the labels (or @gate = any gate open, @marker = a marker term) that let the level run</div>
               {["1", "2"].map((lv) => (
@@ -270,7 +414,7 @@ export function LabView() {
                 <label><input type="checkbox" checked={draft.settings.all_labels} onChange={(e) => setDraft((d) => { d.settings.all_labels = e.target.checked; })} /> all labels</label>
               </div>
               <div className="faint" style={{ fontSize: 11.5 }}>the fast model is the one the model service has loaded (restart it with another to compare models)</div>
-            </div>
+            </div>) : null}
 
             <div className="panel" data-testid="lab-diff">
               <h2>Draft vs base</h2>
@@ -389,7 +533,7 @@ function NewLabel({ onAdd, existing }: { onAdd: (k: string, l: PolicyLabelData) 
       <input type="text" placeholder="hypothesis: This text …" value={hyp} onChange={(e) => setHyp(e.target.value)} style={{ flex: 1, minWidth: 200 }} data-testid="lab-new-hyp" />
       <button className="btn small" disabled={bad} onClick={() => { onAdd(k, { level, decision, threshold: thr, hypothesis: hyp.trim() }); setK(""); setHyp(""); }}
         data-testid="lab-new-add">+ label</button>
-      {level === 0 ? <span className="faint" style={{ fontSize: 11.5 }}>several gates are OR-combined: use @gate in Run if</span> : null}
+      {level === 0 ? <span className="faint" style={{ fontSize: 11.5 }}>gates are OR-combined: a new gate is added to every Run if level that names a gate</span> : null}
     </div>);
 }
 

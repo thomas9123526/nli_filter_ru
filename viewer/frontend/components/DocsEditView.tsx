@@ -95,7 +95,7 @@ export function DocsEditView() {
             <button className="btn small" disabled={!draft} onClick={() => { setDraft(null); setCheck(null); }}>Discard</button>
             {msg ? <span className="faint" style={{ fontSize: 12 }} data-testid="docs-saved">{msg}</span> : null}
           </div>
-          {draft && check?.errors.length ? <ul className="policy-errors">{check.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
+          {draft && check?.errors.length ? <ul className="policy-errors">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
           {err ? <div className="alert error" style={{ marginTop: 6 }}>{err}</div> : null}
         </div>
       </div>

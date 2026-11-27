@@ -1113,6 +1113,29 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         """The draft checked like nli_label.py checks a policy (errors stop a run; warnings = missing files)."""
         return _check_policy(body.data)
 
+    # ---- the Experiment page's drafts (dataset/lab_drafts/, see lab_drafts.py): kept to be loaded again elsewhere
+    from . import lab_drafts as _drafts
+
+    @app.get("/api/labels/lab/drafts", tags=["labels"])
+    def lab_drafts_list():
+        """Every saved draft (automatic and named), newest first, without policy and texts."""
+        return {"drafts": _drafts.listing(project), "folder": str(_drafts.drafts_dir(project)), "max_auto": _drafts.MAX_AUTO}
+
+    @app.get("/api/labels/lab/drafts/{draft_id}", tags=["labels"])
+    def lab_drafts_get(draft_id: str):
+        return _drafts.get(project, draft_id)
+
+    @app.post("/api/labels/lab/drafts/save", tags=["labels"])
+    def lab_drafts_save(body: Dict[str, Any], request: Request):
+        """{auto: true, id?} = the page's automatic save; {auto: false, name, overwrite?} = "Save draft as"."""
+        save_guard(request)
+        return _drafts.save(project, body)
+
+    @app.post("/api/labels/lab/drafts/delete", tags=["labels"])
+    def lab_drafts_delete(body: Dict[str, Any], request: Request):
+        save_guard(request)
+        return _drafts.delete(project, str(body.get("id") or ""))
+
     @app.post("/api/labels/lab/save", tags=["labels"])
     def lab_save(body: LabSaveBody, request: Request):
         """Save the Experiment page's draft, only on an explicit confirm: save_as = a new policy file (never overwrites);

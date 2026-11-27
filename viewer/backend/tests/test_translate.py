@@ -533,3 +533,58 @@ def test_test_button_with_unsaved_values(tmp_path, servers):
     assert p["reachable"] and p["base_url"] == b.url and p["model"] == "fake-model" and p["model_served"]
     assert c.get("/api/translate/settings").json()["providers"][0]["base_url"] == "http://127.0.0.1:9/v1"
     assert c.post("/api/translate/test", json={"provider": "qwen", "override": {"base_url": "nope"}}).status_code == 400
+
+
+def test_add_and_remove_providers(tmp_path, servers):
+    c, f, a, b = _file_client(tmp_path, servers)
+    from nli_viewer.config import _strip_comments
+    s = c.get("/api/translate/settings").json()
+    new = {"new": True, "name": "qwen36", "base_url": a.url + "/", "model": "fake-model", "no_think": True,
+           "note": "Qwen3.6-35B-A3B on the GPU server", "link": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B",
+           "api_key_env": "QWEN36_KEY", "timeout": 90}
+    r = c.post("/api/translate/settings/save", json={"mtime": s["mtime"], "providers": [new, {"name": "qwen"}, {"name": "hunyuan"}]})
+    assert r.status_code == 200, r.text
+    blk = json.loads(_strip_comments(f.read_text("utf-8")))["translate"]
+    p = blk["providers"][0]
+    assert p == {"name": "qwen36", "kind": "openai", "base_url": a.url, "model": "fake-model", "no_think": True,
+                 "note": "Qwen3.6-35B-A3B on the GPU server", "link": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B",
+                 "api_key_env": "QWEN36_KEY", "timeout": 90}
+    s2 = c.get("/api/translate/settings").json()
+    assert s2["providers"][0]["note"].startswith("Qwen3.6") and s2["providers"][0]["link"].endswith("A3B")
+    x = c.post("/api/translate", json={"texts": ["Hi."], "target": "zh"}).json()["results"][0]
+    assert x["ok"] and x["provider"] == "qwen36"
+    # remove: only when named in "remove"
+    assert c.post("/api/translate/settings/save", json={"mtime": s2["mtime"], "providers": [{"name": "qwen"}, {"name": "hunyuan"}]}).status_code == 400
+    r = c.post("/api/translate/settings/save", json={"mtime": s2["mtime"], "providers": [{"name": "qwen"}, {"name": "hunyuan"}], "remove": ["qwen36"]})
+    assert r.status_code == 200, r.text
+    assert [p["name"] for p in c.get("/api/translate/settings").json()["providers"]] == ["qwen", "hunyuan"]
+
+
+@pytest.mark.parametrize("bad", [
+    {"new": True, "name": "qwen", "base_url": "http://x:1/v1", "model": "m"},          # name taken
+    {"new": True, "name": "bad name!", "base_url": "http://x:1/v1", "model": "m"},
+    {"new": True, "name": "n1", "base_url": "http://x:1/v1"},                           # no model
+    {"new": True, "name": "n1", "base_url": "x:1/v1", "model": "m"},
+    {"new": True, "name": "n1", "base_url": "http://x:1/v1", "model": "m", "api_key": "sk-1"},
+    {"new": True, "name": "n1", "base_url": "http://x:1/v1", "model": "m", "api_key_env": "sk-abc def"},
+    {"new": True, "name": "n1", "base_url": "http://x:1/v1", "model": "m", "prompt": "other"},
+    {"new": True, "name": "n1", "base_url": "http://x:1/v1", "model": "m", "link": "javascript:alert(1)"},
+    {"new": True, "name": "n1", "base_url": "http://x:1/v1", "model": "m", "kind": "grpc"},
+])
+def test_add_provider_refusals(tmp_path, servers, bad):
+    c, f, a, b = _file_client(tmp_path, servers)
+    s = c.get("/api/translate/settings").json()
+    before = f.read_text("utf-8")
+    r = c.post("/api/translate/settings/save", json={"mtime": s["mtime"], "providers": [{"name": "qwen"}, {"name": "hunyuan"}, bad]})
+    assert r.status_code == 400, r.text
+    assert f.read_text("utf-8") == before
+
+
+def test_models_lookup_for_the_add_form(tmp_path, servers):
+    a = servers(model="served-x")
+    c = _client(tmp_path, [_prov("qwen", a.url)])
+    r = c.post("/api/translate/models", json={"base_url": a.url + "/"}).json()
+    assert r["reachable"] and r["models"] == ["served-x"] and r["base_url"] == a.url
+    r = c.post("/api/translate/models", json={"base_url": "http://127.0.0.1:9/v1"}).json()
+    assert r["reachable"] is False and r["models"] == []
+    assert c.post("/api/translate/models", json={"base_url": "nope"}).status_code == 400

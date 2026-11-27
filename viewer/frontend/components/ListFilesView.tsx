@@ -161,8 +161,8 @@ export function ListFilesView() {
           <button className="btn small" disabled={!dirty} onClick={() => setText(null)}>Discard</button>
           {kind ? <span className="faint" style={{ fontSize: 12 }}>{list.data?.kinds[kind]}</span> : null}
         </div>
-        {check?.errors.length ? <ul className="policy-errors">{check.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
-        {check?.warnings?.length ? <ul className="policy-warnings">{check.warnings.map((e) => <li key={e}>{e}</li>)}</ul> : null}
+        {check?.errors.length ? <ul className="policy-errors">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
+        {check?.warnings?.length ? <ul className="policy-warnings">{check.warnings.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
         {msg ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }} data-testid="list-saved">{msg}</div> : null}
         {err ? <div className="alert error" style={{ marginTop: 6 }}>{err}</div> : null}
       </div>

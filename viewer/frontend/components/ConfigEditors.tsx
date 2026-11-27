@@ -79,7 +79,7 @@ export function SaveBar({ c, file, placeholder, testid, noSaveAs }: { c: ReturnT
         <input type="text" placeholder={placeholder} value={c.saveAs} onChange={(e) => c.setSaveAs(e.target.value)} style={{ width: 200 }} />
         <button className="btn small" disabled={!c.saveAs.trim() || c.saving || !c.check?.ok} onClick={() => c.save(c.saveAs.trim())}>Save as new</button></>}
       </div>
-      {c.check?.errors.length ? <ul className="policy-errors" data-testid={`${testid}-errors`}>{c.check.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
+      {c.check?.errors.length ? <ul className="policy-errors" data-testid={`${testid}-errors`}>{c.check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
       {c.msg ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }} data-testid={`${testid}-saved`}>{c.msg}</div> : null}
       {c.err ? <div className="alert error" style={{ marginTop: 6 }}>{c.err}</div> : null}
     </div>

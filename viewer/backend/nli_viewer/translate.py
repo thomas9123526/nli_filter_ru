@@ -28,7 +28,9 @@ Endpoints (wired by install(app, cfg)):
     POST /api/translate            {"texts": [...]} or {"paragraphs": [...]}, "target": "zh"|"ru",
                                    optional "provider" (force one, no fallback), "nocache"
     GET  /api/translate/settings   the providers (no keys) and targets; "editable" + "mtime" for the save below
-    POST /api/translate/settings/save  order, on / off, base_url, model, timeout of the providers: rewrites only the
+    POST /api/translate/models     the models a server serves (for the settings page's "add a model" form)
+    POST /api/translate/settings/save  add / remove providers; order, on / off, base_url, model, timeout, prompt,
+                                   no_think, api_key_env, note, link of each: rewrites only the
                                    "translate" block of viewer_config.json (old file to .backup/), refused when the
                                    file changed since it was loaded; used at once (the file is re-read on change)
     POST /api/translate/test       per provider: reachable, served models, a sample translation + language check
@@ -87,6 +89,8 @@ class Provider:
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     max_chars: int = 3000           # longer paragraphs are split on line / sentence ends
+    note: str = ""                  # shown on the settings page only (what it is, where it runs, quality)
+    link: str = ""                  # e.g. the model card
 
     def api_key(self) -> Optional[str]:
         return os.environ.get(self.api_key_env) or None if self.api_key_env else None
@@ -95,7 +99,8 @@ class Provider:
         return {"name": self.name, "kind": self.kind, "base_url": self.base_url, "model": self.model,
                 "timeout": self.timeout, "no_think": self.no_think, "no_think_tag": self.no_think_tag,
                 "prompt": self.prompt, "enabled": self.enabled,
-                "api_key_env": self.api_key_env, "has_key": bool(self.api_key())}
+                "api_key_env": self.api_key_env, "has_key": bool(self.api_key()), "note": self.note,
+                "link": self.link}
 
 
 @dataclass
@@ -415,42 +420,96 @@ def format_block(block: Dict[str, Any], indent: str) -> str:
     return "\n".join(lines)
 
 
-EDITABLE = ("enabled", "base_url", "model", "timeout")
+EDITABLE = ("enabled", "base_url", "model", "timeout", "prompt", "no_think", "api_key_env", "note", "link")
+NEW_KEYS = ("name", "kind") + EDITABLE
+OPTIONAL_TEXT = ("api_key_env", "note", "link")     # empty = the key is left out
 
 
-def edited_block(block: Dict[str, Any], edits: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """The block with the providers in the order of `edits` (every provider exactly once, by name) and their
-    enabled / base_url / model / timeout replaced; every other field stays as it was."""
+def _set_field(p: Dict[str, Any], k: str, v: Any, name: str) -> None:
+    if k == "enabled":
+        if bool(v):
+            p.pop("enabled", None)          # on = the default: leave it out
+        else:
+            p["enabled"] = False
+        return
+    if k == "no_think":
+        if bool(v):
+            p["no_think"] = True
+        else:
+            p.pop("no_think", None)
+        return
+    if k == "timeout":
+        v = float(v)
+        if not 1 <= v <= 3600:
+            raise ValueError(f"{name}: timeout must be 1 to 3600 seconds")
+        p[k] = int(v) if v == int(v) else v
+        return
+    v = str(v).strip()
+    if k in OPTIONAL_TEXT and not v:
+        p.pop(k, None)
+        return
+    if not v:
+        raise ValueError(f"{name}: {k} is empty")
+    if k == "base_url":
+        if not re.match(r"^https?://[^\s/]+", v):
+            raise ValueError(f"{name}: base_url must start with http:// or https://")
+        v = v.rstrip("/")
+    elif k == "prompt" and v not in ("generic", "hunyuan"):
+        raise ValueError(f"{name}: prompt must be generic or hunyuan")
+    elif k == "kind" and v not in ("openai", "local"):
+        raise ValueError(f"{name}: kind must be openai or local")
+    elif k == "api_key_env" and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", v):
+        raise ValueError(f"{name}: api_key_env is the NAME of an environment variable (letters, digits, _), not the key")
+    elif k == "note" and len(v) > 2000:
+        raise ValueError(f"{name}: note is longer than 2000 characters")
+    elif k == "link" and not re.match(r"^https?://\S+$", v):
+        raise ValueError(f"{name}: link must be an http(s):// address")
+    p[k] = v
+
+
+def edited_block(block: Dict[str, Any], edits: List[Dict[str, Any]],
+                 remove: Optional[List[str]] = None) -> Dict[str, Any]:
+    """The block with the providers in the order of `edits`. An entry names an existing provider (its editable fields
+    replaced, every other field kept) or is a new one ("new": true, with name, base_url and model). A provider that is
+    not in `edits` must be named in `remove` (so nothing is deleted by mistake)."""
     old = {p.get("name"): p for p in block.get("providers") or []}
+    remove = list(remove or [])
     names = [e.get("name") for e in edits]
-    if sorted(map(str, names)) != sorted(map(str, old)) or len(set(names)) != len(names):
-        raise ValueError(f"give every provider exactly once: have {sorted(old)}, got {names}")
+    if len(set(names)) != len(names):
+        raise ValueError(f"a provider name is given twice: {names}")
+    for r in remove:
+        if r not in old:
+            raise ValueError(f"cannot remove '{r}': there is no such provider")
+        if r in names:
+            raise ValueError(f"'{r}' is both kept and removed")
+    missing = [n for n in old if n not in names and n not in remove]
+    if missing:
+        raise ValueError(f"give every provider (or remove it): missing {missing}")
     provs = []
     for e in edits:
-        p = dict(old[e["name"]])
-        for k in EDITABLE:
-            if k not in e or e[k] is None:
-                continue
-            v = e[k]
-            if k == "enabled":
-                v = bool(v)
-                if v:
-                    p.pop("enabled", None)      # on = the default: leave it out
-                    continue
-            elif k == "timeout":
-                v = float(v)
-                if not 1 <= v <= 3600:
-                    raise ValueError(f"{e['name']}: timeout must be 1 to 3600 seconds")
-                v = int(v) if v == int(v) else v
-            else:
-                v = str(v).strip()
-                if not v:
-                    raise ValueError(f"{e['name']}: {k} is empty")
-                if k == "base_url":
-                    if not re.match(r"^https?://[^\s/]+", v):
-                        raise ValueError(f"{e['name']}: base_url must start with http:// or https://")
-                    v = v.rstrip("/")
-            p[k] = v
+        name = e.get("name")
+        if e.get("new"):
+            if not isinstance(name, str) or not re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$", name):
+                raise ValueError(f"new provider name '{name}': 1-40 letters, digits, _ . - (starting with a letter or digit)")
+            if name in old:
+                raise ValueError(f"a provider named '{name}' exists already")
+            if "api_key" in e:
+                raise ValueError("give the key's environment variable name (api_key_env), never the key itself")
+            p: Dict[str, Any] = {"name": name, "kind": "openai"}
+            for k in NEW_KEYS[1:]:
+                if k in e and e[k] is not None:
+                    _set_field(p, k, e[k], name)
+            for k in ("base_url", "model"):
+                if not p.get(k):
+                    raise ValueError(f"new provider {name}: {k} is needed")
+            p.setdefault("timeout", 60)
+        else:
+            if name not in old:
+                raise ValueError(f"unknown provider '{name}' (a new one needs \"new\": true)")
+            p = dict(old[name])
+            for k in EDITABLE:
+                if k in e and e[k] is not None:
+                    _set_field(p, k, e[k], name)
         provs.append(p)
     out = dict(block)
     out["providers"] = provs
@@ -508,7 +567,8 @@ class Translator:
         except OSError:
             return None
 
-    def save(self, edits: List[Dict[str, Any]], mtime: Optional[str]) -> Dict[str, Any]:
+    def save(self, edits: List[Dict[str, Any]], mtime: Optional[str],
+             remove: Optional[List[str]] = None) -> Dict[str, Any]:
         """Write the edited providers into the config file's "translate" block (see edited_block)."""
         if not self.editable:
             raise HTTPException(409, "these settings do not come from a viewer_config.json file: edit them where "
@@ -524,7 +584,7 @@ class Translator:
             if not isinstance(block, dict) or span is None:
                 raise HTTPException(409, f'no "translate" block found in {f.name}')
             try:
-                new = edited_block(block, edits)
+                new = edited_block(block, edits, remove)
                 parse_settings(new, str(f))          # the same checks as on loading
             except ValueError as exc:
                 raise HTTPException(400, str(exc))
@@ -709,11 +769,13 @@ class Translator:
             name = provs[0].name
             try:
                 e = edited_block({"providers": [provs[0].public()]},
-                                 [{"name": name, **{k: override.get(k) for k in ("base_url", "model", "timeout")}}])
+                                 [{"name": name, **{k: override.get(k) for k in ("base_url", "model", "timeout",
+                                                                                 "prompt", "no_think")}}])
             except ValueError as exc:
                 raise HTTPException(400, str(exc))
             p = e["providers"][0]
-            provs = [dataclasses.replace(provs[0], base_url=p["base_url"], model=p["model"], timeout=float(p["timeout"]))]
+            provs = [dataclasses.replace(provs[0], base_url=p["base_url"], model=p["model"], timeout=float(p["timeout"]),
+                                         prompt=p.get("prompt", "generic"), no_think=bool(p.get("no_think")))]
 
         def one(p: Provider) -> Dict[str, Any]:
             row = {"name": p.name, "model": p.model, "base_url": p.base_url, "enabled": p.enabled, **self.models(p)}
@@ -759,6 +821,12 @@ class TranslateRequest(BaseModel):
 class TranslateSaveRequest(BaseModel):
     providers: List[Dict[str, Any]]
     mtime: Optional[str] = None
+    remove: Optional[List[str]] = None          # providers to delete (every other one must be in providers)
+
+
+class TranslateModelsRequest(BaseModel):
+    base_url: str
+    api_key_env: Optional[str] = None
 
 
 class TranslateTestRequest(BaseModel):
@@ -818,10 +886,25 @@ def api_translate_settings(request: Request):
             "editable": tr.editable, "mtime": tr.file_mtime()}
 
 
+@router.post("/api/translate/models")
+def api_translate_models(body: TranslateModelsRequest, request: Request):
+    """The models an OpenAI-compatible server serves (GET <base_url>/models): fills the add form's model list."""
+    tr = _translator(request)
+    p: Dict[str, Any] = {"name": "probe", "kind": "openai"}
+    try:
+        _set_field(p, "base_url", body.base_url, "probe")
+        if body.api_key_env:
+            _set_field(p, "api_key_env", body.api_key_env, "probe")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    prov = Provider(name="probe", base_url=p["base_url"], model="", api_key_env=p.get("api_key_env"), timeout=10)
+    return {"base_url": prov.base_url, **tr.models(prov)}
+
+
 @router.post("/api/translate/settings/save")
 def api_translate_settings_save(body: TranslateSaveRequest, request: Request):
     tr = _translator(request)
-    r = tr.save(body.providers, body.mtime)
+    r = tr.save(body.providers, body.mtime, body.remove)
     st = tr.settings
     r["providers"] = [p.public() for p in st.providers]
     return r

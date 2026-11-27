@@ -274,3 +274,148 @@ def test_translate_settings_edit_save_and_provider_choice(srv, tmp_path):
         await asyncio.sleep(0.1)
 
     _browser(tmp_path, scenario)
+
+
+def test_translate_settings_add_and_remove_a_model(srv, tmp_path):
+    """/label/translate/: "+ Chat model …" -> name / URL / model / link / note -> Add -> Save: a new provider in
+    viewer_config.json with its note and link shown; then Remove -> Save: gone again."""
+    import asyncio
+
+    set_value = """((sel, v) => { const i = document.querySelector(sel);
+        const proto = i.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, 'value').set.call(i, v);
+        i.dispatchEvent(new Event('input', {bubbles: true})); })"""
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/translate/")
+        assert await wait_for("!!document.querySelector('[data-testid=add-chat]')")
+        await js("document.querySelector('[data-testid=add-chat]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=add-name]')")
+        assert await js("document.querySelector('[data-testid=add-confirm]').disabled")
+        await js(f"{set_value}('[data-testid=add-name]', 'qwen36')")
+        await js(f"{set_value}('[data-testid=add-url]', 'http://127.0.0.1:9/v1')")
+        await js(f"{set_value}('[data-testid=add-model]', 'Qwen3.6-35B-A3B')")
+        await js(f"{set_value}('[data-testid=add-link]', 'https://huggingface.co/Qwen/Qwen3.6-35B-A3B')")
+        await js(f"{set_value}('[data-testid=add-note]', 'MoE, 3B active; on the GPU server')")
+        assert await wait_for("!document.querySelector('[data-testid=add-confirm]').disabled")
+        await js("document.querySelector('[data-testid=add-confirm]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=provider-qwen36]')")
+        await js("document.querySelector('[data-testid=translate-save]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=translate-saved]')")
+        prov = await js("fetch('/api/translate/settings').then(r => r.json()).then(d => d.providers.find(p => p.name === 'qwen36'))")
+        assert prov and prov["model"] == "Qwen3.6-35B-A3B" and prov["no_think"] is True
+        assert prov["link"].endswith("Qwen3.6-35B-A3B") and prov["note"].startswith("MoE")
+        assert await wait_for("(document.querySelector('[data-testid=note-qwen36]')?.textContent || '').includes('MoE')")
+        assert await wait_for("!!document.querySelector('[data-testid=provider-qwen36] a[href*=huggingface]')")
+        # remove it again
+        await js("document.querySelector('[data-testid=remove-qwen36]').click()")
+        await js("document.querySelector('[data-testid=translate-save]').click()")
+        assert await wait_for("fetch('/api/translate/settings').then(r => r.json()).then(d => !d.providers.some(p => p.name === 'qwen36'))")
+        assert await wait_for("!document.querySelector('[data-testid=provider-qwen36]')")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
+
+
+def test_experiment_add_a_second_gate(srv, tmp_path):
+    """Experiment page: adding a level-0 label also adds it to every Run if level that names a gate, so the draft stays
+    valid (one problem list, no stale rows); a Run if naming only one gate gets the "Use @gate" fix."""
+    import asyncio
+
+    set_value = """((sel, v) => { const i = document.querySelector(sel);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v);
+        i.dispatchEvent(new Event('input', {bubbles: true})); })"""
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/lab/?run=o_detail&file=b_test&line=1&para=0")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-new-key]') && !!document.querySelector('[data-testid=lab-valid]')")
+        await js(f"{set_value}('[data-testid=lab-new-key]', 'gate2')")
+        await js("""(() => { const s = document.querySelector('[data-testid=lab-new-label] select');
+            Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '0');
+            s.dispatchEvent(new Event('change', {bubbles: true})); })()""")
+        await js(f"{set_value}('[data-testid=lab-new-hyp]', 'This text is about Moscow.')")
+        assert await wait_for("!document.querySelector('[data-testid=lab-new-add]').disabled")
+        await js("document.querySelector('[data-testid=lab-new-add]').click()")
+        assert await wait_for("document.querySelector('[data-testid=runif-1]').value.includes('gate2')")
+        assert await js("document.querySelector('[data-testid=runif-1]').value") == "involves, @marker, gate2"
+        assert await wait_for("!!document.querySelector('[data-testid=lab-valid]')")
+        assert not await js("!!document.querySelector('[data-testid=lab-gate-fix]')")
+        # take gate2 out of Run if by hand: the fix offer, then the button
+        await js(f"{set_value}('[data-testid=runif-1]', 'involves, @marker')")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-gate-fix]')")
+        assert await wait_for("document.querySelectorAll('.policy-errors li').length === 1")
+        await js("document.querySelector('[data-testid=lab-gate-fix-button]').click()")
+        assert await wait_for("document.querySelector('[data-testid=runif-1]').value === '@gate, @marker'")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-valid]') && !document.querySelector('.policy-errors')")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
+
+
+def test_experiment_hide_the_draft(srv, tmp_path):
+    """Experiment page: "◂ Hide" on the Draft policy panel -> the texts take the whole width, a slim bar to show it
+    again; remembered after a reload."""
+    import asyncio
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Emulation.setDeviceMetricsOverride", width=1400, height=800, deviceScaleFactor=1, mobile=False)
+        await call("Page.navigate", url=srv + "/label/lab/?run=o_detail&file=b_test&line=1&para=0")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-draft-hide]')")
+        w0 = await js("document.querySelector('[data-testid=lab-texts]').getBoundingClientRect().width")
+        await js("document.querySelector('[data-testid=lab-draft-hide]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-draft-hidden]') && !document.querySelector('[data-testid=lab-draft]')")
+        w1 = await js("document.querySelector('[data-testid=lab-texts]').getBoundingClientRect().width")
+        assert w1 > w0 * 1.6, (w0, w1)
+        # Draft vs base and Save come after the texts
+        assert await js("""document.querySelector('[data-testid=lab-diff]').getBoundingClientRect().top >
+                           document.querySelector('[data-testid=lab-texts]').getBoundingClientRect().bottom""")
+        await call("Page.reload")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-draft-hidden]')")
+        await js("document.querySelector('[data-testid=lab-draft-show]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-draft]')")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
+
+
+def test_experiment_drafts_kept_and_loaded_elsewhere(srv, tmp_path):
+    """Experiment page: a change is kept by itself as a draft file; "Save draft as" a name; on another Experiment page
+    (another base policy) "Load" carries the changes onto that base (its own gate2 stays), "+ texts" adds the texts."""
+    import asyncio
+
+    set_value = """((sel, v) => { const i = document.querySelector(sel);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v);
+        i.dispatchEvent(new Event('input', {bubbles: true})); })"""
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/lab/?run=o_detail&file=b_test&line=2")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-new-key]') && !!document.querySelector('[data-testid=lab-text-0]')")
+        await js(f"{set_value}('[data-testid=lab-new-key]', 'weather')")
+        await js(f"{set_value}('[data-testid=lab-new-hyp]', 'This text is about the weather.')")
+        assert await wait_for("!document.querySelector('[data-testid=lab-new-add]').disabled")
+        await js("document.querySelector('[data-testid=lab-new-add]').click()")
+        assert await wait_for("document.querySelector('[data-testid=lab-autosave]').textContent.includes('kept as auto-')", 10)
+        await js(f"{set_value}('[data-testid=lab-draft-name]', 'w_try')")
+        await js("document.querySelector('[data-testid=lab-draft-save]').click()")
+        assert await wait_for("(document.querySelector('[data-testid=lab-drafts-msg]')?.textContent || '').includes('Saved as w_try')")
+        # another page, another base (two.json: a second gate)
+        await call("Page.navigate", url=srv + "/label/lab/?policy=policy/two.json")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-drafts-open]')")
+        assert await js("document.querySelectorAll('[data-testid^=lab-text-]').length") == 0
+        await js("document.querySelector('[data-testid=lab-drafts-open]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-draft-load-w_try]')")
+        await js("document.querySelector('[data-testid=lab-draft-load-w_try]').click()")
+        assert await wait_for("(document.querySelector('[data-testid=lab-drafts-msg]')?.textContent || '').includes('carried onto this base')")
+        d = await js("document.querySelector('[data-testid=lab-diff]').textContent")
+        assert "added label weather" in d and "gate2" not in d, d
+        assert await js("document.querySelectorAll('[data-testid^=lab-text-]').length") == 0
+        await js("[...document.querySelectorAll('[data-testid=lab-draft-w_try] button')].find(b => b.textContent.includes('+ texts')).click()")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-text-0]')")
+        assert "Russian algorithm research" in await js("document.querySelector('[data-testid=lab-text-0] textarea').value")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)

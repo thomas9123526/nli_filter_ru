@@ -411,6 +411,19 @@ For trying any change of the policy or of the run settings on real lines, withou
   per paragraph base / draft actions (a change marked), and both flow traces side by side for the chosen paragraph.
 - **Draft vs base**: a readable list ("added label X …", "threshold of Y: 0.8 → 0.7", "run_if 1: … → …").
 - **The draft stays in this browser** (it survives a reload; "Discard draft" starts again from the base).
+- **Drafts kept as files, to load on another page** (`dataset\lab_drafts\`, git-ignored): a draft that differs from its
+  base is saved by itself a moment after every change (one automatic file per page; the newest 50 are kept), and
+  **Save draft as…** keeps one under a name until it is deleted. **Load a draft…** lists them (newest first: name or
+  time, the changes, the run / line it came from, its number of texts):
+  - **Load**: its changes carried onto this page's base (added / removed labels, changed thresholds, hypotheses,
+    decisions, run_if entries, other settings, run settings); this page's texts stay. On the same base it is simply
+    its policy;
+  - **+ texts**: the same, and its texts added;
+  - **whole policy**: its policy exactly as it was, replacing this base;
+  - **✕**: delete the file.
+  Nothing in `policy\` changes: a real policy is still saved only by "Save as new" / "Replace".
+- **◂ Hide** on the Draft policy panel gives the texts and traces the whole width (Draft vs base and Save move below
+  the texts); **Show draft policy ▸** brings it back; remembered in this browser.
 - **Saving only on an explicit confirm**: "Save as new policy…" (a name; never overwrites), or "Replace
   policy/<file>…", which shows the changes and asks to type the file name; the old file goes to `policy\.backup\`,
   refused when the file changed since. Never saved automatically or on leaving the page.

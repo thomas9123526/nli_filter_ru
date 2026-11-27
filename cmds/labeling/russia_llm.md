@@ -85,8 +85,9 @@ at or above its threshold, or (`narrative_opens_gate`) a narrative fires. All be
   paragraphs the first one let pass. `--all-labels` still scores every gate everywhere.
 - **run_if:** `"@gate"` = any gate open. With several gates, a run_if that names one gate but not the others is
   refused (it would ignore what the other gates open): use `["@gate", "@marker"]`, or list every gate.
-- **Adding one:** in the policy editor (`/label/policy/`) add a level-0 label, then tick `@gate` in run_if (instead of
-  the single gate key); or try it first on the Experiment page (`/label/lab/`). The labels row records which gate
+- **Adding one:** in the policy editor (`/label/policy/`) or on the Experiment page (`/label/lab/`) add a level-0
+  label: it is added at once to every run_if level that names a gate, so the policy stays valid. A run_if that names
+  only some gates gets a "Use @gate" button (every gate key replaced by `@gate`). The labels row records which gate
   opened a paragraph (`opened_by_gate`, only when there are several).
 - **Existing runs:** `redecide` with a gate added counts its scores as missing (No) until a new `run`; the summary
   lists it as changed.
