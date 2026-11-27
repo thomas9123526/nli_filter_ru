@@ -46,3 +46,4 @@ keywords/*.tmp
 
 output/.backup/
 output/*.tmp
+viewer/.backup/
