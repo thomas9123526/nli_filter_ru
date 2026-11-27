@@ -10,13 +10,15 @@ sets, `note`. 40 files, 440 lines: 306 clear, 72 hard, 62 ambiguous. The earlier
 (`labels\benchmark_clarity.csv`, `cmds\labeling\benchmark_clarity_audit.md`) were removed as no longer needed; they
 matched the new files exactly (the 3 suggested fixes, Pink Floyd / Jamala / Chornobyl, were not applied).
 
-The estimate is about 3½–4 hours:
+The estimate is about 5–5½ hours:
 - tasks 1–4 (clarity tags, new sets and fields): about 1–1½ h;
 - task 5 (expected vs decided on the Experiment page): about 45 min – 1 h;
 - task 6 (score again without the cache): about 30 min;
 - task 7 (one automatic draft per identical draft): about 20–30 min;
 - task 8 (a "Back to …" button on the Experiment page): about 30–45 min;
-- task 9 (quick as the default profile): about 10 min.
+- task 9 (quick as the default profile): about 10 min;
+- task 10 (a blank Experiment page with its own address): about 30–45 min;
+- task 11 (how the line's result comes out of its paragraphs): about 45 min – 1 h.
 
 **The benchmark keeps growing** (said 2026-11-27): the user keeps generating new files into `dataset/benchmark\`. So
 nothing may hard-code set names, line counts or field lists: the builder keeps every source field and accepts any new
@@ -119,3 +121,51 @@ URL (`&profile=quick`), so the browser's Back shows quick again after it was cho
 Expected-result rules → default profile). This changes the default everywhere the profile is used (run page, simple
 runs, document page, Experiment); strict stays one click away and in links that name it. Update the docs that say
 strict is the default.
+
+### 10. A blank Experiment page with its own address (about 30–45 min)
+
+Asked 2026-11-27: "a new page like Experiment that does not load text from the datasets; I type any text; URL like
+/label/try/blank; the policy like the Experiment page's; layout, buttons and functions the same".
+
+Today `/label/lab/` without a run already starts with no text and the Russia-side policy (`policy/russia_llm_policy_v2.json`),
+with every Experiment function. What is missing, and what to build:
+- **Its own address `/label/lab/blank/`** (chosen by the user 2026-11-27, instead of `/label/try/blank/`: `/label/try/`
+  stays the case-set page): the
+  Experiment page in blank mode — the same component (`LabView`), so layout, buttons and functions stay the same and
+  every later change to Experiment applies to it too.
+- **A policy picker** at the top (every `policy/*.json` except the non-English file; default the Russia-side policy;
+  the choice in the URL, `?policy=`). Changing it with unsaved draft changes asks first (or offers to carry the changes
+  onto the new policy, as "Load a draft" does).
+- **Starts blank, keeps your work**: one empty text box to type in. The draft is kept in the browser and as an automatic
+  draft file like any Experiment draft; "New blank" clears texts and draft (asks first). "Load a draft" works here too
+  (its texts with "+ texts").
+- **Only what needs a run is hidden**: Prev / Next, "add a line the run did not get as expected", "Apply to the whole
+  run", the expected vs decided badges (no expected for typed text). The crumb reads "Labelling / Experiment (blank)";
+  the "◂ Back to …" button (task 8) goes to where it was opened from.
+- **Links**: "Blank experiment →" on `/label/` next to "Experiment →"; the Experiment page of a run gets "Open blank →".
+- Tests: the page opens empty with the default policy; typing a text and Run draft and base works; the policy picker;
+  the draft survives a reload; no run-only parts shown.
+
+### 11. How the line's result comes out of its paragraphs (about 45 min – 1 h)
+
+Asked 2026-11-27, on `/label/lab/?run=out_label_benchmark_russian_detail&file=russian_persons__v2&line=3` and the same
+line's document page: "¶1 is remove, ¶2 is keep, the final is remove, but no part shows how the final comes out; the
+document page shows one paragraph at a time but no analysis of the several paragraphs together".
+
+The rule (nli_label.py, paragraph unit): only paragraphs with a keyword / marker are checked, the others stay
+untouched; each checked paragraph gets its own action; the document action is: nothing removed → review if any review,
+else pass if all pass, else kept; something removed → the removed paragraphs are cut, "edited" (or "removed" when less
+than `min_doc_chars` would be left). The expected check and the Experiment's "base → draft" use the strictest
+paragraph action (remove > review > keep > pass). Line unit: the line's own decision.
+
+Build a **"Whole line"** step, after the per-paragraph flow, on the document page and in the Experiment page's traces
+(base and draft):
+- every paragraph of the text in order (¶1, ¶2, ¶3 …), checked or not: its action, reason and the label that decided
+  it (e.g. "¶1 remove · narrative · criticize_about_something 0.988"; "¶3 not checked (no keyword)"); a click selects
+  it (the per-paragraph flow above follows);
+- the document action with the rule that gave it ("¶1 removed, the rest kept → edited · 61 of 161 tokens removed");
+- the line's result for the expected check: "strictest: remove (from ¶1)" and, when the line has an expected action,
+  "expected keep → ✗"; with the decision unit "line": the line's decision and why;
+- on the Experiment page also next to each text's "base → draft" a short "from ¶1" (which paragraph decided).
+Also fix: in a narrow trace the score number next to the bar is cut off ("0.85…" for 0.858, the draft column on the
+Experiment page): keep the number whole (smaller bar or the number on its own line).
