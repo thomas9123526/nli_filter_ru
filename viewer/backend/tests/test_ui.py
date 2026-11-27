@@ -307,4 +307,6 @@ def test_policy_editor_renders(cases_server, tmp_path):
         assert f'data-testid="{tid}"' in page, tid
     assert "keywords_file keywords/russia_v3.txt does not exist" in page  # the test project has no keyword files
     labels = dom(cases_server + "/label/", tmp_path)
-    assert 'data-testid="policy-link"' in labels
+    assert 'data-testid="settings-link"' in labels and 'data-testid="policy-link"' not in labels
+    settings = dom(cases_server + "/settings/", tmp_path)
+    assert 'data-testid="policy-link"' in settings

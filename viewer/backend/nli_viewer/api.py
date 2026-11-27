@@ -1630,6 +1630,18 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         with expected results, each row has "expect" (expected vs got) and expect=wrong / right filters them."""
         return labels.docs(name, file, action, label, para_action, gated, offset, limit, expect, profile)
 
+    @app.get("/api/labels/{name}/nav", tags=["labels"])
+    def label_nav(name: str, file: str, line: int = Query(..., ge=1), crit: str = "all", dir: str = "none"):
+        """Prev / Next through a run's lines (the Experiment page): crit = comma-separated all, remove, review, keep,
+        pass, wrong:<profile> (any matches); dir = next, prev or none (only the position)."""
+        if dir not in ("next", "prev", "none"):
+            raise HTTPException(400, "dir is next, prev or none")
+        cs = [c.strip() for c in crit.split(",") if c.strip()]
+        try:
+            return labels.nav(name, file, line, cs, dir)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(404, str(exc))
+
     @app.get("/api/labels/{name}/expected", tags=["labels"])
     def label_expected(name: str, profile: Optional[str] = None):
         """For a run on a test corpus with expected results: how many lines match, and the ones that do not (detail

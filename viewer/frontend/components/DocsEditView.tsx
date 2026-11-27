@@ -83,7 +83,7 @@ export function DocsEditView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "documents test set" }]} />
+          <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "documents test set" }]} />
           <h1>Documents test set</h1>
           <div className="sub">{file}: {docs.length} multi-paragraph documents, an expected action per paragraph; the document&apos;s expected action follows
             from them. Policy {data?.policy || "?"}; corpus <code className="mono">dataset/{data?.corpus || "?"}</code> (rebuilt on Save).

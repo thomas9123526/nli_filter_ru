@@ -92,7 +92,7 @@ export function PolicyEditView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "policy editor" }]} />
+          <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "policy editor" }]} />
           <h1>Edit a policy</h1>
           <div className="sub">Every setting of the policy file. Checked with nli_label.py&apos;s own rules while you type; a save keeps
             the old file in <code className="mono">policy/.backup/</code>. Runs and Try use the file as soon as it is saved.</div>

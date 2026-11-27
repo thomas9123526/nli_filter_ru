@@ -134,7 +134,7 @@ export function TranslateSettingsView() {
   return (
     <>
       <div className="page-head"><div>
-        <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "Translation" }]} />
+        <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "Translation" }]} />
         <h1>Translation</h1>
         <div className="sub">The translate buttons next to every text (one per language in &quot;targets&quot;): in auto, the providers below
           are tried in order; the page says which one answered. For reading only: labels and decisions always come from the original text.</div>

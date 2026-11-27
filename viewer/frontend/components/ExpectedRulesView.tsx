@@ -45,7 +45,7 @@ export function ExpectedRulesView() {
   return (
     <>
       <div className="page-head"><div>
-        <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "Expected-result rules" }]} />
+        <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "Expected-result rules" }]} />
         <h1>Expected-result rules</h1>
         <div className="sub">What counts as &quot;as expected&quot; on the Expected vs result panels (detail and simple runs, the
           document page). <code>{FILE}</code>; without the file only pass = untouched = none.</div>

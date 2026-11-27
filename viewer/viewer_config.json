@@ -16,14 +16,9 @@
   "translate": {
     "targets": ["ko", "ru"],
     "providers": [
-      {"name": "qwen", "kind": "openai", "base_url": "http://192.168.170.108:8000/v1", "model": "qwen3-4b",
-       "api_key_env": "QWEN_API_KEY", "timeout": 60, "no_think": true},
-      // Hunyuan-MT-7B, OpenAI-compatible on port 8001: vLLM (Linux / H200) or tools/serve_translate_local.py (this PC)
-      {"name": "hunyuan", "kind": "openai", "base_url": "http://127.0.0.1:8001/v1", "model": "Hunyuan-MT-7B",
-       "prompt": "hunyuan", "timeout": 120},
-      // the same model via tools/serve_translate_local.py on another port (transformers, Windows without WSL)
-      {"name": "hunyuan_local", "kind": "local", "base_url": "http://127.0.0.1:8002/v1", "model": "Hunyuan-MT-7B",
-       "prompt": "hunyuan", "timeout": 180, "enabled": false}
+      {"name": "qwen", "kind": "openai", "base_url": "http://192.168.170.108:8000/v1", "model": "qwen3.5-4b", "api_key_env": "QWEN_API_KEY", "timeout": 60, "no_think": true},
+      {"name": "hunyuan", "kind": "openai", "base_url": "http://127.0.0.1:8001/v1", "model": "Hunyuan-MT-7B", "prompt": "hunyuan", "timeout": 120},
+      {"name": "hunyuan_local", "kind": "local", "base_url": "http://127.0.0.1:8002/v1", "model": "Hunyuan-MT-7B", "prompt": "hunyuan", "timeout": 180, "enabled": false}
     ]
   },
   "datasets": [

@@ -32,6 +32,7 @@ class LabelRuns:
         self.stale = stale_seconds
         self.extra: Dict[str, Path] = {}  # runs outside the project folder, named after their dataset
         self._exp_cache: Dict[tuple, Dict[int, Dict[str, Any]]] = {}  # (corpus file, mtime) -> expected per line
+        self._nav_cache: Dict[str, tuple] = {}  # run folder -> (stamp, line index for Prev / Next)
         from .expected_rules import Rules
         self.rules = Rules(self.project)  # labels/expected_rules.json: what counts as "same as expected"
         if str(self.project) not in sys.path:
@@ -739,6 +740,134 @@ class LabelRuns:
                 break
         return {"run": name, "file": f, "files": files, "rows": rows, "read": read, "included": included,
                 "evidence_rows": evidence, "unit": (s.get("settings") or {}).get("decision_unit") or "paragraph"}
+
+    # ---- stepping through a run's lines (the Experiment page's Prev / Next) ----------------------------------
+    NAV_ACTIONS = ("remove", "review", "keep", "pass")
+
+    def nav_index(self, name: str) -> Dict[str, Any]:
+        """Every line of a run, per file in order: [line, the line's strictest action, {profile: as expected?} or None].
+        Detail runs: the labels rows; simple runs: the decisions rows and the expected lines (no row = see _absent).
+        Cached until a file of the run or the expected rules change."""
+        d = self.folder(name)
+        files = self._files(d) or self.label_files(d)
+        stamp = []
+        for q in sorted(d.glob("*")):
+            try:
+                stamp.append((q.name, q.stat().st_mtime_ns))
+            except OSError:
+                pass
+        profiles = self.rules.profiles()
+        key = (str(d), tuple(stamp), json.dumps(self.rules.load(), sort_keys=True, default=str))
+        hit = self._nav_cache.get(str(d))
+        if hit and hit[0] == key:
+            return hit[1]
+        out_files = []
+        simple = self.is_simple(d)
+        for f in files:
+            exp = self.expected(d, f)
+            rows: List[list] = []
+
+            def verdicts(got: str, e: Optional[Dict[str, Any]], r: Optional[Dict[str, Any]], cfg: Dict[str, Any]):
+                if e is None:
+                    return None
+                if simple or "expected_action" in e:
+                    if "expected_action" not in e:
+                        return None
+                    return {p: bool(self.text_verdict(got, e, p)["ok"]) for p in profiles}
+                return {p: bool(self.verdict(r or {}, e, cfg, p)["ok"]) for p in profiles}
+
+            if simple:
+                s_ = _read_json(d / "summary.json") or {}
+                nm = self._schema_names(s_)
+                if not nm.get("line"):
+                    continue
+                got_of = self._simple_got_fn(d)
+                absent, _ = self._absent(s_)
+                seen: Dict[int, Dict[str, Any]] = {}
+                p = self._simple_file(d, f, (s_.get("settings") or {}).get("decisions_file") or "decisions")
+                if p is not None:
+                    for r in self._jsonl(p):
+                        ln = r.get(nm["line"])
+                        if isinstance(ln, int):
+                            seen[ln] = r
+                for ln in sorted(set(seen) | set(exp)):
+                    r = seen.get(ln)
+                    got = got_of(r) if r is not None else absent
+                    rows.append([ln, got, verdicts(got, exp.get(ln), r, {})])
+            else:
+                cfg = self._para_cfg(d) if exp else {}
+                try:
+                    it = list(self._rows(d, f))
+                except KeyError:
+                    continue
+                for r in it:
+                    ln = r.get("line")
+                    if not isinstance(ln, int):
+                        continue
+                    paras = r.get("paragraphs") or []
+                    got = r.get("action", "untouched")
+                    for a in self.NAV_ACTIONS:
+                        if any(p.get("action") == a for p in paras):
+                            got = a
+                            break
+                    rows.append([ln, got, verdicts(got, exp.get(ln), r, cfg)])
+                rows.sort(key=lambda x: x[0])
+            out_files.append({"file": f, "rows": rows, "expected": bool(exp)})
+        idx = {"run": name, "files": out_files, "profiles": profiles, "simple": simple}
+        self._nav_cache[str(d)] = (key, idx)
+        return idx
+
+    @staticmethod
+    def _nav_match(row: list, crit: List[str]) -> bool:
+        if not crit or "all" in crit:
+            return True
+        line, act, ver = row
+        for c in crit:
+            if c == act:
+                return True
+            if c.startswith("wrong:") and ver is not None and ver.get(c[6:]) is False:
+                return True
+        return False
+
+    def nav(self, name: str, file: str, line: int, crit: List[str], direction: str = "none") -> Dict[str, Any]:
+        """Where `file` / `line` is in the run, and (direction next / prev) the next / previous line matching any of
+        `crit` (all, remove, review, keep, pass, wrong:<profile>), going on into the next / previous file."""
+        idx = self.nav_index(name)
+        files = idx["files"]
+        names = [f["file"] for f in files]
+        if file not in names:
+            raise KeyError(f"no file '{file}' in run {name}")
+        fi = names.index(file)
+        flat = [(i, j) for i, f in enumerate(files) for j, row in enumerate(f["rows"])]
+        lines = [r[0] for r in files[fi]["rows"]]
+        # the current position: the row of this line, else where it would be
+        cj = next((j for j, ln in enumerate(lines) if ln >= line), len(lines))
+        exact = cj < len(lines) and lines[cj] == line
+        target = None
+        if direction in ("next", "prev"):
+            pos = sum(len(f["rows"]) for f in files[:fi]) + cj
+            seq = range(pos + (1 if exact else 0), len(flat)) if direction == "next" else range(pos - 1, -1, -1)
+            for k in seq:
+                i, j = flat[k]
+                if self._nav_match(files[i]["rows"][j], crit):
+                    target = {"file": names[i], "line": files[i]["rows"][j][0]}
+                    break
+        # the position report (of the target when there is one, else of the current line)
+        tf, tl = (target["file"], target["line"]) if target else (file, line)
+        ti = names.index(tf)
+        trows = files[ti]["rows"]
+        tj = next((j for j, r in enumerate(trows) if r[0] == tl), None)
+        m_file = [r[0] for r in trows if self._nav_match(r, crit)]
+        m_total = sum(1 for f in files for r in f["rows"] if self._nav_match(r, crit))
+        cur = trows[tj] if tj is not None else None
+        return {"target": target, "direction": direction,
+                "pos": {"file": tf, "line": tl, "file_index": ti + 1, "files": len(files),
+                        "line_index": (tj + 1) if tj is not None else None, "lines_in_file": len(trows),
+                        "lines_total": len(flat), "match_index": (m_file.index(tl) + 1) if tl in m_file else None,
+                        "matches_in_file": len(m_file), "matches_total": m_total,
+                        "action": cur[1] if cur else None, "expected": cur[2] if cur else None},
+                "profiles": idx["profiles"], "has_expected": any(f["expected"] for f in files),
+                "crit": crit}
 
     def doc(self, name: str, file: str, line: int, profile: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)

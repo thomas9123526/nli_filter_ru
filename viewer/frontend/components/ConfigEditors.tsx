@@ -143,7 +143,7 @@ export function SchemaEditView() {
   return (
     <>
       <div className="page-head"><div>
-        <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "simple-mode schema" }]} />
+        <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "simple-mode schema" }]} />
         <h1>Simple-mode output</h1>
         <div className="sub">What <code className="mono">nli_label.py run --output-mode simple</code> writes per line: the fields, which lines get a row,
           the evidence file and your words for the reasons. Used with <code className="mono">--schema {c.file || "output/simple_schema.json"}</code> and by
@@ -254,7 +254,7 @@ export function NonEnglishEditView() {
   return (
     <>
       <div className="page-head"><div>
-        <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "non-English keywords" }]} />
+        <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "non-English keywords" }]} />
         <h1>Non-English keywords and markers</h1>
         <div className="sub">A keyword or marker with a letter in an <strong>enabled</strong> script counts as non-English (Cyrillic and Latin never do).
           Such a paragraph is checked as usual (<code>check</code>) or removed (<code>remove</code>, before the gate; exceptions cannot lower it).

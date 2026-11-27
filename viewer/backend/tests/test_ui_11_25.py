@@ -152,8 +152,28 @@ def test_experiment_and_translate_pages(srv, tmp_path):
     tr = dom(srv + "/label/translate/", tmp_path)
     assert 'data-testid="provider-qwen"' in tr and "qwen-test" in tr and 'data-testid="translate-try"' in tr
     home = dom(srv + "/label/", tmp_path)
-    for tid in ("kwstats-link", "expected-rules-link", "lab-link", "translate-link"):
+    for tid in ("kwstats-link", "lab-link", "settings-link", "compare-link"):
         assert f'data-testid="{tid}"' in home, tid
+    for tid in ("expected-rules-link", "translate-link", "policy-link"):     # moved to /settings
+        assert f'data-testid="{tid}"' not in home, tid
+
+
+def test_settings_page_and_nav(srv, tmp_path):
+    page = dom(srv + "/settings/", tmp_path)
+    for tid in ("policy-link", "files-link", "non-english-link", "expected-rules-link", "output-link", "cases-link",
+                "docs-link", "translate-link", "nav-settings"):
+        assert f'data-testid="{tid}"' in page, tid
+    assert page.count("<svg") >= 8 and "labels/expected_rules.json" in page and "viewer/viewer_config.json" in page
+    # the Settings tab is highlighted on /settings and on a setting page; Labelling on the labelling pages
+    import re
+    def on_tabs(html):
+        nav = html[html.index('data-testid="topnav"'):]
+        nav = nav[:nav.index("</nav>")]
+        return re.findall(r'class="on"[^>]*>([^<]+)<', nav)
+    assert on_tabs(page) == ["Settings"]
+    tr = dom(srv + "/label/translate/", tmp_path)
+    assert on_tabs(tr) == ["Settings"] and tr.count('href="/settings') >= 2  # the tab and the crumb
+    assert on_tabs(dom(srv + "/label/", tmp_path)) == ["Labelling (Russia LLM)"]
 
 
 def _browser(tmp_path, scenario):
@@ -416,6 +436,69 @@ def test_experiment_drafts_kept_and_loaded_elsewhere(srv, tmp_path):
         await js("[...document.querySelectorAll('[data-testid=lab-draft-w_try] button')].find(b => b.textContent.includes('+ texts')).click()")
         assert await wait_for("!!document.querySelector('[data-testid=lab-text-0]')")
         assert "Russian algorithm research" in await js("document.querySelector('[data-testid=lab-text-0] textarea').value")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
+
+
+def test_nav_endpoint(srv):
+    """Prev / Next over o_detail (one file, 4 lines: remove, keep, untouched, remove; expected remove, keep, keep, flag)."""
+    import urllib.request
+    def nav(**q):
+        from urllib.parse import urlencode
+        return json.loads(urllib.request.urlopen(srv + "/api/labels/o_detail/nav?" + urlencode(q)).read())
+    r = nav(file="b_test", line=1)
+    assert r["pos"]["files"] == 1 and r["pos"]["lines_in_file"] == 4 and r["pos"]["action"] == "remove"
+    assert r["has_expected"] and set(r["profiles"]) == {"strict", "quick"}
+    assert nav(file="b_test", line=1, dir="next")["target"] == {"file": "b_test", "line": 2}
+    assert nav(file="b_test", line=1, dir="next", crit="remove")["target"]["line"] == 4
+    assert nav(file="b_test", line=4, dir="next", crit="remove")["target"] is None
+    assert nav(file="b_test", line=1, dir="prev")["target"] is None
+    w = nav(file="b_test", line=1, dir="next", crit="wrong:strict")
+    assert w["target"]["line"] == 3 and w["pos"]["matches_total"] == 1 and w["pos"]["expected"] == {"strict": False, "quick": True}
+    assert nav(file="b_test", line=1, dir="next", crit="wrong:quick")["target"] is None
+    assert nav(file="b_test", line=1, dir="next", crit="keep,wrong:strict")["target"]["line"] == 2
+
+
+def test_experiment_prev_next(srv, tmp_path):
+    """Experiment page: Next / Prev with the position shown; the draft goes along (only the text changes); "Step to"
+    criteria; the end of the run is said."""
+    import asyncio
+
+    set_value = """((sel, v) => { const i = document.querySelector(sel);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v);
+        i.dispatchEvent(new Event('input', {bubbles: true})); })"""
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/lab/?run=o_detail&file=b_test&line=1")
+        assert await wait_for("(document.querySelector('[data-testid=lab-nav-pos]')?.textContent || '').includes('of 4')")
+        await js(f"{set_value}('[data-testid=lab-new-key]', 'weather2')")
+        await js(f"{set_value}('[data-testid=lab-new-hyp]', 'This text is about rain.')")
+        assert await wait_for("!document.querySelector('[data-testid=lab-new-add]').disabled")
+        await js("document.querySelector('[data-testid=lab-new-add]').click()")
+        await js("document.querySelector('[data-testid=lab-next]').click()")
+        assert await wait_for("location.search.includes('line=2') && document.querySelector('[data-testid=lab-text-0] textarea')?.value.includes('physics')")
+        assert "added label weather2" in await js("document.querySelector('[data-testid=lab-diff]').textContent")
+        assert await js("document.querySelectorAll('[data-testid^=lab-text-]').length") == 1
+        assert await wait_for("document.querySelector('[data-testid=lab-nav-pos]').textContent.includes('(2 of 4)')")
+        # stop at remove lines only
+        await js("document.querySelector('[data-testid=lab-crit-remove]').click()")
+        assert await js("document.querySelector('[data-testid=lab-crit-all]').checked") is False
+        await js("document.querySelector('[data-testid=lab-next]').click()")
+        assert await wait_for("location.search.includes('line=4')")
+        assert await wait_for("document.querySelector('[data-testid=lab-nav-pos]').textContent.includes('match 2 of 2')")
+        await js("document.querySelector('[data-testid=lab-next]').click()")
+        assert await wait_for("(document.querySelector('[data-testid=lab-nav-msg]')?.textContent || '').includes('no further')")
+        # not as expected (strict) only, backwards
+        await js("document.querySelector('[data-testid=lab-crit-remove]').click()")
+        await js("document.querySelector('[data-testid=\"lab-crit-wrong:strict\"]').click()")
+        await js("document.querySelector('[data-testid=lab-prev]').click()")
+        assert await wait_for("location.search.includes('line=3')")
+        assert "added label weather2" in await js("document.querySelector('[data-testid=lab-diff]').textContent")
+        # Back goes to the previous line's page
+        await js("history.back()")
+        assert await wait_for("location.search.includes('line=4')")
         await asyncio.sleep(0.1)
 
     _browser(tmp_path, scenario)

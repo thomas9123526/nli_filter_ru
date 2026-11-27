@@ -108,7 +108,8 @@ def test_simple_run_page_renders(om_server, tmp_path):
         assert f'data-testid="{tid}"' in page, tid
     assert "decision unit: line" in page and "no_keyword" in page and "russian" in page
     labels = dom(om_server + "/label/", tmp_path)
-    assert 'data-testid="output-link"' in labels and 'data-testid="non-english-link"' in labels
+    settings = dom(om_server + "/settings/", tmp_path)
+    assert 'data-testid="output-link"' in settings and 'data-testid="non-english-link"' in settings
     assert ">simple<" in labels and "line unit" in labels
 
 

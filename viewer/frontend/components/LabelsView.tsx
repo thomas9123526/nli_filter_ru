@@ -45,17 +45,11 @@ export function LabelsView() {
 
       <div className="row" style={{ marginBottom: 12, flexWrap: "wrap" }}>
         <Link className="btn small primary" href="/label/try" data-testid="labeltry-link">Try the policy, case by case →</Link>
-        <Link className="btn small" href="/label/policy" data-testid="policy-link">Edit a policy →</Link>
-        <Link className="btn small" href="/label/docs" data-testid="docs-link">Documents test set →</Link>
-        <Link className="btn small" href="/label/files" data-testid="files-link">Keywords &amp; place names →</Link>
         <Link className="btn small" href="/label/compare" data-testid="compare-link">Compare runs →</Link>
         <Link className="btn small" href="/label/folders" data-testid="folders-link">Clean up run folders →</Link>
-        <Link className="btn small" href="/label/output" data-testid="output-link">Simple-mode output →</Link>
-        <Link className="btn small" href="/label/non-english" data-testid="non-english-link">Non-English keywords →</Link>
         <Link className="btn small" href="/label/kwstats" data-testid="kwstats-link">Keyword statistics →</Link>
-        <Link className="btn small" href="/label/expected-rules" data-testid="expected-rules-link">Expected-result rules →</Link>
         <Link className="btn small" href="/label/lab" data-testid="lab-link">Experiment →</Link>
-        <Link className="btn small" href="/label/translate" data-testid="translate-link">Translation settings →</Link>
+        <Link className="btn small" href="/settings" data-testid="settings-link">Settings (policy, keywords, rules, translation …) →</Link>
         <span className="faint" style={{ fontSize: 12 }}>every level-0 / 1 / 2 label and edge case, one text at a time, with its flow</span>
       </div>
       <StartRunForm onChanged={refresh} />

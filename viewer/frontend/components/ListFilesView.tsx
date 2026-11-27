@@ -132,7 +132,7 @@ export function ListFilesView() {
     <>
       <div className="page-head">
         <div>
-          <Crumbs items={[{ label: "Labelling", href: "/label" }, { label: "keywords and place names" }]} />
+          <Crumbs items={[{ label: "Settings", href: "/settings" }, { label: "keywords and place names" }]} />
           <h1>Keyword lists and place names</h1>
           <div className="sub">The files the policy names: <code className="mono">keywords_file</code> (what makes a paragraph checked),
             <code className="mono"> place_names_file</code> and <code className="mono">place_name_exceptions_file</code> (the clean copy&apos;s renaming).

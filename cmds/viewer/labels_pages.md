@@ -411,6 +411,14 @@ For trying any change of the policy or of the run settings on real lines, withou
   per paragraph base / draft actions (a change marked), and both flow traces side by side for the chosen paragraph.
 - **Draft vs base**: a readable list ("added label X …", "threshold of Y: 0.8 → 0.7", "run_if 1: … → …").
 - **The draft stays in this browser** (it survives a reload; "Discard draft" starts again from the base).
+- **◂ Prev / Next ▸** (opened from a run line): the next / previous line of the run, on into the next / previous file
+  after the last / before the first line. The bar shows "file 1 of 14: russian_companies__v1 · line 2 (2 of 10)", with
+  a criterion "match 2 of 6 in this file · 90 in the run", the run's action for the line and, on a corpus with
+  expected results, ✓ / ✗ per profile (strict, quick). **Next / Prev stop at** (ticks, any of them; remembered in this
+  browser): every line, remove, review, keep, not as expected (strict), not as expected (quick). **Your draft goes
+  along**: only the text changes to the new line. "run draft and base on each step" runs at once. Keys `[` / `]`
+  (outside text boxes); the browser's Back returns to the previous line. API:
+  `GET /api/labels/{run}/nav?file=&line=&crit=remove,wrong:strict&dir=next|prev|none`.
 - **Drafts kept as files, to load on another page** (`dataset\lab_drafts\`, git-ignored): a draft that differs from its
   base is saved by itself a moment after every change (one automatic file per page; the newest 50 are kept), and
   **Save draft as…** keeps one under a name until it is deleted. **Load a draft…** lists them (newest first: name or
@@ -433,3 +441,22 @@ For trying any change of the policy or of the run settings on real lines, withou
   works on real lines with the whole draft policy.
 - API: `GET /api/labels/lab/base`, `POST /api/labels/lab/check`, `POST /api/labels/lab/save` (save_as, or replace +
   confirm + base_sha); `reuse_scores` on `POST /api/labels/try`.
+
+## Settings (`/settings`, "Settings" in the top bar)
+
+Every setting of the labelling in one place: cards with an icon, what the setting is for and the file it changes. A
+card opens the page where that setting is shown and edited (checked while typing, saved with a backup):
+
+| Group | Card | Page | File |
+|---|---|---|---|
+| Policy and keywords | Labelling policy | `/label/policy` | `policy/*.json` |
+| | Keywords & place names | `/label/files` | `keywords/*.txt`, place-name files |
+| | Non-English keywords | `/label/non-english` | `policy/non_english.json` |
+| Results | Expected-result rules | `/label/expected-rules` | `labels/expected_rules.json` |
+| | Simple-mode output | `/label/output` | `output/simple_schema.json` |
+| Test sets | Case sets | `/label/try` | `labels/*cases*.json` |
+| | Documents test set | `/label/docs` | `labels/*docs*.json` |
+| Viewer | Translation | `/label/translate` | `viewer/viewer_config.json` |
+
+On those pages the top bar highlights **Settings** and the crumb leads back to `/settings`. `/label/` keeps the tools
+(Try, Experiment, Compare runs, Clean up run folders, Keyword statistics) and a "Settings →" link.

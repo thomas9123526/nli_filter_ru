@@ -5,7 +5,7 @@
 // "Discard draft" starts again). Nothing reaches policy/ unless "Save as new policy" or a replace confirmed by typing
 // the file name. Different from /label/try/: no case sets, real lines, the whole policy.
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, getJSON, postJSON, useApi } from "@/lib/api";
 import { href } from "@/lib/format";
@@ -23,6 +23,11 @@ type Base = { text: string | null; paragraph: string | null; problem: string | n
 type Settings = { use_judge: boolean; band: [number, number]; unit: string; review_as: string; all_labels: boolean };
 type Draft = { policy: PolicyData; settings: Settings; texts: string[] };
 type Result = { draft: LabelTryResp | null; base: LabelTryResp | null; error: string | null };
+type NavPos = { file: string; line: number; file_index: number; files: number; line_index: number | null; lines_in_file: number;
+  lines_total: number; match_index: number | null; matches_in_file: number; matches_total: number; action: string | null;
+  expected: Record<string, boolean> | null };
+type NavResp = { target: { file: string; line: number } | null; pos: NavPos; profiles: string[]; has_expected: boolean };
+const NAV_CRIT_KEY = "nli.lab.navCrit", NAV_RUN_KEY = "nli.lab.navAutoRun";
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 const LEVELS = [0, 1, 2];
@@ -70,6 +75,7 @@ function strictest(row: LabelTryResp["rows"][number] | undefined): string {
 
 export function LabView() {
   const sp = useSearchParams();
+  const router = useRouter();
   const run = sp.get("run") || "", file = sp.get("file") || "", line = Number(sp.get("line") || 0);
   const para = sp.get("para"), ds = sp.get("ds") || "", path = sp.get("path") || "", member = sp.get("member") || "";
   const policyQ = sp.get("policy") || "";
@@ -202,6 +208,63 @@ export function LabView() {
     try { await postJSON("/api/labels/lab/drafts/delete", { id: x.id }); loadList(); }
     catch (e) { setDraftsErr((e as Error).message); }
   };
+  // ---- Prev / Next through the run's lines; the draft goes along (only the text changes)
+  const [crit, setCrit] = useState<string[]>(["all"]);
+  const [autoRun, setAutoRun] = useState(false);
+  useEffect(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem(NAV_CRIT_KEY) || "null");
+      if (Array.isArray(c) && c.length) setCrit(c);
+      setAutoRun(localStorage.getItem(NAV_RUN_KEY) === "1");
+    } catch { /* private mode */ }
+  }, []);
+  const setCritKeep = (c: string[]) => { setCrit(c); try { localStorage.setItem(NAV_CRIT_KEY, JSON.stringify(c)); } catch { /* private mode */ } };
+  const toggleCrit = (c: string) => {
+    if (c === "all") return setCritKeep(["all"]);
+    const rest = crit.filter((x) => x !== "all");
+    const next = rest.includes(c) ? rest.filter((x) => x !== c) : [...rest, c];
+    setCritKeep(next.length ? next : ["all"]);
+  };
+  const nav = useApi(run && file && line ? `labnav:${run}:${file}:${line}:${crit.join(",")}` : null,
+    (s) => getJSON<NavResp>(`/api/labels/${encodeURIComponent(run)}/nav`, { file, line, crit: crit.join(","), dir: "none" }, s));
+  const [navBusy, setNavBusy] = useState(false);
+  const [navMsg, setNavMsg] = useState<string | null>(null);
+  const pendingRun = useRef(false);
+  const step = async (dir: "next" | "prev") => {
+    if (!run || !file || !line || !draft || navBusy) return;
+    setNavBusy(true); setNavMsg(null);
+    try {
+      const r = await getJSON<NavResp>(`/api/labels/${encodeURIComponent(run)}/nav`, { file, line, crit: crit.join(","), dir });
+      if (!r.target) { setNavMsg(dir === "next" ? "no further matching line in this run" : "no earlier matching line in this run"); return; }
+      const nb = await getJSON<Base>("/api/labels/lab/base", { run, file: r.target.file, line: r.target.line });
+      const text = nb.text || "";
+      const moved: Draft = { ...draft, texts: text ? [text] : [] };
+      const newKey = `${run}|${r.target.file}|${r.target.line}||${ds}|${path}|${policyQ}`;
+      try {
+        localStorage.setItem(`nli.lab.draft:${newKey}`, JSON.stringify(moved));
+        const aid = sessionStorage.getItem(autoIdKey);
+        if (aid) sessionStorage.setItem(`nli.lab.autoId:${newKey}`, aid);   // the same automatic draft file goes on
+      } catch { /* private mode */ }
+      lastSaved.current = snapshot(moved);
+      setDraftState(moved);
+      setResults([]);
+      setSel({});
+      pendingRun.current = autoRun && !!text;
+      router.push(href("/label/lab", { run, file: r.target.file, line: r.target.line }));
+    } catch (e) { setNavMsg((e as Error).message); }
+    finally { setNavBusy(false); }
+  };
+  useEffect(() => {   // "[" / "]" outside text fields: Prev / Next
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "]") { e.preventDefault(); step("next"); }
+      else if (e.key === "[") { e.preventDefault(); step("prev"); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   // running
   const [results, setResults] = useState<Result[]>([]);
   const [busy, setBusy] = useState(false);
@@ -231,6 +294,10 @@ export function LabView() {
     setResults(out);
     setBusy(false);
   };
+  useEffect(() => {
+    if (pendingRun.current && b && draft && baseSettings && !busy) { pendingRun.current = false; runAll(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b, draft, baseSettings]);
   // saving (only on explicit confirm)
   const [saveName, setSaveName] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -287,6 +354,42 @@ export function LabView() {
       <ErrorBox error={base.error} onRetry={base.reload} />
       {base.loading && !b ? <Loading what="Loading the base" /> : null}
       {b && draft && pol && baseSettings ? (<>
+        {run && file && line ? (() => {
+          const p = nav.data?.pos;
+          const profiles = nav.data?.profiles || [];
+          const hasExp = !!nav.data?.has_expected;
+          const options: [string, string, boolean][] = [["all", "every line", true], ["remove", "remove", true], ["review", "review", true],
+            ["keep", "keep", true], ...profiles.map((pr) => [`wrong:${pr}`, `not as expected (${pr})`, hasExp] as [string, string, boolean])];
+          const onlyAll = crit.length === 1 && crit[0] === "all";
+          return (
+            <div className="panel lab-nav" data-testid="lab-nav">
+              <div className="row" style={{ flexWrap: "wrap" }}>
+                <button className="btn small" disabled={navBusy} onClick={() => step("prev")} data-testid="lab-prev" title="previous matching line ( [ )">◂ Prev</button>
+                <button className="btn small primary" disabled={navBusy} onClick={() => step("next")} data-testid="lab-next" title="next matching line ( ] )">Next ▸</button>
+                {p ? (
+                  <span style={{ fontSize: 13 }} data-testid="lab-nav-pos">
+                    file <strong>{p.file_index}</strong> of {p.files}: <code>{p.file}</code> · line <strong>{p.line}</strong>
+                    {p.line_index ? <> ({p.line_index} of {p.lines_in_file})</> : <> (of {p.lines_in_file})</>}
+                    {!onlyAll ? <> · match <strong>{p.match_index ?? "–"}</strong> of {p.matches_in_file} in this file · {p.matches_total} in the run</> : null}
+                    {p.action ? <> · run: <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></> : null}
+                    {p.expected ? Object.entries(p.expected).map(([pr, ok]) => (
+                      <span key={pr} className={`badge ${ok ? "keep" : "warn"}`} style={{ marginLeft: 4 }}>{pr} {ok ? "✓" : "✗"}</span>)) : null}
+                  </span>) : nav.loading ? <span className="faint">…</span> : null}
+              </div>
+              <div className="row" style={{ flexWrap: "wrap", marginTop: 6, fontSize: 12.5 }} data-testid="lab-nav-crit">
+                <span className="faint">Next / Prev stop at:</span>
+                {options.map(([k, label, usable]) => (
+                  <label key={k} className={usable ? "" : "faint"} title={usable ? "" : "this run has no expected results"}>
+                    <input type="checkbox" disabled={!usable} checked={crit.includes(k)} onChange={() => toggleCrit(k)} data-testid={`lab-crit-${k}`} /> {label}</label>))}
+                <span className="spacer" />
+                <label title="run draft and base right after each step"><input type="checkbox" checked={autoRun} data-testid="lab-nav-autorun"
+                  onChange={(e) => { setAutoRun(e.target.checked); try { if (e.target.checked) localStorage.setItem(NAV_RUN_KEY, "1"); else localStorage.removeItem(NAV_RUN_KEY); } catch { /* private mode */ } }} /> run draft and base on each step</label>
+              </div>
+              <div className="faint" style={{ fontSize: 11.5, marginTop: 2 }}>Your draft policy and settings go along; only the text changes to the new line.
+                Keys: <code>[</code> / <code>]</code> (outside text boxes).</div>
+              {navMsg ? <div className="alert" style={{ marginTop: 6 }} data-testid="lab-nav-msg">{navMsg}</div> : null}
+            </div>);
+        })() : null}
         <div className="panel">
           <div className="row" style={{ flexWrap: "wrap" }}>
             <span>base: <strong>{b.policy_from}</strong>{b.policy_path ? <> · file <code>{b.policy_path}</code></> : null}</span>
