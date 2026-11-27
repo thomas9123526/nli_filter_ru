@@ -25,6 +25,8 @@ export function RunTools({ run, policy }: { run: string; policy?: string | null 
   const [out, setOut] = useState("");
   const [clean, setClean] = useState(false);
   const [reviewAs, setReviewAs] = useState("");
+  const [share, setShare] = useState("");        // "" = the run's own value, "0" = off
+  const [firstCut, setFirstCut] = useState("");  // "" = the run's own, "on", "off"
   const [job, setJob] = useState<RunJob | null>(null);
   const [newRun, setNewRun] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -47,7 +49,9 @@ export function RunTools({ run, policy }: { run: string; policy?: string | null 
     setErr(null); setJob(null); setNewRun(null);
     try {
       const body = pol === DRAFT && draft ? { policy_data: draft.data } : { policy: pol };
-      const r = await api.labelRedecide(run, { ...body, output_dir: out.trim(), write_clean: clean, review_as: reviewAs || undefined });
+      const r = await api.labelRedecide(run, { ...body, output_dir: out.trim(), write_clean: clean, review_as: reviewAs || undefined,
+        ...(share.trim() !== "" ? { max_removed_share: Number(share) } : {}),
+        ...(firstCut ? { drop_if_first_cut: firstCut === "on" } : {}) });
       setJob(r.job); setNewRun(r.run);
     } catch (e) { setErr((e as Error).message); }
   };
@@ -78,6 +82,12 @@ export function RunTools({ run, policy }: { run: string; policy?: string | null 
                 <select value={reviewAs} onChange={(e) => setReviewAs(e.target.value)}>
                   <option value="">kept (default)</option><option value="remove">cut (--review-as remove)</option>
                 </select></label>
+              <label className="faint" style={{ fontSize: 13 }} title="drop a whole document when more than this share of its tokens is cut (0 = off; empty = the run's own value)">
+                max removed share&nbsp;<input type="number" min={0} max={1} step={0.05} placeholder="run's" value={share}
+                  onChange={(e) => setShare(e.target.value)} style={{ width: 70 }} data-testid="rd-max-share" /></label>
+              <label className="faint" style={{ fontSize: 13 }} title="drop a whole document when its first checked paragraph is cut">drop if first cut&nbsp;
+                <select value={firstCut} onChange={(e) => setFirstCut(e.target.value)} data-testid="rd-first-cut">
+                  <option value="">run&apos;s</option><option value="on">on</option><option value="off">off</option></select></label>
               <button className="btn small primary" disabled={!pol || !out.trim() || job?.state === "running"} onClick={start} data-testid="rd-start">
                 {job?.state === "running" ? "Redeciding…" : "Redecide"}</button>
             </div>

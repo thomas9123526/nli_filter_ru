@@ -12,21 +12,29 @@ import { href } from "@/lib/format";
 import type { LabelTryResp, PolicyCheck, PolicyData, PolicyLabelData } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
 import { actionClass } from "./LabelRunView";
+import { ClarityBadge } from "./ExpectedPanel";
+import { expectedOk, type LineExpected } from "@/lib/expected";
 import { TryTrace } from "./TryTrace";
 import { TextTools } from "./TextTools";
 import { addGateToRunIf, gatesToAt, partialGates } from "@/lib/policyGates";
 import { carryChanges, carrySettings, samePolicy, type DraftFile, type DraftInfo } from "@/lib/labDrafts";
+import { safeBack } from "@/lib/urlState";
+import { backTarget } from "./LabLink";
+import { WholeLine, decidingParagraph } from "./WholeLine";
 
 type Base = { text: string | null; paragraph: string | null; problem: string | null; settings: Record<string, unknown>;
   source?: { run: string; file: string; line: number; input: string | null }; policy_data: PolicyData; policy_from: string;
-  policy_path?: string; policy_sha?: string; file_differs?: boolean; policies: string[] };
+  policy_path?: string; policy_sha?: string; file_differs?: boolean; policies: string[]; expected?: LineExpected };
 type Settings = { use_judge: boolean; band: [number, number]; unit: string; review_as: string; all_labels: boolean };
-type Draft = { policy: PolicyData; settings: Settings; texts: string[] };
+// sources[i]: where texts[i] came from (a run line, with its expected result and the text as it was), null = typed
+type TextSource = { run: string; file: string; line: number; text: string; expected?: LineExpected | null };
+type Draft = { policy: PolicyData; settings: Settings; texts: string[]; sources?: (TextSource | null)[] };
 type Result = { draft: LabelTryResp | null; base: LabelTryResp | null; error: string | null };
 type NavPos = { file: string; line: number; file_index: number; files: number; line_index: number | null; lines_in_file: number;
   lines_total: number; match_index: number | null; matches_in_file: number; matches_total: number; action: string | null;
-  expected: Record<string, boolean> | null };
-type NavResp = { target: { file: string; line: number } | null; pos: NavPos; profiles: string[]; has_expected: boolean };
+  expected: Record<string, boolean> | null; clarity?: string | null };
+type NavResp = { target: { file: string; line: number } | null; pos: NavPos; profiles: string[]; has_expected: boolean;
+  clarities?: string[] };
 const NAV_CRIT_KEY = "nli.lab.navCrit", NAV_RUN_KEY = "nli.lab.navAutoRun";
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -73,13 +81,16 @@ function strictest(row: LabelTryResp["rows"][number] | undefined): string {
   return acts.sort((x, y) => (STRICT[y] ?? 0) - (STRICT[x] ?? 0))[0] || row.action;
 }
 
-export function LabView() {
+export function LabView({ blank = false }: { blank?: boolean } = {}) {
+  // blank (/label/lab/blank/): no run, no corpus line — one empty text box, a policy picker; everything else the same
   const sp = useSearchParams();
   const router = useRouter();
-  const run = sp.get("run") || "", file = sp.get("file") || "", line = Number(sp.get("line") || 0);
-  const para = sp.get("para"), ds = sp.get("ds") || "", path = sp.get("path") || "", member = sp.get("member") || "";
+  const run = blank ? "" : sp.get("run") || "", file = blank ? "" : sp.get("file") || "", line = blank ? 0 : Number(sp.get("line") || 0);
+  const para = blank ? null : sp.get("para"), ds = blank ? "" : sp.get("ds") || "", path = blank ? "" : sp.get("path") || "";
+  const member = blank ? "" : sp.get("member") || "";
   const policyQ = sp.get("policy") || "";
-  const baseKey = `${run}|${file}|${line}|${para ?? ""}|${ds}|${path}|${policyQ}`;
+  const back = safeBack(sp.get("back"));   // where the page was opened from (kept through Prev / Next)
+  const baseKey = blank ? `blank|${policyQ}` : `${run}|${file}|${line}|${para ?? ""}|${ds}|${path}|${policyQ}`;
   const base = useApi(`labbase:${baseKey}`, (s) => getJSON<Base>("/api/labels/lab/base",
     { run: run || undefined, file: file || undefined, line: line || undefined, para: para ?? undefined, policy: policyQ || undefined }, s));
   const corpus = useApi(ds && path && line ? `labcorpus:${ds}:${path}:${line}` : null,
@@ -93,6 +104,8 @@ export function LabView() {
       review_as: String(st.review_as || "keep"), all_labels: !!st.all_labels };
   }, [b]);
   const firstText = b ? (b.paragraph || b.text || corpus.data?.lines[0]?.text || "") : "";
+  const firstSource: TextSource | null = b && run && file && line && firstText
+    ? { run, file, line, text: firstText, expected: b.expected || null } : null;
   const storeKey = `nli.lab.draft:${baseKey}`;
   const [draft, setDraftState] = useState<Draft | null>(null);
   const [restored, setRestored] = useState(false);
@@ -101,7 +114,8 @@ export function LabView() {
     if (ds && !corpus.data) return;
     let d: Draft | null = null;
     try { const v = localStorage.getItem(storeKey); if (v) { d = JSON.parse(v); setRestored(true); } } catch { /* no storage */ }
-    setDraftState(d || { policy: clone(b.policy_data), settings: clone(baseSettings), texts: firstText ? [firstText] : [] });
+    setDraftState(d || { policy: clone(b.policy_data), settings: clone(baseSettings), texts: firstText ? [firstText] : (blank ? [""] : []),
+      sources: firstText ? [firstSource] : (blank ? [null] : []) });
   }, [b, baseSettings, corpus.data, ds, draft, firstText, storeKey]);
   const setDraft = (fn: (d: Draft) => void) => setDraftState((o) => {
     if (!o) return o;
@@ -115,7 +129,8 @@ export function LabView() {
     try { localStorage.removeItem(storeKey); sessionStorage.removeItem(autoIdKey); } catch { /* no storage */ }
     lastSaved.current = null;
     setRestored(false);
-    setDraftState({ policy: clone(b.policy_data), settings: clone(baseSettings), texts: firstText ? [firstText] : [] });
+    setDraftState({ policy: clone(b.policy_data), settings: clone(baseSettings), texts: firstText ? [firstText] : (blank ? [""] : []),
+      sources: firstText ? [firstSource] : (blank ? [null] : []) });
     setResults([]);
   };
   // checked while typing
@@ -140,7 +155,7 @@ export function LabView() {
     summary: diff.slice(0, 8).join("; ") + (diff.length > 8 ? ` … (${diff.length} changes)` : ""),
     base: { run: run || undefined, file: file || undefined, line: line || undefined, para, policy_path: b?.policy_path,
       policy_data: b?.policy_data, settings: baseSettings },
-    policy: d.policy, settings: d.settings, texts: d.texts });
+    policy: d.policy, settings: d.settings, texts: d.texts, sources: d.sources || [] });
   useEffect(() => {
     if (!draft || !b) return;
     const snap = snapshot(draft);
@@ -150,10 +165,12 @@ export function LabView() {
       let id: string | undefined;
       try { id = sessionStorage.getItem(autoIdKey) || undefined; } catch { /* private mode */ }
       try {
-        const r = await postJSON<{ id: string; saved: string }>("/api/labels/lab/drafts/save", { auto: true, id, ...draftBody(draft) });
+        const r = await postJSON<{ id: string; saved: string; same_as?: string | null; replaced?: string[] }>(
+          "/api/labels/lab/drafts/save", { auto: true, id, ...draftBody(draft) });
         try { sessionStorage.setItem(autoIdKey, r.id); } catch { /* private mode */ }
         lastSaved.current = snap;
-        setAutoMsg(`kept as ${r.id} (${r.saved.slice(11)})`);
+        setAutoMsg(r.same_as ? `same as your draft ${r.same_as} (not kept twice)`
+          : `kept as ${r.id} (${r.saved.slice(11)})${r.replaced?.length ? `, replacing ${r.replaced.length} identical one${r.replaced.length > 1 ? "s" : ""}` : ""}`);
       } catch (e) { setAutoMsg(`not kept: ${(e as Error).message}`); }
     }, 1500);
     return () => clearTimeout(t);
@@ -183,7 +200,12 @@ export function LabView() {
       setDraft((x) => {
         x.policy = policy;
         x.settings = settings;
-        if (withTexts) for (const t of d.texts || []) if (t.trim() && !x.texts.includes(t)) x.texts.push(t);
+        if (withTexts) (d.texts || []).forEach((t, k) => {
+          if (!t.trim() || x.texts.includes(t)) return;
+          x.sources = [...(x.sources || x.texts.map(() => null))];
+          x.texts.push(t);
+          x.sources.push((d.sources || [])[k] || null);
+        });
       });
       setResults([]);
       setDraftsMsg(`Loaded ${d.name || d.id}: ${how}${withTexts ? `, with its ${d.texts.length} text(s)` : ""}. Run draft and base to see it.`);
@@ -238,7 +260,8 @@ export function LabView() {
       if (!r.target) { setNavMsg(dir === "next" ? "no further matching line in this run" : "no earlier matching line in this run"); return; }
       const nb = await getJSON<Base>("/api/labels/lab/base", { run, file: r.target.file, line: r.target.line });
       const text = nb.text || "";
-      const moved: Draft = { ...draft, texts: text ? [text] : [] };
+      const moved: Draft = { ...draft, texts: text ? [text] : [],
+        sources: text ? [{ run, file: r.target.file, line: r.target.line, text, expected: nb.expected || null }] : [] };
       const newKey = `${run}|${r.target.file}|${r.target.line}||${ds}|${path}|${policyQ}`;
       try {
         localStorage.setItem(`nli.lab.draft:${newKey}`, JSON.stringify(moved));
@@ -250,7 +273,7 @@ export function LabView() {
       setResults([]);
       setSel({});
       pendingRun.current = autoRun && !!text;
-      router.push(href("/label/lab", { run, file: r.target.file, line: r.target.line }));
+      router.push(href("/label/lab", { run, file: r.target.file, line: r.target.line, back: back || undefined }));
     } catch (e) { setNavMsg((e as Error).message); }
     finally { setNavBusy(false); }
   };
@@ -265,6 +288,37 @@ export function LabView() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  // blank page: switching the base policy carries the draft's changes onto the new one (once it is loaded)
+  const pendingCarry = useRef<{ from: PolicyData; draft: PolicyData } | null>(null);
+  const pickPolicy = (p: string) => {
+    if (!b || !draft || p === b.policy_path) return;
+    if (diff.length && !window.confirm(`Switch the base policy to ${p}? Your ${diff.length} change(s) are carried onto it where they apply.`)) return;
+    pendingCarry.current = { from: clone(b.policy_data), draft: clone(draft.policy) };
+    router.replace(href("/label/lab/blank", { policy: p, back: back || undefined }));
+  };
+  useEffect(() => {
+    const pc = pendingCarry.current;
+    if (!pc || !b || !draft || samePolicy(pc.from, b.policy_data)) return;
+    pendingCarry.current = null;
+    const c = carryChanges(pc.from, pc.draft, b.policy_data);
+    setDraftState((o) => {
+      if (!o) return o;
+      const x = { ...o, policy: c.policy };
+      try { localStorage.setItem(storeKey, JSON.stringify(x)); } catch { /* no storage */ }   // kept under the new address
+      return x;
+    });
+    setResults([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b]);
+  const newBlank = () => {
+    if (!b || !baseSettings) return;
+    if ((diff.length || draft?.texts.some((t) => t.trim())) && !window.confirm("Clear the texts and the draft and start again?")) return;
+    try { localStorage.removeItem(storeKey); sessionStorage.removeItem(autoIdKey); } catch { /* no storage */ }
+    lastSaved.current = null;
+    setRestored(false);
+    setDraftState({ policy: clone(b.policy_data), settings: clone(baseSettings), texts: [""], sources: [null] });
+    setResults([]);
+  };
   // running
   const [results, setResults] = useState<Result[]>([]);
   const [busy, setBusy] = useState(false);
@@ -276,9 +330,23 @@ export function LabView() {
     try { if (v) localStorage.setItem("nli.lab.draftHidden", "1"); else localStorage.removeItem("nli.lab.draftHidden"); } catch { /* private mode */ }
   };
   const [sel, setSel] = useState<Record<string, number>>({});
+  // "score again (no cache)": the model service forgets its scored pairs first, so the base run scores everything
+  // with the models (the draft then reuses the base's fresh scores for unchanged hypotheses)
+  const [fresh, setFresh] = useState(false);
+  const rules = useApi("expected-rules", (s2) => api.expectedRules(undefined, s2));
+  const [expProfile, setExpProfile] = useState("");
+  const [cacheMsg, setCacheMsg] = useState<string | null>(null);
+  const clearCache = async () => {
+    try {
+      const r = await postJSON<{ cleared: number }>("/api/labels/cache/clear", {});
+      setCacheMsg(`score cache cleared (${r.cleared} scored pairs forgotten)`);
+      return true;
+    } catch (e) { setCacheMsg(`could not clear the score cache: ${(e as Error).message}`); return false; }
+  };
   const runAll = async () => {
     if (!draft || !b || !baseSettings) return;
     setBusy(true);
+    if (fresh) await clearCache();
     const texts = draft.texts.filter((t) => t.trim());
     const call = (pd: PolicyData, st: Settings) => api.labelTry({ texts, policy_data: pd, all_labels: st.all_labels, use_judge: st.use_judge,
       decision_unit: st.unit, review_as: st.review_as, uncertain_band: st.band, reuse_scores: true });
@@ -335,7 +403,11 @@ export function LabView() {
   const addLine = async (f: string, ln: number) => {
     try {
       const r = await getJSON<Base>("/api/labels/lab/base", { run, file: f, line: ln });
-      if (r.text) setDraft((d) => { d.texts.push(r.text!); });
+      if (r.text) setDraft((d) => {
+        d.sources = [...(d.sources || d.texts.map(() => null))];
+        d.texts.push(r.text!);
+        d.sources.push({ run, file: f, line: ln, text: r.text!, expected: r.expected || null });
+      });
     } catch { /* shown nowhere: the line is simply not added */ }
   };
   const [paste, setPaste] = useState("");
@@ -346,8 +418,22 @@ export function LabView() {
     <>
       <div className="page-head"><div>
         <Crumbs items={[{ label: "Labelling", href: "/label" }, ...(run ? [{ label: run, href: href("/label/run", { run, file: file || undefined }) }] : []),
-          ...(run && line ? [{ label: `line ${line}`, href: href("/label/doc", { run, file, line }) }] : []), { label: "Experiment" }]} />
-        <h1>Experiment</h1>
+          ...(run && line ? [{ label: `line ${line}`, href: href("/label/doc", { run, file, line }) }] : []), { label: blank ? "Experiment (blank)" : "Experiment" }]} />
+        <div className="row" style={{ alignItems: "baseline", flexWrap: "wrap" }}><h1 style={{ marginRight: 8 }}>{blank ? "Experiment (blank)" : "Experiment"}</h1>
+          {(() => { const t = backTarget(back, run); return (
+            <Link className="btn small" href={t.url} data-testid="lab-back"
+              title="back to the page this Experiment was opened from, as you left it (the browser's Back goes line by line through Prev / Next)">◂ Back to {t.label}</Link>); })()}
+          {blank && b ? (
+            <label style={{ fontSize: 13 }} title="the base policy of this blank experiment">policy{" "}
+              <select value={b.policy_path || ""} data-testid="lab-policy-pick" onChange={(e) => pickPolicy(e.target.value)}>
+                {(b.policies || []).map((p) => <option key={p} value={p}>{p}</option>)}
+              </select></label>) : null}
+          {blank ? <button className="btn small ghost" onClick={newBlank} data-testid="lab-new-blank" title="clear the texts and the draft, start again">New blank</button>
+            : <Link className="btn small ghost" href={href("/label/lab/blank", { back: back || undefined })} data-testid="lab-open-blank"
+                title="an Experiment page with no line: type any text">Open blank →</Link>}
+        </div>
+        {blank ? <div className="sub">Type any text and compare the draft with the chosen policy. Nothing is loaded from a dataset; everything
+          else works as on the Experiment page.</div> : null}
         <div className="sub">Change anything in a working copy (the draft) and compare with the base on real lines. Nothing is saved
           unless you confirm below. For case sets and their expected actions use <Link href="/label/try">Try</Link>.</div>
       </div></div>
@@ -359,7 +445,8 @@ export function LabView() {
           const profiles = nav.data?.profiles || [];
           const hasExp = !!nav.data?.has_expected;
           const options: [string, string, boolean][] = [["all", "every line", true], ["remove", "remove", true], ["review", "review", true],
-            ["keep", "keep", true], ...profiles.map((pr) => [`wrong:${pr}`, `not as expected (${pr})`, hasExp] as [string, string, boolean])];
+            ["keep", "keep", true], ...profiles.map((pr) => [`wrong:${pr}`, `not as expected (${pr})`, hasExp] as [string, string, boolean]),
+            ...(nav.data?.clarities || []).map((c) => [`clarity:${c}`, c, true] as [string, string, boolean])];
           const onlyAll = crit.length === 1 && crit[0] === "all";
           return (
             <div className="panel lab-nav" data-testid="lab-nav">
@@ -372,6 +459,7 @@ export function LabView() {
                     {p.line_index ? <> ({p.line_index} of {p.lines_in_file})</> : <> (of {p.lines_in_file})</>}
                     {!onlyAll ? <> · match <strong>{p.match_index ?? "–"}</strong> of {p.matches_in_file} in this file · {p.matches_total} in the run</> : null}
                     {p.action ? <> · run: <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></> : null}
+                    {p.clarity ? <> <ClarityBadge c={p.clarity} /></> : null}
                     {p.expected ? Object.entries(p.expected).map(([pr, ok]) => (
                       <span key={pr} className={`badge ${ok ? "keep" : "warn"}`} style={{ marginLeft: 4 }}>{pr} {ok ? "✓" : "✗"}</span>)) : null}
                   </span>) : nav.loading ? <span className="faint">…</span> : null}
@@ -559,23 +647,52 @@ export function LabView() {
 
           <div>
             <div className="panel" data-testid="lab-texts">
-              <div className="row"><h2 style={{ margin: 0 }}>Texts</h2><span className="spacer" />
+              <div className="row"><h2 style={{ margin: 0 }}>Texts</h2>
+                {(draft.sources || []).some((x) => x?.expected) && rules.data ? (
+                  <span className="seg" title="which actions count as the same (labels/expected_rules.json)" data-testid="lab-exp-profile">
+                    {Object.keys(rules.data.profiles || {}).map((p) => (
+                      <button key={p} className={p === (expProfile || rules.data!.default) ? "on" : ""} onClick={() => setExpProfile(p)}>{p}</button>))}
+                  </span>) : null}
+                <span className="spacer" />
+                <label className="faint" style={{ fontSize: 12 }} title="forget every scored pair first, so the base is scored with the models again (slower)">
+                  <input type="checkbox" checked={fresh} onChange={(e) => setFresh(e.target.checked)} data-testid="lab-fresh" /> score again (no cache)</label>
+                <button className="btn small ghost" onClick={clearCache} title="the model service keeps scored pairs in memory until it restarts; a cached score equals a fresh one for the same models"
+                  data-testid="lab-clear-cache">Clear score cache</button>
                 <button className="btn small primary" disabled={busy || !draft.texts.some((t) => t.trim()) || (check !== null && !check.ok)} onClick={runAll} data-testid="lab-run">
                   {busy ? "Running…" : "Run draft and base"}</button></div>
+              {cacheMsg ? <div className="faint" style={{ fontSize: 12 }} data-testid="lab-cache-msg">{cacheMsg}</div> : null}
               {draft.texts.map((t, i) => {
                 const r = results[i];
                 const rd = r?.draft?.rows[i], rb = r?.base?.rows[i];
                 const changed = rd && rb && strictest(rd) !== strictest(rb);
+                const src = (draft.sources || [])[i] || null;
+                const ex = src?.expected || null;
+                const okB = ex && rb ? expectedOk(strictest(rb), ex, rules.data, expProfile) : null;
+                const okD = ex && rd ? expectedOk(strictest(rd), ex, rules.data, expProfile) : null;
                 const pi = sel[i] ?? rd?.decided_by ?? 0;
                 return (
                   <div key={i} className="panel" style={{ marginTop: 10 }} data-testid={`lab-text-${i}`}>
                     <div className="row" style={{ flexWrap: "wrap" }}><strong>text {i + 1}</strong>
                       {rd && rb ? <span data-testid={`lab-result-${i}`}>base <span className={`badge ${actionClass(strictest(rb))}`}>{strictest(rb)}</span> → draft{" "}
                         <span className={`badge ${actionClass(strictest(rd))}`}>{strictest(rd)}</span>
+                        {(() => { const k = decidingParagraph(rd.paragraphs || []); return k !== null && (rd.paragraphs || []).length > 1
+                          ? <span className="faint" style={{ fontSize: 11.5 }} data-testid={`lab-from-${i}`}> (from ¶{k + 1})</span> : null; })()}
                         {changed ? <span className="badge warn" style={{ marginLeft: 4 }}>changed</span> : null}</span> : null}
+                      {ex ? (
+                        <span data-testid={`lab-expected-${i}`} title={ex.note || ""}>
+                          · expected <span className={`badge ${actionClass(ex.expected_action)}`}>{ex.expected_action}</span>
+                          {ex.acceptable?.length ? <span className="faint"> (also {ex.acceptable.join(", ")})</span> : null}
+                          {okB !== null ? <> base <span className={`badge ${okB ? "keep" : "filter"}`}>{okB ? "✓" : "✗"}</span></> : null}
+                          {okD !== null ? <> draft <span className={`badge ${okD ? "keep" : "filter"}`}>{okD ? "✓" : "✗"}</span></> : null}
+                          {okB === false && okD ? <span className="badge keep" style={{ marginLeft: 4 }} data-testid={`lab-fixed-${i}`}>fixed</span> : null}
+                          {okB && okD === false ? <span className="badge filter" style={{ marginLeft: 4 }} data-testid={`lab-broken-${i}`}>broken</span> : null}
+                          {" "}<ClarityBadge c={ex.clarity} reason={ex.clarity_reason} gate={ex.gate_expected} />
+                          {src && src.text !== t ? <span className="faint" style={{ fontSize: 11.5 }} data-testid={`lab-edited-${i}`}> · text edited</span> : null}
+                          <span className="faint" style={{ fontSize: 11.5 }}> · {src!.file} line {src!.line}</span>
+                        </span>) : null}
                       <span className="spacer" />
                       <TextTools text={t} testid={`lab-tools-${i}`} />
-                      <button className="btn small ghost danger" onClick={() => { setDraft((d) => { d.texts.splice(i, 1); }); setResults([]); }}>✕</button></div>
+                      <button className="btn small ghost danger" onClick={() => { setDraft((d) => { d.texts.splice(i, 1); if (d.sources) d.sources.splice(i, 1); }); setResults([]); }}>✕</button></div>
                     <textarea rows={4} style={{ width: "100%" }} value={t} onChange={(e) => setDraft((d) => { d.texts[i] = e.target.value; })} />
                     {r?.error ? <div className="alert error">{r.error}</div> : null}
                     {rd && rb ? (<>
@@ -593,17 +710,22 @@ export function LabView() {
                       {!(rd.paragraphs || []).length ? <div className="faint">no paragraph checked (no keyword or marker): {rd.action}</div> : null}
                       {rd.paragraphs?.[pi] ? (
                         <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 8 }}>
-                          <div><strong>Base</strong>{rb.paragraphs?.[pi] ? <TryTrace res={r!.base!} p={rb.paragraphs[pi]} text={t} row={rb} docAction={rb.action} /> : <div className="faint">–</div>}</div>
-                          <div><strong>Draft</strong><TryTrace res={r!.draft!} p={rd.paragraphs[pi]} text={t} row={rd} docAction={rd.action} /></div>
+                          <div><strong>Base</strong>{rb.paragraphs?.[pi] ? <TryTrace res={r!.base!} p={rb.paragraphs[pi]} text={t} row={rb} docAction={rb.action} /> : <div className="faint">–</div>}
+                            <WholeLine text={t} row={rb} policy={r!.base!.policy} unit={baseSettings.unit} reviewAs={baseSettings.review_as} sel={pi}
+                              onSel={(k) => setSel((o) => ({ ...o, [i]: k }))} expected={ex ? { action: ex.expected_action, ok: okB } : null} testid={`whole-base-${i}`} /></div>
+                          <div><strong>Draft</strong><TryTrace res={r!.draft!} p={rd.paragraphs[pi]} text={t} row={rd} docAction={rd.action} />
+                            <WholeLine text={t} row={rd} policy={r!.draft!.policy} unit={draft.settings.unit} reviewAs={draft.settings.review_as} sel={pi}
+                              onSel={(k) => setSel((o) => ({ ...o, [i]: k }))} expected={ex ? { action: ex.expected_action, ok: okD } : null} testid={`whole-draft-${i}`} /></div>
                         </div>) : null}
                     </>) : null}
                   </div>);
               })}
-              {results[0]?.draft ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>draft {results[0].draft.seconds}s ·
-                {" "}{results[0].draft.pairs.fast} new pairs{results[0].draft.pairs.reused ? `, ${results[0].draft.pairs.reused} reused` : ""}</div> : null}
+              {results[0]?.draft ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }} data-testid="lab-timing">
+                {results[0].base ? <>base {results[0].base.seconds}s · {results[0].base.pairs.fast} scored by the model{results[0].base.pairs.reused ? `, ${results[0].base.pairs.reused} from the cache` : ""} · </> : null}
+                draft {results[0].draft.seconds}s · {results[0].draft.pairs.fast} scored by the model{results[0].draft.pairs.reused ? `, ${results[0].draft.pairs.reused} from the cache` : ""}</div> : null}
               <div style={{ marginTop: 10 }}>
                 <textarea rows={3} style={{ width: "100%" }} placeholder="paste another text" value={paste} onChange={(e) => setPaste(e.target.value)} data-testid="lab-paste" />
-                <button className="btn small" disabled={!paste.trim()} onClick={() => { setDraft((d) => { d.texts.push(paste); }); setPaste(""); }} data-testid="lab-add">+ add text</button>
+                <button className="btn small" disabled={!paste.trim()} onClick={() => { setDraft((d) => { d.sources = [...(d.sources || d.texts.map(() => null)), null]; d.texts.push(paste); }); setPaste(""); }} data-testid="lab-add">+ add text</button>
               </div>
               {exp.data?.expected?.wrong.length ? (
                 <details style={{ marginTop: 8 }}><summary>add a line {run} did not get as expected ({exp.data.expected.wrong.length})</summary>

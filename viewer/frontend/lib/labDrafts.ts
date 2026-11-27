@@ -9,7 +9,8 @@ export type DraftInfo = { id: string; name: string | null; auto: boolean; saved:
 export type DraftFile = { id: string; name: string | null; auto: boolean; saved: string; summary: string;
   base: { run?: string; file?: string; line?: number; para?: string | null; policy_path?: string; policy_data?: PolicyData;
     settings?: Record<string, unknown> };
-  policy: PolicyData; settings: Record<string, unknown>; texts: string[] };
+  policy: PolicyData; settings: Record<string, unknown>; texts: string[];
+  sources?: ({ run: string; file: string; line: number; text: string; expected?: { expected_action: string } | null } | null)[] };
 
 const J = (x: unknown) => JSON.stringify(x ?? null);
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));

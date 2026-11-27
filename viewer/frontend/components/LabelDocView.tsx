@@ -10,6 +10,8 @@ import { Crumbs, ErrorBox, Loading, ScoreBar } from "./ui";
 import { safeBack } from "@/lib/urlState";
 import { TextTools } from "./TextTools";
 import { actionClass } from "./LabelRunView";
+import { LabLink } from "./LabLink";
+import { WholeLine } from "./WholeLine";
 
 const REASONS: Record<string, string> = {
   gate_negative: "Every gate label is below its threshold and there is no marker term: the keyword was incidental, the paragraph passes untouched.",
@@ -269,14 +271,18 @@ export function LabelDocView() {
             <div className="row" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Flow</h2>
               {paras[sel] ? <a className="btn small" data-testid="try-this" href={href("/label/try", { run, file, line, para: sel })}
                 title="Open the Try page with this paragraph and the run's policy">Try this paragraph →</a> : null}
-              {d.text ? <a className="btn small" data-testid="lab-this" href={href("/label/lab", { run, file, line, para: paras[sel] ? sel : undefined })}
-                title="Open the Experiment page with this paragraph: change any setting of the policy, compare with the run's policy; nothing is saved unless you confirm">Experiment →</a> : null}
+              {d.text ? <LabLink className="btn small" testid="lab-this" params={{ run, file, line, para: paras[sel] ? sel : undefined }}
+                title="Open the Experiment page with this paragraph: change any setting of the policy, compare with the run's policy; nothing is saved unless you confirm">Experiment →</LabLink> : null}
               {paras.length > 1 ? <span className="seg">{paras.map((p, i) => (
                 <button key={i} className={i === sel ? "on" : ""} onClick={() => setSel(i)} title={d.row.decided_by === i ? "this paragraph decided the line" : undefined}>
                   ¶{i + 1}{d.row.decided_by === i ? " ★" : ""} <span className={`badge ${actionClass(p.action)}`}>{p.action}</span></button>))}</span> : null}
             </div>
             {d.expect ? <ExpectBox e={d.expect} sel={paras[sel]?.span} /> : null}
             {paras[sel] ? <Flow policy={d.policy} p={paras[sel]} /> : <div className="faint">Nothing to show.</div>}
+            {d.text && (paras.length || d.row.gate === false) ? (<><div className="flow-arrow">↓</div>
+              <WholeLine text={d.text} row={d.row} policy={d.policy} unit={String(d.settings?.decision_unit || "paragraph")}
+                reviewAs={d.clean?.review_as || String(d.settings?.review_as || "keep")} sel={sel} onSel={setSel}
+                expected={d.expect ? { action: d.expect.expected, ok: d.expect.ok } : null} /></>) : null}
           </div>
         </div>
       ) : null}

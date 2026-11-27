@@ -11,7 +11,8 @@ import { ProgressBadge } from "./LabelsView";
 import { RunTools } from "./RunTools";
 import { LineText } from "./LineText";
 import { SimpleRunView } from "./SimpleRunView";
-import { ExpectBadge, ExpectedPanel } from "./ExpectedPanel";
+import { ClarityBadge, ExpectBadge, ExpectedPanel } from "./ExpectedPanel";
+import { LabLink } from "./LabLink";
 
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
 const PARA_ACTIONS = ["remove", "review", "keep", "pass"];
@@ -24,8 +25,9 @@ export function LabelRunView() {
   const run = sp.get("run") || "";
   const res = useApi(run ? `labelrun:${run}` : null, (s) => api.labelRun(run, s));
   // the view is kept in the URL (file, filters, page, opened rows, expected profile): Back and copied links show it again
-  const [u, setU] = useUrlState({ file: "", action: "", label: "", para_action: "", expect: "", offset: "0", open: "", profile: "" });
-  const file = u.file, action = u.action, label = u.label, paraAction = u.para_action, expect = u.expect, profile = u.profile;
+  const [u, setU] = useUrlState({ file: "", action: "", label: "", para_action: "", expect: "", offset: "0", open: "", profile: "", clarity: "" });
+  const file = u.file, action = u.action, label = u.label, paraAction = u.para_action, expect = u.expect, profile = u.profile,
+    clarity = u.clarity;
   const offset = parseInt(u.offset, 10) || 0;
   const openLines = parseSet(u.open);  // rows whose full text is shown (▸)
   const setFile = (v: string) => setU({ file: v, offset: "0", open: "" });
@@ -45,8 +47,8 @@ export function LabelRunView() {
   });
   const f = file || res.data?.files[0]?.name || "";
   const simple = res.data?.summary.settings?.output_mode === "simple";  // simple mode: its own page
-  const docs = useApi(run && f && res.data && !simple ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}:${profile}` : null,
-    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}), profile }, s));
+  const docs = useApi(run && f && res.data && !simple ? `labeldocs:${run}:${f}:${action}:${label}:${paraAction}:${offset}:${expect}:${profile}:${clarity}` : null,
+    (s) => api.labelDocs(run, { file: f, action, label, para_action: paraAction, offset, limit: PAGE, ...(expect ? { expect } : {}), ...(clarity ? { clarity } : {}), profile }, s));
   useEffect(() => {  // ?expand=1: every row's text open
     if (sp.get("expand") === "1" && docs.data) setU({ expand: undefined, open: formatSet(new Set(docs.data.rows.map((r) => r.line))) } as never);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,6 +183,14 @@ export function LabelRunView() {
                 <button className={expect === "wrong" ? "on" : ""} onClick={() => { setExpect("wrong"); reset(); }}>✗ not as expected</button>
                 <button className={expect === "right" ? "on" : ""} onClick={() => { setExpect("right"); reset(); }}>✓ as expected</button>
               </span>) : null}
+            {docs.data?.clarities || clarity ? (
+              <span className="seg" data-testid="clarity-filter" title="the benchmark's clarity tag of the line">
+                <button className={clarity === "" ? "on" : ""} onClick={() => { setU({ clarity: "", offset: "0", open: "" }); reset(); }}>clarity: any</button>
+                {["clear", "hard", "ambiguous", ...Object.keys(docs.data?.clarities || {}).filter((k) => !["clear", "hard", "ambiguous"].includes(k))]
+                  .filter((k) => (docs.data?.clarities || {})[k] || clarity === k).map((k) => (
+                  <button key={k} className={clarity === k ? "on" : ""} data-testid={`clarity-${k}`}
+                    onClick={() => { setU({ clarity: k, offset: "0", open: "" }); reset(); }}>{k} {(docs.data?.clarities || {})[k] ?? ""}</button>))}
+              </span>) : null}
             {docs.data?.expected ? <span className="faint" style={{ fontSize: 12 }}>{docs.data.expected.ok} / {docs.data.expected.n} in this file</span> : null}
           </div>
           <ErrorBox error={docs.error} onRetry={docs.reload} />
@@ -199,15 +209,15 @@ export function LabelRunView() {
                     <td><span className={`badge ${actionClass(r.action)}`}>{r.action}</span></td>
                     {docs.data!.expected ? (
                       <td>{r.expect ? (<>
-                        <ExpectBadge v={r.expect} />
+                        <ExpectBadge v={r.expect} /> <ClarityBadge c={r.expect.clarity} reason={r.expect.clarity_reason} gate={r.expect.gate_expected} />
                         {r.expect.paragraphs?.some((p) => !p.ok) ? <span className="faint"> · {r.expect.paragraphs.filter((p) => !p.ok).length} ¶ ✗</span> : null}
                       </>) : <span className="faint">–</span>}</td>) : null}
                     <td>{PARA_ACTIONS.filter((a) => r.paragraphs[a]).map((a) => <span key={a} className={`badge ${actionClass(a)}`} style={{ marginRight: 4 }}>{a} {r.paragraphs[a]}</span>)}</td>
                     <td>{r.labels.map((l) => <span key={l} className="chip">{l}</span>)}{r.flags.map((l) => <span key={l} className="chip">⚑ {l}</span>)}</td>
                     <td className="faint">{r.keywords.join(", ")}</td>
                     <td className="right">{r.tokens_removed ? `${num(r.tokens_removed)} / ${num(r.tokens)}` : "–"}</td>
-                    <td className="right"><Link className="btn small" data-testid="row-lab" title="open this line on the Experiment page (change any setting, compare with the run's policy)"
-                      href={href("/label/lab", { run, file: f, line: r.line })}>Experiment</Link></td>
+                    <td className="right"><LabLink className="btn small" testid="row-lab" title="open this line on the Experiment page (change any setting, compare with the run's policy)"
+                      params={{ run, file: f, line: r.line }} line={r.line}>Experiment</LabLink></td>
                   </tr>
                   {openLines.has(r.line) ? <tr className="line-text-row"><td colSpan={docs.data!.expected ? 9 : 8}><LineText run={run} file={f} line={r.line} /></td></tr> : null}
                   </Fragment>))}</tbody>

@@ -676,7 +676,8 @@ class Labeller:
                  all_labels: bool = False, text_field: str = "text", id_field: Optional[str] = "id",
                  review_as: str = "keep", min_doc_chars: int = 50, marker_matcher=None,
                  group_field: Optional[str] = None, force_gate: bool = False, narrative_matcher=None,
-                 topic_field: Optional[str] = None, topic_mode: Optional[str] = None, unit: str = "paragraph"):
+                 topic_field: Optional[str] = None, topic_mode: Optional[str] = None, unit: str = "paragraph",
+                 max_removed_share: Optional[float] = None, drop_if_first_cut: bool = False):
         self.p, self.matcher, self.rules, self.scorer = policy, matcher, rules, scorer
         if unit not in DECISION_UNITS:
             raise ValueError(f"decision unit must be one of {', '.join(DECISION_UNITS)}")
@@ -696,6 +697,9 @@ class Labeller:
         self.text_field, self.id_field = text_field, id_field
         self.review_as = review_as
         self.min_doc_chars = min_doc_chars
+        # paragraph unit: an edited document is removed when more than this share of its tokens is cut (None: off)
+        self.max_removed_share = max_removed_share or None
+        self.drop_if_first_cut = bool(drop_if_first_cut)  # ... or when its first checked paragraph is cut
         self.marker_matcher = marker_matcher
         self.narrative_matcher = narrative_matcher  # policy "narrative_keywords" (Ukraine, Kyiv, NATO ...)
 
@@ -994,6 +998,14 @@ class Labeller:
             action = "removed"
         else:
             action = "edited"
+            share = tokens_removed / row["tokens"] if row["tokens"] else 0.0
+            first = min(para_rows, key=lambda pr: tuple(pr["span"]))  # the first checked paragraph
+            if self.max_removed_share is not None and share > self.max_removed_share:
+                action, row["removed_by"] = "removed", "removed_share"
+            elif self.drop_if_first_cut and tuple(first["span"]) in set(removed):
+                action, row["removed_by"] = "removed", "first_cut"
+            if action == "removed":
+                row["removed_share"] = round(share, 4)
         row["action"] = action
         clean = None
         if action != "removed":
@@ -1031,6 +1043,8 @@ class Stats:
         self.exceptions = collections.Counter(data.get("exceptions") or {})
         self.topic = collections.Counter({tuple(k.split("|", 1)): v for k, v in (data.get("topic_agreement") or {}).items()})
         self.non_english = collections.Counter(data.get("non_english") or {})  # "keyword:arabic" -> paragraphs
+        # edited documents removed by --max-removed-share ("removed_share") / --drop-if-first-cut ("first_cut")
+        self.removed_by = collections.Counter(data.get("removed_by") or {})
 
     def add(self, o: Outcome, group: Optional[str] = None) -> None:
         r = o.row
@@ -1040,6 +1054,8 @@ class Stats:
         a = r.get("action", "error")
         self.docs[a] += 1
         self.doc_tokens[a] += t
+        if r.get("removed_by"):
+            self.removed_by[r["removed_by"]] += 1
         self.tokens_removed += r.get("tokens_removed", 0)
         for pa in r.get("paragraphs") or []:
             self.paras[pa["action"]] += 1
@@ -1074,7 +1090,7 @@ class Stats:
         self.tokens_removed += o.tokens_removed
         self.rewrites += o.rewrites
         for a in ("docs", "doc_tokens", "paras", "para_tokens", "reasons", "label_paras", "label_tokens", "flags",
-                  "rewrite_names", "exceptions", "topic", "non_english"):
+                  "rewrite_names", "exceptions", "topic", "non_english", "removed_by"):
             getattr(self, a).update(getattr(o, a))
         for k, v in o.groups.items():
             self.groups.setdefault(k, collections.Counter()).update(v)
@@ -1089,6 +1105,7 @@ class Stats:
                 "groups": {k: dict(v) for k, v in self.groups.items()},
                 **({"exceptions": dict(self.exceptions)} if self.exceptions else {}),
                 **({"non_english": dict(self.non_english)} if self.non_english else {}),
+                **({"removed_by": dict(self.removed_by)} if self.removed_by else {}),
                 **({"topic_agreement": {f"{k}|{c}": v for (k, c), v in sorted(self.topic.items())}}
                    if self.topic else {})}
 
@@ -1113,6 +1130,14 @@ def format_report(summary: Dict[str, Any]) -> str:
         if st["docs"].get(a):
             L.append(f"  {a:<10} {st['docs'][a]:>9,}  {st['doc_tokens'].get(a, 0):>15,}   "
                      f"{_pct(st['doc_tokens'].get(a, 0), T)}")
+    if st.get("removed_by"):
+        lim = []
+        if sett.get("max_removed_share") is not None:
+            lim.append(f"max removed share {sett['max_removed_share']:g}")
+        if sett.get("drop_if_first_cut"):
+            lim.append("drop if first cut")
+        L.append("  removed instead of edited: " + ", ".join(f"{k} {v:,}" for k, v in sorted(st["removed_by"].items()))
+                 + (f" ({'; '.join(lim)})" if lim else ""))
     if st["paragraphs"]:
         L.append("")
         L.append("paragraphs      count       tokens (est.)")
@@ -1319,6 +1344,11 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
     if args.compress == "zst" and not zstd_available():
         print("error: --compress zst needs the 'zstandard' package", file=sys.stderr)
         return 2
+    max_share = getattr(args, "max_removed_share", None) or None  # 0 / None: off
+    if max_share is not None and not 0 < max_share <= 1:
+        print("error: --max-removed-share needs 0 < X <= 1 (e.g. 0.5)", file=sys.stderr)
+        return 2
+    drop_first = bool(getattr(args, "drop_if_first_cut", False))
     matcher, rules, markers = build_matchers(policy)
     rewrite = not args.no_rewrite and policy.rewrite_place_names and not simple  # simple: no clean copy
     rewriter = policy.rewriter(args.place_names, args.place_name_exceptions) if rewrite else None
@@ -1336,7 +1366,8 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                         args.text_field, args.id_field or None, args.review_as, args.min_doc_chars, markers,
                         args.group_field, narrative_matcher=build_narrative_matcher(policy),
                         topic_field=topic_field, topic_mode=topic_mode,
-                        unit=getattr(args, "decision_unit", None) or "paragraph")
+                        unit=getattr(args, "decision_unit", None) or "paragraph",
+                        max_removed_share=max_share, drop_if_first_cut=drop_first)
     labeller.want_counts = bool(schema and schema.needs("keyword_counts"))
     label_info = {k: {"level": lab.level, "decision": lab.decision} for k, lab in policy.labels.items()}
     total = Stats()
@@ -1514,6 +1545,7 @@ def cmd_run(args, scorer_override=None, records_for=None, extra: Optional[Dict[s
                      "topic_field": topic_field, "topic_mode": topic_mode if topic_field else None,
                      "text_field": args.text_field, "max_length": args.max_length, "group_field": args.group_field,
                      "shard": shard, "inflight": inflight, "decision_unit": labeller.unit,
+                     "max_removed_share": max_share, "drop_if_first_cut": drop_first,
                      "output_mode": "simple" if simple else "detail",
                      **({"schema": schema.path, "evidence": schema.evidence, "decisions_file": schema.kind}
                         if simple else {})},
@@ -1645,6 +1677,11 @@ def cmd_redecide(args) -> int:
     ns.uncertain_band = st.get("uncertain_band") or [0.6, 0.95]
     if not getattr(args, "decision_unit", None):
         ns.decision_unit = st.get("decision_unit") or "paragraph"
+    # not given on the command line: the run's own values (--max-removed-share 0 / off, --no-drop-if-first-cut: off)
+    if getattr(args, "max_removed_share", None) is None:
+        ns.max_removed_share = st.get("max_removed_share")
+    if getattr(args, "drop_if_first_cut", None) is None:
+        ns.drop_if_first_cut = bool(st.get("drop_if_first_cut"))
     ns.limit, ns.overwrite = None, True
     return cmd_run(ns, scorer_override=scorer, records_for=records_for, extra={"from": str(run)})
 
@@ -2212,6 +2249,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="hint: field yes = subject yes, the rest by the models; trust: mapped subjects by the field "
                         "only; off: recorded and compared, not used (default: the policy's, else hint)")
     r.add_argument("--min-doc-chars", type=int, default=50, help="shorter after cleaning = document removed")
+    r.add_argument("--max-removed-share", type=_share_arg, default=None, metavar="X",
+                   help="paragraph unit: an edited document with more than this share of its tokens cut "
+                        "(0 < X <= 1, e.g. 0.5) is removed instead (default off)")
+    r.add_argument("--drop-if-first-cut", action="store_true",
+                   help="paragraph unit: an edited document whose first checked paragraph is cut is removed")
     r.add_argument("--decision-unit", choices=list(DECISION_UNITS), default="paragraph",
                    help="paragraph (default): removed paragraphs are cut out; line: the strictest paragraph "
                         "(remove > review > keep > pass) decides the whole line, kept whole or dropped")
@@ -2288,6 +2330,7 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--topic-field", default=None, help="default: the one the run used")
     d.add_argument("--topic-mode", choices=list(TOPIC_MODES), default=None)
     d.add_argument("--min-doc-chars", type=int, default=50)
+    _drop_rule_args(d)
     d.add_argument("--decision-unit", choices=list(DECISION_UNITS), default=None,
                    help="default: the one the run used")
     d.add_argument("--output-mode", choices=["detail", "simple"], default="detail")
@@ -2306,10 +2349,40 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--text-field", default="text")
     x.add_argument("--id-field", default="id")
     x.add_argument("--min-doc-chars", type=int, default=50)
+    _drop_rule_args(x)
     x.add_argument("--chunk-lines", type=int, default=256)
     import nli_kwstats  # keyword / marker statistics, no models (cmds/labeling/keyword_stats.md)
     nli_kwstats.add_parser(sub)
     return ap
+
+
+def _share_arg(v: str) -> float:
+    """--max-removed-share of 'run': 0 < X <= 1."""
+    try:
+        x = float(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {v}")
+    if not 0 < x <= 1:
+        raise argparse.ArgumentTypeError("needs 0 < X <= 1 (e.g. 0.5)")
+    return x
+
+
+def _share_or_off(v: str) -> float:
+    """--max-removed-share of 'redecide' / 'export': 0 < X <= 1, or 0 / off to turn the run's value off."""
+    if str(v).strip().lower() in ("off", "none", "0", "0.0"):
+        return 0.0
+    return _share_arg(v)
+
+
+def _drop_rule_args(p) -> None:
+    """--max-removed-share / --drop-if-first-cut of redecide and export: not given = the run's recorded values."""
+    p.add_argument("--max-removed-share", type=_share_or_off, default=None, metavar="X",
+                   help="paragraph unit: an edited document with more than this share of its tokens cut is "
+                        "removed (0 < X <= 1; 0 or off: no limit; default: the run's)")
+    p.add_argument("--drop-if-first-cut", dest="drop_if_first_cut", action="store_const", const=True, default=None,
+                   help="an edited document whose first checked paragraph is cut is removed (default: the run's)")
+    p.add_argument("--no-drop-if-first-cut", dest="drop_if_first_cut", action="store_const", const=False,
+                   help="turn --drop-if-first-cut off (when the run had it)")
 
 
 def _utf8_console() -> None:

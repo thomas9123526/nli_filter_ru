@@ -15,6 +15,7 @@ import { TryTrace } from "./TryTrace";
 import { ExpectBadge, ExpectedPanel } from "./ExpectedPanel";
 import { TextTools } from "./TextTools";
 import { useRestoreScroll, useUrlState } from "@/lib/urlState";
+import { LabLink } from "./LabLink";
 
 const PAGE = 50;
 const DOC_ACTIONS = ["untouched", "pass", "kept", "review", "edited", "removed", "error"];
@@ -66,8 +67,8 @@ function LinePanel({ run, file, line, profile, onClose }: { run: string; file: s
         {d?.expect ? <span data-testid="simple-line-expect"><ExpectBadge v={d.expect} /></span> : null}
         <span className="spacer" />
         {d?.text ? <TextTools text={d.text} source={{ run, file, line, id: (d.row?.id as string) ?? null }} row={d.row ?? undefined} testid="simple-tools" /> : null}
-        {d?.text ? <Link className="btn small" data-testid="simple-lab" href={href("/label/lab", { run, file, line })}
-          title="Open the Experiment page with this line">Experiment →</Link> : null}
+        {d?.text ? <LabLink className="btn small" testid="simple-lab" params={{ run, file, line }} line={line}
+          title="Open the Experiment page with this line">Experiment →</LabLink> : null}
         <button className="btn small primary" disabled={!d?.text || busy} onClick={explain} data-testid="simple-explain"
           title="check this line again through the model service, with the policy and settings this run recorded">{busy ? "Checking…" : "Explain this line"}</button>
         <button className="btn small ghost" onClick={onClose}>close ✕</button>

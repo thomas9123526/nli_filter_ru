@@ -76,6 +76,10 @@ class Playground:
 
     # ---- nli_filter.py runs (started by the service, in its torch environment) -------------------
 
+    def clear_cache(self) -> Dict[str, Any]:
+        """Empty the model service's score table (the Experiment page's reuse of scored pairs)."""
+        return self._call("/cache/clear", {}, timeout=30)
+
     def label(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """nli_label.py policy labels on a few texts (the policy Try page). Slow on a CPU: ~1 s per label."""
         return self._call("/label", body, timeout=1800)

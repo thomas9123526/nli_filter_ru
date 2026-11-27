@@ -500,6 +500,19 @@ mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent);
 /* a narrow trace (e.g. base | draft side by side on the Experiment page): the side note goes under the box */
 @container (max-width: 560px) { .trace-stage { grid-template-columns: minmax(0, 1fr); gap: 0; } .trace-side { padding-left: 12px; padding-top: 4px; } }
 
+/* "Whole line": how the paragraphs give the line's result (document page, Experiment traces) */
+.whole-line { margin-top: 8px; }
+.whole-paras { margin: 6px 0 0; padding-left: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; }
+.whole-paras li { padding: 2px 6px; border-radius: 6px; }
+.whole-paras li.on { background: var(--panel-2); }
+.whole-paras .chip { font-size: 11px; margin-left: 4px; }
+/* a narrow trace: keep the score number whole (smaller bar, columns sized to their content) */
+@container (max-width: 560px) {
+  .trace-sc { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; }
+  .trace-sc .scorebar { width: 44px; }
+}
+.trace-sc > :nth-child(2) { white-space: nowrap; }
+
 /* settings (/settings): cards with an icon */
 .settings-group { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }

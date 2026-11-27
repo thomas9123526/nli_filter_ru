@@ -66,7 +66,9 @@ def srv(tmp_path_factory):
          "profiles": {"strict": {"same": [["pass", "untouched", "none"]]},
                       "quick": {"same": [["keep", "pass", "untouched", "none"]], "note": "text kept = match"}}}), encoding="utf-8")
     inp = proj / "dataset" / "corpus" / "b_test.jsonl"
-    inp.write_text("".join(json.dumps({"id": f"t{i}", "text": t, "expected_action": e}) + "\n"
+    tags = ["clear", "clear", "hard", "ambiguous"]   # the benchmark's clarity tags (11_27 task 3)
+    inp.write_text("".join(json.dumps({"id": f"t{i}", "text": t, "expected_action": e, "clarity": tags[i - 1],
+                                       "clarity_reason": f"reason {i}"}) + "\n"
                            for i, (t, e) in enumerate(LINES, 1)), encoding="utf-8")
     big = proj / "dataset" / "corpus2" / "big.jsonl"  # 60 lines: two pages on the run page
     big.write_text("".join(json.dumps({"id": f"b{i}", "text": f"Line {i}: a long paragraph about Russian ballet, film {i}."}) + "\n"
@@ -523,3 +525,127 @@ def test_expected_file_jumps_to_its_line(srv, tmp_path):
         await asyncio.sleep(0.1)
 
     _browser(tmp_path, scenario)
+
+
+def test_clarity_tags_scores_filter_nav(srv, tmp_path):
+    """11_27 task 3: the benchmark's clarity tags - per-tag scores in Expected vs result, a badge per line, the run
+    page's clarity filter, Prev / Next "stop at" a tag. o_detail lines: remove/clear, keep/clear, untouched/hard
+    (expected keep), remove/ambiguous (expected flag)."""
+    import urllib.request
+    from urllib.parse import urlencode
+
+    def get(path, **q):
+        return json.loads(urllib.request.urlopen(srv + path + ("?" + urlencode(q) if q else "")).read())
+    ex = get("/api/labels/o_detail/expected", profile="strict")["expected"]
+    assert ex["by_clarity"] == {"clear": {"n": 2, "ok": 2, "review": 0}, "hard": {"n": 1, "ok": 0, "review": 0},
+                                "ambiguous": {"n": 1, "ok": 1, "review": 0}}, ex["by_clarity"]
+    assert ex["wrong"][0]["clarity"] == "hard" and ex["wrong"][0]["clarity_reason"] == "reason 3"
+    d = get("/api/labels/o_detail/docs", file="b_test", clarity="hard", gated="false")
+    assert [r["line"] for r in d["rows"]] == [3] and d["clarities"] == {"clear": 2, "hard": 1, "ambiguous": 1}
+    assert d["rows"][0]["expect"]["clarity"] == "hard"
+    n = get("/api/labels/o_detail/nav", file="b_test", line=1, crit="clarity:ambiguous", dir="next")
+    assert n["target"]["line"] == 4 and n["pos"]["clarity"] == "ambiguous" and n["clarities"] == ["ambiguous", "clear", "hard"]
+    page = dom(srv + "/label/run/?run=o_detail&profile=strict", tmp_path)
+    assert 'data-testid="clarity-scores"' in page and 'data-testid="clarity-filter"' in page
+    assert 'data-testid="clarity-badge"' in page and "reason 3" in page
+    lab = dom(srv + "/label/lab/?run=o_detail&file=b_test&line=1", tmp_path)
+    assert 'data-testid="lab-crit-clarity:hard"' in lab
+
+
+def test_no_clarity_without_tags(srv, tmp_path):
+    """A run whose corpus has no tags (o_big): no clarity parts, no errors."""
+    import urllib.request
+    from urllib.parse import urlencode
+    d = json.loads(urllib.request.urlopen(srv + "/api/labels/o_big/docs?" + urlencode({"file": "big"})).read())
+    assert "clarities" not in d
+    n = json.loads(urllib.request.urlopen(srv + "/api/labels/o_big/nav?" + urlencode({"file": "big", "line": 1})).read())
+    assert n["clarities"] == [] and n["pos"]["clarity"] is None
+    page = dom(srv + "/label/run/?run=o_big", tmp_path)
+    assert 'data-testid="clarity-filter"' not in page and 'data-testid="clarity-scores"' not in page
+
+
+def test_experiment_expected_vs_decided(srv, tmp_path):
+    """11_27 task 5: a text from a run line shows its expected action; after Run, base / draft ✓ / ✗ with the profile
+    switch; an edited text says so; a pasted text has none. (The model service is not reachable in this fixture, so
+    the run itself is not checked here; the lab/base endpoint and the badge are.)"""
+    import urllib.request
+    from urllib.parse import urlencode
+    b = json.loads(urllib.request.urlopen(srv + "/api/labels/lab/base?" + urlencode({"run": "o_detail", "file": "b_test", "line": 3})).read())
+    assert b["expected"] == {"expected_action": "keep", "clarity": "hard", "clarity_reason": "reason 3"}
+    page = dom(srv + "/label/lab/?run=o_detail&file=b_test&line=3", tmp_path)
+    assert 'data-testid="lab-expected-0"' in page and "b_test line 3" in page and 'data-testid="lab-exp-profile"' in page
+
+
+def test_experiment_back_to_where_it_was_opened(srv, tmp_path):
+    """11_27 task 8: "◂ Back to the run" returns to the run page as it was left (filters, profile), after Prev / Next."""
+    import asyncio
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/run/?run=o_detail&profile=strict&action=removed")
+        assert await wait_for("!!document.querySelector('[data-testid=row-lab]')")
+        await js("document.querySelector('[data-testid=row-lab]').click()")
+        assert await wait_for("location.pathname.startsWith('/label/lab') && location.search.includes('back=')")
+        assert await wait_for("(document.querySelector('[data-testid=lab-back]')?.textContent || '').includes('Back to the run')")
+        await js("document.querySelector('[data-testid=lab-next]').click()")
+        assert await wait_for("location.search.includes('line=2') && location.search.includes('back=')")
+        await js("document.querySelector('[data-testid=lab-back]').click()")
+        assert await wait_for("location.pathname.startsWith('/label/run')")
+        q = await js("location.search")
+        assert "profile=strict" in q and "action=removed" in q and "run=o_detail" in q, q
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
+
+
+def test_blank_experiment_page(srv, tmp_path):
+    """11_27 task 10: /label/lab/blank/ — no run, one empty box, a policy picker (the draft's changes carried onto the
+    new policy), run-only parts hidden, the draft kept over a reload, "New blank"."""
+    import asyncio
+
+    set_value = """((sel, v) => { const i = document.querySelector(sel);
+        const proto = i.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, 'value').set.call(i, v);
+        i.dispatchEvent(new Event('input', {bubbles: true})); })"""
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/lab/blank/")
+        assert await wait_for("!!document.querySelector('[data-testid=lab-policy-pick]') && !!document.querySelector('[data-testid=lab-text-0]')")
+        assert await js("document.querySelector('[data-testid=lab-text-0] textarea').value") == ""
+        for tid in ("lab-nav", "lab-apply"):
+            assert not await js(f"!!document.querySelector('[data-testid={tid}]')"), tid
+        assert "Experiment (blank)" in await js("document.querySelector('h1').textContent")
+        await js(f"{set_value}('[data-testid=lab-text-0] textarea', 'Some text about Moscow ballet.')")
+        await js(f"{set_value}('[data-testid=lab-new-key]', 'weather3')")
+        await js(f"{set_value}('[data-testid=lab-new-hyp]', 'This text is about snow.')")
+        assert await wait_for("!document.querySelector('[data-testid=lab-new-add]').disabled")
+        await js("document.querySelector('[data-testid=lab-new-add]').click()")
+        assert await wait_for("document.querySelector('[data-testid=lab-diff]').textContent.includes('added label weather3')")
+        # switch the policy: the change is carried
+        await js("window.confirm = () => true")
+        await js("""(() => { const s = document.querySelector('[data-testid=lab-policy-pick]');
+            Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'policy/two.json');
+            s.dispatchEvent(new Event('change', {bubbles: true})); })()""")
+        ok = await wait_for("location.search.includes('two.json') && document.querySelector('[data-testid=lab-diff]').textContent.includes('added label weather3')")
+        assert ok, await js("location.href + ' | ' + (document.querySelector('[data-testid=lab-diff]')?.textContent || 'NO DIFF') + ' | ' + (document.querySelector('[data-testid=lab-policy-pick]')?.value)")
+        assert "gate2" not in await js("document.querySelector('[data-testid=lab-diff]').textContent")
+        # kept over a reload
+        await call("Page.reload")
+        assert await wait_for("(document.querySelector('[data-testid=lab-text-0] textarea')?.value || '').includes('Moscow ballet')")
+        await js("window.confirm = () => true")
+        await js("document.querySelector('[data-testid=lab-new-blank]').click()")
+        assert await wait_for("document.querySelector('[data-testid=lab-text-0] textarea').value === '' && document.querySelector('[data-testid=lab-diff]').textContent.includes('no change')")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
+    home = dom(srv + "/label/", tmp_path)
+    assert 'data-testid="lab-blank-link"' in home
+
+
+def test_whole_line_on_the_document_page(srv, tmp_path):
+    """11_27 task 11: the document page's "Whole line" step: every paragraph, the document rule, the strictest action
+    and the expected check."""
+    page = dom(srv + "/label/doc/?run=o_detail&file=b_test&line=1", tmp_path)
+    assert 'data-testid="whole-line"' in page and 'data-testid="whole-line-result"' in page
+    assert "Line result for the expected check" in page and "decides" in page

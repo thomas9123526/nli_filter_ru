@@ -48,9 +48,14 @@ note, and expects `benchmark_ru_llm_<russian|ukrainian>_<topic>_vN.jsonl`. Chang
 - Text, ids and line numbers of existing sets stay as they are, so existing runs stay valid.
 
 Then rebuild `dataset\corpus_benchmark` (all sides: russian, ukrainian, shared) and `dataset\corpus_benchmark_russian`
-(as now: only the `russian_*` sets, now 8 topics with culture and values, folder `<topic>\russian_<topic>__vN`).
+(as now: only the `russian_*` sets, now 9 topics with culture and values, folder `<topic>\russian_<topic>__vN`).
 **Open (default used unless the user says otherwise):** contested_history and negative_controls go only into the full
 corpus, not into corpus_benchmark_russian.
+
+**DONE 2026-11-27.** `tools\build_benchmark_corpus.py` keeps every source field (source `group` → `control_group`),
+accepts any `benchmark_ru_llm_<name>_v<N>` (no side → `shared\<name>\`), has `--sides` / `--flat`, prints and records
+lines per side and per clarity; both corpora rebuilt (old ids, texts and fields unchanged; see
+`cmds\labeling\benchmark_corpus.md`).
 
 ### 2. Nothing breaks without tags (about 10 min)
 
@@ -58,7 +63,13 @@ corpus, not into corpus_benchmark_russian.
 without them, a set without a side, a source `group`; a label run on a corpus without tags gives the same labels file
 as before; the viewer's expected panel, run page and nav on a run without tags show no clarity parts and no errors.
 
+**DONE 2026-11-27.** `nli_label.py` reads only `id` / `text` (unchanged); `tests\test_build_benchmark_corpus.py` covers
+the builder cases and a label run with and without the extra fields giving the same labels file (the viewer checks
+belong with task 3).
+
 ### 3. The viewer uses the tags (about 30–40 min)
+
+**DONE 2026-11-27.** Per-tag scores, badges, run-page filter, Prev / Next stop-at; nothing on runs without tags (tests in test_ui_11_25.py).
 
 Read `clarity` (and `clarity_reason`) with the other expected fields (`LabelRuns.expected`):
 - **Expected vs result**: when any line has a tag, three scores next to the total, per the audit's recommendation:
@@ -73,10 +84,14 @@ Read `clarity` (and `clarity_reason`) with the other expected fields (`LabelRuns
 
 ### 4. Docs and tests (about 15 min)
 
+**DONE 2026-11-27.** Docs: benchmark_corpus.md, labels_pages.md, output_modes.md. Tests: project 319 passed (2 skipped); viewer 307 passed (one browser test, the Back button, failed once in a full run under load and passed in two reruns).
+
 `cmds\labeling\benchmark_corpus.md`: the two new fields and the rebuild; `cmds\viewer\labels_pages.md`: the scores,
 badges, filter and stop-at options. Backend and browser tests; the full suites.
 
 ### 5. Expected vs decided on the Experiment page (about 45 min – 1 h)
+
+**DONE 2026-11-27.** `sources` in the draft; expected / base / draft ✓ ✗, strict / quick, fixed / broken, text edited.
 
 Asked 2026-11-27 ("this page should show expected vs decided at the output result"). A text that comes from a run line
 (the page's own line, Prev / Next, "add a line … did not get as expected") keeps where it came from: the draft gets a
@@ -89,6 +104,8 @@ line: "text edited" next to the expected (still shown). Saved drafts keep `sourc
 
 ### 6. Score again without the cache (about 30 min)
 
+**DONE 2026-11-27.** "score again (no cache)", "Clear score cache" (`POST /api/labels/cache/clear`), pairs scored vs from the cache.
+
 The instant result is the model service's in-memory score table (`CachedScorer` in nli_playground.py, kept until the
 service restarts, keyed by the model names and judge band, so a cached score equals a fresh one for the same models).
 On the Experiment page: a checkbox **"score again (no cache)"** next to "Run draft and base" (sends `reuse_scores:
@@ -98,6 +115,8 @@ pairs, M reused" — add the time so a real run is visible.
 
 ### 7. One automatic draft per identical draft (about 20–30 min)
 
+**DONE 2026-11-27.** In `lab_drafts.save` (`drop_duplicates`); the page says "same as your draft …".
+
 Asked 2026-11-27 ("the automatic items should be replaced if two environments are identical"). Identical = the same
 draft policy and run settings (texts and the line it came from do not count). When an automatic draft is saved, an
 older automatic draft identical to it is deleted (the newest stays, with its texts); when a named draft is identical,
@@ -105,6 +124,8 @@ the automatic one is not kept at all (the named one already has it). Named draft
 The list shows "same as test1" when an automatic draft equals a named one (only until it is replaced).
 
 ### 8. A "◂ Back to …" button on the Experiment page (about 30–45 min)
+
+**DONE 2026-11-27.** `LabLink` adds `back=` on every Experiment link; Prev / Next keep it.
 
 Asked 2026-11-27. Not the same as the browser's Back: since Prev / Next, every step is a history entry, so the
 browser's Back goes line by line (12 → 11 → 10 …). The button returns in one click to the page the Experiment was
@@ -117,6 +138,8 @@ Without `back` (a typed or old link): to the run page of `run`, else `/label/`. 
 
 ### 9. Quick as the default profile (about 10 min)
 
+**DONE 2026-11-27.** `labels\expected_rules.json` has `"default": "quick"`; labels_pages.md says so.
+
 Asked 2026-11-27 ("I want quick in default when the run page opens normally"). Checked: the profile is kept in the
 URL (`&profile=quick`), so the browser's Back shows quick again after it was chosen; a plain link shows the default,
 `"default": "strict"` in `labels\expected_rules.json`. Change it to `"default": "quick"` (the same as Settings →
@@ -125,6 +148,8 @@ runs, document page, Experiment); strict stays one click away and in links that 
 strict is the default.
 
 ### 10. A blank Experiment page with its own address (about 30–45 min)
+
+**DONE 2026-11-27.** `/label/lab/blank/` = `LabView blank`; the default policy falls back to the first policy file when the Russia-side one is missing.
 
 Asked 2026-11-27: "a new page like Experiment that does not load text from the datasets; I type any text; URL like
 /label/try/blank; the policy like the Experiment page's; layout, buttons and functions the same".
@@ -150,6 +175,8 @@ with every Experiment function. What is missing, and what to build:
 
 ### 11. How the line's result comes out of its paragraphs (about 45 min – 1 h)
 
+**DONE 2026-11-27.** `components/WholeLine.tsx` on the document page and in both Experiment traces; score numbers kept whole in narrow traces.
+
 Asked 2026-11-27, on `/label/lab/?run=out_label_benchmark_russian_detail&file=russian_persons__v2&line=3` and the same
 line's document page: "¶1 is remove, ¶2 is keep, the final is remove, but no part shows how the final comes out; the
 document page shows one paragraph at a time but no analysis of the several paragraphs together".
@@ -173,6 +200,8 @@ Also fix: in a narrow trace the score number next to the bar is cut off ("0.85�
 Experiment page): keep the number whole (smaller bar or the number on its own line).
 
 ### 12. Spaces checked when keyword files are saved (about 30 min)
+
+**DONE 2026-11-27.** `_tidy_list` in api.py: reported by the check (+ "Trim spaces"), trimmed by the save. Not trimmed while typing in the table (it would eat the space in "Saint Petersburg").
 
 Asked 2026-11-27: `keywords/russia_v3.txt` got the line `Petersburg<space><TAB>B<TAB>place<TAB>Russia` from a save on
 the viewer's files page (`/label/files/`, the table's keyword box keeps what is typed). Checked: harmless today —
@@ -213,3 +242,10 @@ Example with 0.5: russian_persons v2 line 3 (61 of 161 tokens cut, 38 %) stays e
 - Line unit: not used (a line is kept or dropped whole anyway).
 - Docs: `cmds\labeling\output_modes.md` / the labelling guide; tests: below / at / above the limit, off by default,
   first-paragraph option, redecide, the summary count.
+
+**DONE 2026-11-27 (nli_label.py part).** `--max-removed-share X` / `--drop-if-first-cut` in `run`, `redecide` and The viewer part is done too: max removed share / --drop-if-first-cut on the Start-a-run form and the redecide panel; the Whole line step says why a document was removed.
+`export` (redecide / export keep the run's values unless given; `--max-removed-share off`, `--no-drop-if-first-cut`),
+row fields `removed_by` (`removed_share` / `first_cut`) + `removed_share`, `settings.max_removed_share` /
+`settings.drop_if_first_cut`, `stats.removed_by` per run and per file, docs in `cmds\labeling\output_modes.md`, tests
+in `tests\test_max_removed_share.py`; the viewer parts (Start-a-run form, redecide panel, document page / "Whole line"
+text) are done by someone else.

@@ -270,13 +270,14 @@ none, and these pages look as before.
 
 ### What counts as expected: `labels\expected_rules.json` (`/label/expected-rules/`)
 
-    {"default": "strict",
+    {"default": "quick",
      "profiles": {"strict": {"same": [["pass", "untouched", "none"]]},
                   "quick":  {"same": [["keep", "pass", "untouched", "none"]], "note": "text kept = match"}},
      "aliases": {"flag": "remove"}}
 
 - **Profiles**: each has groups of actions that count as equal (`same`). `quick` makes keep = pass = untouched (the
-  text stays in) for a quick review. As many profiles as wanted; `default` is used when a page does not choose one.
+  text stays in) for a quick review. As many profiles as wanted; `default` is used when a page does not choose one. The shipped default is `quick` (since 2026-11-27; strict
+  stays one click away and in links with `&profile=strict`).
 - **Aliases**: an expected value replaced before comparing, e.g. the benchmark's 14 `flag` lines → `remove`. Without
   an alias they stay mismatches. The shipped file has no alias (decide it on the editor page).
 - **On the panel**: a switch strict / quick / …; the counts and the wrong lines change at once, and a match made by a
@@ -462,3 +463,60 @@ card opens the page where that setting is shown and edited (checked while typing
 
 On those pages the top bar highlights **Settings** and the crumb leads back to `/settings`. `/label/` keeps the tools
 (Try, Experiment, Compare runs, Clean up run folders, Keyword statistics) and a "Settings →" link.
+
+## Benchmark clarity tags (clear / hard / ambiguous)
+
+Benchmark lines carry the audit's `clarity` (clear / hard / ambiguous), `clarity_reason` and, for negative controls,
+`gate_expected` (kept in the corpus by `tools\build_benchmark_corpus.py`, see `cmds\labeling\benchmark_corpus.md`).
+Where a run's corpus has them:
+- **Expected vs result**: three scores under the counts — **clear** ok / n (%), **hard** ok / n (%), **ambiguous →
+  review** (how many ambiguous lines the run sent to review); they follow the strict / quick switch. The
+  not-as-expected list has a **Clarity** column (the reason on hover; "gate: no" for a negative control).
+- **Run page**: the badge in the Expected column and a **clarity** filter (`&clarity=hard`), with the counts.
+- **Experiment Prev / Next**: "stop at" **clear**, **hard**, **ambiguous**; the position shows the line's tag.
+- Runs on corpora without tags: none of this appears. API: `by_clarity` in `/api/labels/{run}/expected`,
+  `clarity=` on `/docs`, `clarity:<tag>` in `/nav`'s `crit`.
+
+## Experiment page additions (2026-11-27)
+
+- **Expected vs decided**: a text that came from a run line (the page's own line, Prev / Next, "add a line …") keeps
+  where it came from (`sources` in the draft): **expected X**, **base ✓ / ✗**, **draft ✓ / ✗** with its own strict /
+  quick switch, **fixed** (the draft gets right what the base got wrong) / **broken**, "text edited" when changed, the
+  clarity tag and "file line N". Typed texts have none. `GET /api/labels/lab/base` returns the line's `expected`.
+- **Score again**: "score again (no cache)" (the model service forgets its scored pairs first, so the base run scores
+  everything with the models) and **Clear score cache**; the result line says how many pairs the model scored and how
+  many came from the cache, base and draft separately. API: `POST /api/labels/cache/clear` (model service
+  `POST /cache/clear`). A cached score equals a fresh one for the same models.
+- **Automatic drafts**: an older automatic draft identical to the new one (same draft policy and run settings; texts
+  do not count) is replaced; when a named draft is identical, no automatic copy is kept ("same as your draft …").
+- **◂ Back to …**: back in one click to the page the Experiment was opened from (the run page, line N, the corpus, the
+  comparison), as it was left — every Experiment link adds `back=`, Prev / Next keep it. The browser's Back still
+  goes line by line.
+- **Whole line** (also on the document page): every paragraph in order (checked or "not checked (no keyword or
+  marker)"), its action, reason and positive labels with scores, which one **decides** (the strictest), the document
+  rule ("¶1 cut, the rest kept → edited · 61 of 161 tokens removed", or why it was removed) and the line result for
+  the expected check ("strictest remove (from ¶1) · expected keep ✗"). "(from ¶N)" next to base → draft. A click on
+  a paragraph shows its flow. In narrow traces the score number is no longer cut off.
+
+## The blank Experiment page (`/label/lab/blank/`)
+
+The Experiment page with no run line: one empty text box to type in, a **policy** picker (every `policy/*.json`; the
+draft's changes are carried onto the newly chosen policy), **New blank** (clears texts and draft), and everything
+else as on the Experiment page (draft table, Run draft and base, traces, Whole line, saved drafts, Hide, Save).
+Prev / Next, "add a line from the run", "Apply to the whole run" and expected badges are not shown (no run). Linked
+from `/label/` ("Blank experiment →") and from a run's Experiment page ("Open blank →").
+
+## Stray spaces in keyword files (`/label/files/`)
+
+The check reports every cell that starts or ends with a space, and double spaces inside a keyword ("line 62:
+'Petersburg ' ends with a space"), with a **Trim spaces** button; the save trims them anyway and says how many lines it
+fixed. Comment lines, the tabs between columns and the inside of other cells (e.g. an exclude regex) stay as they are.
+(The reader `nli_filter.parse_keyword_line` already ignored such spaces; the files are now tidy too.) Adding a row:
+"+ add a row" is below the table and adds at the end of the file.
+
+## Dropping documents that lose too much (run form, redecide panel)
+
+The Start-a-run form has **max removed share** and **--drop-if-first-cut**, the run page's redecide panel the same
+(empty = the run's own values; 0 = off). See `cmds\labeling\output_modes.md`. The document page's Whole line says why
+a document was removed (e.g. "75 % of the tokens would be cut, above the limit").
+

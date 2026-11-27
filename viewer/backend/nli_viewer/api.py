@@ -228,6 +228,8 @@ class RedecideBody(BaseModel):
     output_dir: str                               # a new folder name, created in the project's dataset/ folder
     write_clean: bool = False
     review_as: Optional[str] = None               # keep | remove (default: nli_label.py's, keep)
+    max_removed_share: Optional[float] = None     # drop a document when more than this share is cut; 0 = off;
+    drop_if_first_cut: Optional[bool] = None      # None = the run's own values (nli_label.py redecide)
 
 
 class SaveDocsBody(BaseModel):
@@ -1081,6 +1083,10 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             if file and line:
                 text, problem, src = labels.source_text(d, file, int(line))
                 out.update(text=text, problem=problem, source={"run": run, "file": file, "line": line, "input": src})
+                e = labels.expected(d, file).get(int(line))
+                if e and e.get("expected_action"):   # the line's expected result (a test / benchmark corpus)
+                    out["expected"] = {k: e[k] for k in ("expected_action", "acceptable", "note", "clarity",
+                                                         "clarity_reason", "gate_expected") if k in e}
                 if text and para is not None:
                     row = None
                     try:
@@ -1095,6 +1101,9 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         rel = (pol_path or "policy/russia_llm_policy_v2.json").replace("\\", "/")
         m = re.search(r"policy/[A-Za-z0-9_.-]+\.json$", rel)
         rel = m.group(0) if m else "policy/russia_llm_policy_v2.json"
+        if not pol_path and not (project / rel).is_file():   # no default policy here: the first one there is
+            first = sorted(p for p in (project / "policy").glob("*.json") if not _is_non_english_file(p))
+            rel = f"policy/{first[0].name}" if first else rel
         f = project / rel
         if f.is_file():
             raw = f.read_bytes()
@@ -1288,6 +1297,53 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         kind = "keywords" if m.group(1) else "place_names" if m.group(2) else "exceptions"
         return project / rel, kind
 
+    def _tidy_list(kind: str, text: str) -> Tuple[str, List[str]]:
+        """Stray spaces in a keyword list / place-name table / exceptions file: every cell without spaces at its start
+        and end, and a run of spaces inside the keyword (first cell) made one. Comment and blank lines, the tabs between
+        columns and the inside of other cells (e.g. exclude regexes) stay as they are. Returns (text, notes per line)."""
+        import csv
+        import io
+        notes: List[str] = []
+        out_lines = []
+        for i, line in enumerate(text.split("\n"), 1):
+            end = "\r" if line.endswith("\r") else ""
+            body = line[:-1] if end else line
+            if not body.strip() or body.lstrip().startswith("#"):
+                out_lines.append(line)
+                continue
+            if kind == "keywords":
+                cells = body.split("\t")
+            elif kind == "place_names":
+                try:
+                    cells = next(csv.reader([body]))
+                except (csv.Error, StopIteration):
+                    out_lines.append(line)
+                    continue
+            else:
+                cells = [body]
+            new = [c.strip() for c in cells]
+            if new and kind != "exceptions":
+                new[0] = re.sub(r" {2,}", " ", new[0])
+            if new == cells:
+                out_lines.append(line)
+                continue
+            what = []
+            for k, (a, b) in enumerate(zip(cells, new)):
+                if a != b:
+                    what.append(f"{a!r}" + (" starts with a space" if a[:1].isspace() else
+                                            " ends with a space" if a[-1:].isspace() else " has a double space"))
+            notes.append(f"line {i}: " + "; ".join(what))
+            if kind == "keywords":
+                body = "\t".join(new)
+            elif kind == "place_names":
+                buf = io.StringIO()
+                csv.writer(buf, lineterminator="").writerow(new)
+                body = buf.getvalue()
+            else:
+                body = new[0]
+            out_lines.append(body + end)
+        return "\n".join(out_lines), notes
+
     def _check_list(kind: str, text: str, sample: Optional[str] = None,
                     other: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Problems that stop a save (the same parsers nli_label.py uses), counts, and a place-name preview."""
@@ -1295,6 +1351,9 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         import tempfile
         errors: List[str] = []
         out: Dict[str, Any] = {"ok": True, "errors": errors}
+        tidy_text, tidy_notes = _tidy_list(kind, text)
+        if tidy_notes:
+            out["spaces"] = {"count": len(tidy_notes), "lines": tidy_notes[:50], "text": tidy_text}
         if kind == "keywords":
             from nli_filter import parse_keywords
             try:
@@ -1403,14 +1462,15 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         if body.base_sha and hashlib.sha1(raw).hexdigest() != body.base_sha:
             raise HTTPException(409, f"{body.path} was changed by someone else since you loaded it: reload the page "
                                      "(your edits are still on the page; copy what you need first)")
-        chk = _check_list(kind, body.text)
+        text_in, trimmed = _tidy_list(kind, body.text.replace("\r\n", "\n"))
+        chk = _check_list(kind, text_in)
         if not chk["ok"]:
             raise HTTPException(400, "; ".join(chk["errors"][:8]))
         bdir = f.parent / ".backup"
         bdir.mkdir(exist_ok=True)
         b = bdir / f"{f.stem}.{time.strftime('%Y%m%d-%H%M%S')}{f.suffix}"
         shutil.copy2(f, b)
-        text = body.text.replace("\r\n", "\n")
+        text = text_in
         if not text.endswith("\n"):
             text += "\n"
         crlf = b"\r\n" in raw
@@ -1419,7 +1479,8 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             fh.write(text)
         tmp.replace(f)
         return {"path": body.path, "sha": hashlib.sha1(f.read_bytes()).hexdigest(),
-                "backup": b.relative_to(project).as_posix(), "check": chk}
+                "backup": b.relative_to(project).as_posix(), "check": chk, "trimmed": len(trimmed),
+                **({"trimmed_lines": trimmed[:50]} if trimmed else {})}
 
     def _case_files() -> List[Path]:
         """labels/cases_vN.json (newest last), then other labels/*cases_vN.json sets (e.g. russia_llm_cases_v1.json)."""
@@ -1542,6 +1603,13 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
         return {"file": body.file, "sha": hashlib.sha1(pick.read_bytes()).hexdigest(), "backup": f"labels/.backup/{backup.name}",
                 "cases": len(data["cases"]), "texts": texts, "corpus": corpus}
 
+    @app.post("/api/labels/cache/clear", tags=["labels"])
+    def label_cache_clear(request: Request):
+        """The Experiment page's "Clear score cache": the model service forgets every scored pair, so the next run
+        scores everything with the models again."""
+        save_guard(request)
+        return pg.clear_cache()
+
     @app.post("/api/labels/try", tags=["labels"])
     def label_try(body: TryLabelBody):
         """Policy labels (level 0 / 1 / 2, decision) on up to 20 texts, through the model service."""
@@ -1614,6 +1682,12 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
             if body.review_as not in ("keep", "remove"):
                 raise HTTPException(400, "review_as must be keep or remove")
             args += ["--review-as", body.review_as]
+        if body.max_removed_share is not None:
+            if not 0 <= body.max_removed_share <= 1:
+                raise HTTPException(400, "max_removed_share must be between 0 (off) and 1")
+            args += ["--max-removed-share", format(body.max_removed_share, "g")]
+        if body.drop_if_first_cut is not None:
+            args.append("--drop-if-first-cut" if body.drop_if_first_cut else "--no-drop-if-first-cut")
         job = pg.start_job(args, {}, f"labels: redecide {name} -> {body.output_dir}", script="nli_label.py")
         return {"job": job, "run": body.output_dir, "policy": policy}
 
@@ -1625,10 +1699,11 @@ def create_app(cfg: ViewerConfig) -> FastAPI:
     def label_docs(name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
                    para_action: Optional[str] = None, gated: bool = True,
                    offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
-                   expect: Optional[str] = None, profile: Optional[str] = None):
+                   expect: Optional[str] = None, profile: Optional[str] = None, clarity: Optional[str] = None):
         """Documents of one file of a run, filtered by document action, label or paragraph action; for a test corpus
-        with expected results, each row has "expect" (expected vs got) and expect=wrong / right filters them."""
-        return labels.docs(name, file, action, label, para_action, gated, offset, limit, expect, profile)
+        with expected results, each row has "expect" (expected vs got) and expect=wrong / right filters them;
+        clarity=clear / hard / ambiguous keeps the lines with that benchmark tag."""
+        return labels.docs(name, file, action, label, para_action, gated, offset, limit, expect, profile, clarity)
 
     @app.get("/api/labels/{name}/nav", tags=["labels"])
     def label_nav(name: str, file: str, line: int = Query(..., ge=1), crit: str = "all", dir: str = "none"):

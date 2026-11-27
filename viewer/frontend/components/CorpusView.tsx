@@ -18,6 +18,7 @@ import type { LabelLineResult } from "@/lib/types";
 import { TryLineResult } from "./TryResult";
 import type { TryResult } from "@/lib/types";
 import { Crumbs, ErrorBox, Loading } from "./ui";
+import { LabLink } from "./LabLink";
 
 const PAGE = 20;
 const PREVIEW = 600;
@@ -336,8 +337,8 @@ function LineCard({ ds, file, member, fileKey, l, editable, pending, onStage, on
         {l.text !== null ? <TextTools text={line.text || ""} source={{ file, line: l.line, id: l.id === null || l.id === undefined ? null : String(l.id) }}
           row={l.extra ? { line: l.line, id: l.id, ...l.extra } : undefined} testid={`tools-${l.line}`}
           full={l.truncated && !full ? async () => (await api.corpusLines(ds, { path: file, member, start: l.line, count: 1 })).lines[0]?.text || "" : undefined} /> : null}
-        {area === "label" && l.text !== null ? <Link className="btn small ghost" data-testid={`lab-${l.line}`} title="open this line on the Experiment page"
-          href={href("/label/lab", { ds, path: file, member, line: l.line })}>Experiment</Link> : null}
+        {area === "label" && l.text !== null ? <LabLink className="btn small ghost" testid={`lab-${l.line}`} title="open this line on the Experiment page"
+          params={{ ds, path: file, member, line: l.line }} line={l.line}>Experiment</LabLink> : null}
         {l.truncated && mode === "view" && !pending ? <button className="btn small ghost" onClick={() => load("full")}>Show all ({num(l.text_length)} chars)</button> : null}
         {mode === "full" ? <button className="btn small ghost" onClick={() => setMode("view")}>Show less</button> : null}
         {pending && mode !== "edit" ? <button className="btn small ghost" onClick={onDiscard}>Discard change</button> : null}

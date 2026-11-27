@@ -293,7 +293,8 @@ class LabelRuns:
                 data = rec.data if isinstance(rec.data, dict) else {}
                 if "expected_action" in data or "expected_doc_action" in data:
                     e = {k: data[k] for k in ("expected_action", "acceptable", "expected_doc_action",
-                                              "expected_paragraphs", "note", "case") if k in data}
+                                              "expected_paragraphs", "note", "case", "clarity", "clarity_reason",
+                                              "gate_expected") if k in data}
                     if "expected_paragraphs" in data:
                         e["_text"] = data.get("text") or ""
                     out[rec.line] = e
@@ -315,7 +316,24 @@ class LabelRuns:
         ok = got in self._same(exp, profile)
         why = self.rules.why(got, exp, profile) if ok else ""
         return {"kind": "text", "expected": e["expected_action"], "acceptable": e.get("acceptable") or [],
-                "got": got, "ok": ok, "note": e.get("note") or "", **({"rule": why} if why else {})}
+                "got": got, "ok": ok, "note": e.get("note") or "", **({"rule": why} if why else {}), **self.tags(e)}
+
+    @staticmethod
+    def tags(e: Dict[str, Any]) -> Dict[str, Any]:
+        """The benchmark's own tags of a line (clarity, clarity_reason, gate_expected), only those it has."""
+        return {k: e[k] for k in ("clarity", "clarity_reason", "gate_expected") if e.get(k) is not None}
+
+    @staticmethod
+    def clarity_add(stats: Dict[str, Dict[str, int]], v: Dict[str, Any]) -> None:
+        """Count a verdict into the per-clarity scores: n / ok, and for every tag how many went to review (the
+        audit's measure for ambiguous lines: did the filter send them to a person?)."""
+        c = v.get("clarity")
+        if not c:
+            return
+        st = stats.setdefault(str(c), {"n": 0, "ok": 0, "review": 0})
+        st["n"] += 1
+        st["ok"] += bool(v["ok"])
+        st["review"] += v.get("got") == "review"
 
     def verdict(self, row: Dict[str, Any], e: Dict[str, Any], para_cfg: Dict[str, Any],
                 profile: Optional[str] = None) -> Dict[str, Any]:
@@ -333,7 +351,7 @@ class LabelRuns:
         exp_doc = e.get("expected_doc_action")
         res: Dict[str, Any] = {"kind": "document", "expected": exp_doc, "acceptable": [],
                                "got": got_doc, "ok": got_doc in self._same([exp_doc], profile), "note": "",
-                               "paragraphs": []}
+                               "paragraphs": [], **self.tags(e)}
         exp_paras = e.get("expected_paragraphs") or []
         if exp_paras and e.get("_text"):
             from nli_label import split_paragraphs
@@ -377,6 +395,7 @@ class LabelRuns:
         cfg = self._para_cfg(d)
         n = ok = 0
         wrong = []
+        by_clarity: Dict[str, Dict[str, int]] = {}
         for f in files:
             exp = self.expected(d, f)
             if not exp:
@@ -388,11 +407,14 @@ class LabelRuns:
                 v = self.verdict(r, e, cfg, profile)
                 n += 1
                 ok += bool(v["ok"])
+                self.clarity_add(by_clarity, v)
                 if not v["ok"]:
                     wrong.append({"file": f, "line": r.get("line"), "id": r.get("id"), "expected": v["expected"],
                                   "acceptable": v["acceptable"], "got": v["got"], "note": v["note"] or e.get("note", ""),
-                                  "paragraphs_wrong": sum(1 for p in v.get("paragraphs", []) if not p["ok"])})
-        return {"n": n, "ok": ok, "wrong": wrong, **self._profile_info(profile)}
+                                  "paragraphs_wrong": sum(1 for p in v.get("paragraphs", []) if not p["ok"]),
+                                  **self.tags(e)})
+        return {"n": n, "ok": ok, "wrong": wrong, **self._profile_info(profile),
+                **({"by_clarity": by_clarity} if by_clarity else {})}
 
     def expected_profiles(self, name: str) -> Optional[Dict[str, Any]]:
         """n / ok of a run under every profile (the preview on the rules editor)."""
@@ -456,6 +478,7 @@ class LabelRuns:
         got_of = self._simple_got_fn(d)
         n = ok = 0
         wrong = []
+        by_clarity: Dict[str, Dict[str, int]] = {}
         for f in self._files(d):
             exp = self.expected(d, f)
             if not exp:
@@ -474,19 +497,23 @@ class LabelRuns:
                 v = self.text_verdict(got, e, profile)
                 n += 1
                 ok += bool(v["ok"])
+                self.clarity_add(by_clarity, v)
                 if not v["ok"]:
                     wrong.append({"file": f, "line": line, "id": (r or {}).get(nm.get("id") or "id"),
                                   "expected": v["expected"], "acceptable": v["acceptable"], "got": got,
-                                  "note": v["note"], "paragraphs_wrong": 0, **({"no_row": True} if r is None else {})})
-        return {"n": n, "ok": ok, "wrong": wrong, **info,
+                                  "note": v["note"], "paragraphs_wrong": 0, **({"no_row": True} if r is None else {}),
+                                  **self.tags(e)})
+        return {"n": n, "ok": ok, "wrong": wrong, **info, **({"by_clarity": by_clarity} if by_clarity else {}),
                 **({"note": f"lines without a row (the schema's include leaves out {', '.join(missing)}) count as "
                             f"'{absent}'"} if missing else {})}
 
     def docs(self, name: str, file: str, action: Optional[str] = None, label: Optional[str] = None,
              para_action: Optional[str] = None, gated: bool = True, offset: int = 0, limit: int = 50,
-             expect: Optional[str] = None, profile: Optional[str] = None) -> Dict[str, Any]:
+             expect: Optional[str] = None, profile: Optional[str] = None,
+             clarity: Optional[str] = None) -> Dict[str, Any]:
         d = self.folder(name)
         counts: Dict[str, int] = {}
+        clarities: Dict[str, int] = {}
         out, total = [], 0
         exp = self.expected(d, file)
         cfg = self._para_cfg(d) if exp else {}
@@ -496,6 +523,10 @@ class LabelRuns:
             if v is not None:
                 exp_n += 1
                 exp_ok += bool(v["ok"])
+                if v.get("clarity"):
+                    clarities[v["clarity"]] = clarities.get(v["clarity"], 0) + 1
+            if clarity and (v is None or v.get("clarity") != clarity):
+                continue
             if expect in ("wrong", "right"):
                 if v is None or v["ok"] != (expect == "right"):
                     continue
@@ -521,7 +552,8 @@ class LabelRuns:
                             "keywords": sorted({h["kw"] for h in r.get("hits") or [] if not h.get("rule")})[:8],
                             **({"expect": v} if v is not None else {})})
         return {"rows": out, "total": total, "counts": counts, "offset": offset, "limit": limit,
-                **({"expected": {"n": exp_n, "ok": exp_ok}} if exp else {})}
+                **({"expected": {"n": exp_n, "ok": exp_ok}} if exp else {}),
+                **({"clarities": clarities} if clarities else {})}
 
     def clean_view(self, d: Path, file: str, row: Dict[str, Any], text_field: str,
                    settings: Dict[str, Any]) -> Dict[str, Any]:
@@ -793,7 +825,7 @@ class LabelRuns:
                 for ln in sorted(set(seen) | set(exp)):
                     r = seen.get(ln)
                     got = got_of(r) if r is not None else absent
-                    rows.append([ln, got, verdicts(got, exp.get(ln), r, {})])
+                    rows.append([ln, got, verdicts(got, exp.get(ln), r, {}), (exp.get(ln) or {}).get("clarity")])
             else:
                 cfg = self._para_cfg(d) if exp else {}
                 try:
@@ -810,10 +842,11 @@ class LabelRuns:
                         if any(p.get("action") == a for p in paras):
                             got = a
                             break
-                    rows.append([ln, got, verdicts(got, exp.get(ln), r, cfg)])
+                    rows.append([ln, got, verdicts(got, exp.get(ln), r, cfg), (exp.get(ln) or {}).get("clarity")])
                 rows.sort(key=lambda x: x[0])
             out_files.append({"file": f, "rows": rows, "expected": bool(exp)})
-        idx = {"run": name, "files": out_files, "profiles": profiles, "simple": simple}
+        idx = {"run": name, "files": out_files, "profiles": profiles, "simple": simple,
+               "clarities": sorted({r[3] for f in out_files for r in f["rows"] if len(r) > 3 and r[3]})}
         self._nav_cache[str(d)] = (key, idx)
         return idx
 
@@ -821,9 +854,12 @@ class LabelRuns:
     def _nav_match(row: list, crit: List[str]) -> bool:
         if not crit or "all" in crit:
             return True
-        line, act, ver = row
+        line, act, ver = row[0], row[1], row[2]
+        tag = row[3] if len(row) > 3 else None
         for c in crit:
             if c == act:
+                return True
+            if c.startswith("clarity:") and tag and tag == c[8:]:
                 return True
             if c.startswith("wrong:") and ver is not None and ver.get(c[6:]) is False:
                 return True
@@ -865,8 +901,10 @@ class LabelRuns:
                         "line_index": (tj + 1) if tj is not None else None, "lines_in_file": len(trows),
                         "lines_total": len(flat), "match_index": (m_file.index(tl) + 1) if tl in m_file else None,
                         "matches_in_file": len(m_file), "matches_total": m_total,
-                        "action": cur[1] if cur else None, "expected": cur[2] if cur else None},
+                        "action": cur[1] if cur else None, "expected": cur[2] if cur else None,
+                        "clarity": cur[3] if cur and len(cur) > 3 else None},
                 "profiles": idx["profiles"], "has_expected": any(f["expected"] for f in files),
+                "clarities": idx.get("clarities", []),
                 "crit": crit}
 
     def doc(self, name: str, file: str, line: int, profile: Optional[str] = None) -> Dict[str, Any]:

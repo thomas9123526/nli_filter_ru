@@ -9,6 +9,7 @@ keyword does.
 | `--decision-unit` | `paragraph` / `line` | `paragraph` | `run`, `redecide`, `export` |
 | `--output-mode` | `detail` / `simple` | `detail` | `run`, `redecide` (and `export`, always simple) |
 | `non_english_file` | a config file, or no line | off | in the policy |
+| `--max-removed-share X`, `--drop-if-first-cut` | 0 < X ≤ 1; a flag | off | `run`, `redecide`, `export` |
 
 All settings are recorded in the run's `summary.json` (`settings.decision_unit`, `settings.output_mode`,
 `policy.non_english`, and the whole policy as `policy_data`).
@@ -41,6 +42,37 @@ python nli_label.py redecide out_label_ru_v2 --output-dir out_line2 --decision-u
 - The run page shows "decision unit: line".
 - The document page shows the line decision on top and marks the deciding paragraph (★).
 - On the document page, "What is cut" says that the whole line is kept or dropped.
+
+## Dropping documents that lose too much: `--max-removed-share`, `--drop-if-first-cut`
+
+Added 2026-11-27 (plan `cmds\plans\11_27_big_plan.md`, task 13). Paragraph unit only (in line unit a line is kept or
+dropped whole anyway). Both are **off by default**: without them every run gives exactly the same output as before.
+
+Without them, a document with cut paragraphs is **edited** unless fewer than `--min-doc-chars` (50) characters are left.
+So a document that loses 90 % of its text but keeps 60 characters stays in the clean copy as a fragment.
+
+| Option | An edited document becomes **removed** when … | Row fields |
+|---|---|---|
+| `--max-removed-share X` (0 < X ≤ 1) | `tokens_removed / tokens` is **above** X (exactly X stays edited) | `"removed_by": "removed_share"`, `"removed_share": 0.75` |
+| `--drop-if-first-cut` | its first checked paragraph (the first of `paragraphs`, by position) is cut (often the main topic) | `"removed_by": "first_cut"`, `"removed_share": …` |
+
+- The `--min-doc-chars` rule is checked first (a document removed by it has no `removed_by`); then the share, then the
+  first paragraph.
+- A removed document gets no clean line, as with `--min-doc-chars`.
+- "Cut" means removed, and with `--review-as remove` also review.
+- Example with `--max-removed-share 0.5`: 61 of 161 tokens cut (38 %) stays edited; 300 of 400 cut (75 %) → removed.
+- `summary.json`: `settings.max_removed_share` (`null` = off) and `settings.drop_if_first_cut`; the stats (of the run
+  and of each `<name>.summary.json`) get `removed_by`, e.g. `{"removed_share": 12, "first_cut": 3}`: how many
+  documents went from edited to removed by each rule (they are counted in `docs.removed`). `report` prints it as
+  "removed instead of edited".
+- `redecide` and `export` (no models) take both from the run unless given: `--max-removed-share 0` (or `off`) and
+  `--no-drop-if-first-cut` turn the run's values off.
+
+```bash
+python nli_label.py run dataset/corpus --policy policy/russia_llm_policy_v2.json --output-dir out_share --max-removed-share 0.5
+python nli_label.py redecide out_label_ru_v2 --output-dir out_share2 --max-removed-share 0.5 --drop-if-first-cut
+python nli_label.py redecide out_share2 --output-dir out_share3 --max-removed-share off   # the limit off again
+```
 
 ## Output mode: detail or simple
 

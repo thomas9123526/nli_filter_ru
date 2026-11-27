@@ -175,7 +175,43 @@ def test_drafts_only_newest_autos_kept(env, monkeypatch):
     c.post("/api/labels/lab/drafts/save", json=_draft_body(auto=False, name="keep_me"), headers=H)
     ids = []
     for i in range(5):
-        ids.append(c.post("/api/labels/lab/drafts/save", json=_draft_body(id=f"auto-{i}"), headers=H).json()["id"])
+        body = _draft_body(id=f"auto-{i}")
+        body["policy"]["labels"]["weather"]["threshold"] = 0.5 + i / 100   # different drafts (identical ones replace)
+        ids.append(c.post("/api/labels/lab/drafts/save", json=body, headers=H).json()["id"])
         time.sleep(0.02)
     left = [x["id"] for x in c.get("/api/labels/lab/drafts").json()["drafts"]]
     assert set(left) == {"keep_me", "auto-2", "auto-3", "auto-4"}
+
+
+def test_identical_automatic_drafts_replaced(env):
+    """11_27 task 7: identical = same draft policy and run settings (texts / line do not count)."""
+    c, proj, _ = env
+    a = c.post("/api/labels/lab/drafts/save", json=_draft_body(id="auto-a", texts=["one"]), headers=H).json()
+    b = c.post("/api/labels/lab/drafts/save", json=_draft_body(id="auto-b", texts=["two"]), headers=H).json()
+    assert b["replaced"] == ["auto-a"] and b["same_as"] is None
+    assert [x["id"] for x in c.get("/api/labels/lab/drafts").json()["drafts"]] == ["auto-b"]
+    # a different draft stays next to it
+    other = _draft_body(id="auto-c")
+    other["policy"]["labels"]["weather"]["threshold"] = 0.6
+    assert c.post("/api/labels/lab/drafts/save", json=other, headers=H).json()["replaced"] == []
+    # a named draft identical to auto-b: the automatic one is not kept
+    c.post("/api/labels/lab/drafts/save", json=_draft_body(auto=False, name="named_w"), headers=H)
+    r = c.post("/api/labels/lab/drafts/save", json=_draft_body(id="auto-b", texts=["three"]), headers=H).json()
+    assert r["same_as"] == "named_w"
+    ids = {x["id"] for x in c.get("/api/labels/lab/drafts").json()["drafts"]}
+    assert ids == {"auto-c", "named_w"}
+
+
+def test_clear_score_cache(env):
+    """11_27 task 6: "Clear score cache" makes the next run score everything with the model again."""
+    c, _, fast = env
+    body = {"texts": [TEXT], "all_labels": False, "use_judge": False, "reuse_scores": True, "policy_data": POLICY}
+    c.post("/api/labels/try", json=body)
+    again = c.post("/api/labels/try", json=body).json()
+    assert again["pairs"]["reused"] >= 3 and again["pairs"]["fast"] == 0
+    r = c.post("/api/labels/cache/clear", headers=H)
+    assert r.status_code == 200 and r.json()["cleared"] >= 3
+    n0 = fast.calls
+    fresh = c.post("/api/labels/try", json=body).json()
+    assert fresh["pairs"].get("reused", 0) == 0 and fresh["pairs"]["fast"] >= 3 and fast.calls > n0
+    assert c.post("/api/labels/cache/clear").status_code == 403   # an edit: needs the header

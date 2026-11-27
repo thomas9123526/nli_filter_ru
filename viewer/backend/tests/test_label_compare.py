@@ -106,3 +106,26 @@ def test_redecide_refusals(client):
     assert client.post("/api/labels/run_a/redecide", json={**body, "policy": "../p.json", "output_dir": "ok1"}, headers=H).status_code == 400
     assert client.post("/api/labels/nope/redecide", json={**body, "output_dir": "ok2"}, headers=H).status_code == 404
     assert client.post("/api/labels/run_a/redecide", json={**body, "output_dir": "ok3"}).status_code == 403
+
+
+def test_redecide_max_removed_share(client, project, monkeypatch):
+    """11_27 task 13: the redecide panel's max removed share / drop if first cut reach nli_label.py redecide."""
+    seen = {}
+
+    def fake(self, args, env, label, script="nli_filter.py"):
+        seen.update(args=args)
+        return {"id": "j1", "state": "running"}
+    monkeypatch.setattr(Playground, "start_job", fake)
+    body = {"policy": "policy/p.json", "output_dir": "run_a_mrs", "max_removed_share": 0.5, "drop_if_first_cut": True}
+    assert client.post("/api/labels/run_a/redecide", json=body, headers=H).status_code == 200
+    a = seen["args"]
+    assert a[a.index("--max-removed-share") + 1] == "0.5" and "--drop-if-first-cut" in a
+    body.update(output_dir="run_a_mrs2", max_removed_share=0, drop_if_first_cut=False)
+    client.post("/api/labels/run_a/redecide", json=body, headers=H)
+    assert seen["args"][seen["args"].index("--max-removed-share") + 1] == "0" and "--no-drop-if-first-cut" in seen["args"]
+    body.update(output_dir="run_a_mrs3")
+    body.pop("max_removed_share"); body.pop("drop_if_first_cut")
+    client.post("/api/labels/run_a/redecide", json=body, headers=H)
+    assert "--max-removed-share" not in seen["args"] and "--no-drop-if-first-cut" not in seen["args"]
+    bad = {"policy": "policy/p.json", "output_dir": "run_a_mrs4", "max_removed_share": 1.5}
+    assert client.post("/api/labels/run_a/redecide", json=bad, headers=H).status_code == 400

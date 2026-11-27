@@ -45,6 +45,8 @@ export function StartRunForm({ onChanged }: { onChanged: () => void }) {
   const [overwrite, setOverwrite] = useState(true);
   const [clean, setClean] = useState(true);
   const [reviewAs, setReviewAs] = useState("");
+  const [maxShare, setMaxShare] = useState("");
+  const [firstCut, setFirstCut] = useState(false);
   const [judge, setJudge] = useState(true);
   const [topicField, setTopicField] = useState("");
   const [topicMode, setTopicMode] = useState("");
@@ -62,12 +64,14 @@ export function StartRunForm({ onChanged }: { onChanged: () => void }) {
     if (overwrite) a.push("--overwrite");
     if (clean) a.push("--write-clean");
     if (reviewAs) a.push("--review-as", reviewAs);
+    if (maxShare.trim() && Number(maxShare) > 0 && Number(maxShare) <= 1) a.push("--max-removed-share", String(Number(maxShare)));
+    if (firstCut) a.push("--drop-if-first-cut");
     if (!judge) a.push("--judge-model", "none");
     if (topicField.trim()) a.push("--topic-field", q(topicField.trim()));
     if (topicMode) a.push("--topic-mode", topicMode);
     if (limit.trim() && Number(limit) > 0) a.push("--limit", String(Math.floor(Number(limit))));
     return a.join(" ");
-  }, [src, policy, outDir, overwrite, clean, reviewAs, judge, topicField, topicMode, limit]);
+  }, [src, policy, outDir, overwrite, clean, reviewAs, maxShare, firstCut, judge, topicField, topicMode, limit]);
   const cmd = manual ?? built;
 
   useEffect(() => {
@@ -149,6 +153,11 @@ export function StartRunForm({ onChanged }: { onChanged: () => void }) {
           <select value={reviewAs} onChange={(e) => { setReviewAs(e.target.value); setManual(null); }}>
             <option value="">kept in the clean copy</option><option value="remove">cut (--review-as remove)</option>
           </select></label>
+        <label className="faint" style={{ fontSize: 13 }} title="drop a whole document when more than this share of its tokens is cut (empty = off)">max removed share&nbsp;
+          <input type="number" min={0} max={1} step={0.05} placeholder="off" value={maxShare} style={{ width: 70 }} data-testid="start-max-share"
+            onChange={(e) => { setMaxShare(e.target.value); setManual(null); }} /></label>
+        <label className="faint" style={{ fontSize: 13 }} title="drop a whole document when its first checked paragraph is cut"><input type="checkbox" checked={firstCut}
+          onChange={(e) => { setFirstCut(e.target.checked); setManual(null); }} data-testid="start-first-cut" /> --drop-if-first-cut</label>
       </div>
       <div className="row" style={{ marginTop: 8 }}>
         <textarea className="mono" rows={2} style={{ flex: "1 1 600px", fontSize: 12.5 }} value={cmd} spellCheck={false}

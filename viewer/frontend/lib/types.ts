@@ -453,6 +453,7 @@ export type LabelRunResp = {
 };
 export type ExpectVerdict = {
   kind: "text" | "document"; expected: string; acceptable: string[]; got: string; ok: boolean; note: string; rule?: string;
+  clarity?: string; clarity_reason?: string; gate_expected?: boolean;
   paragraphs?: { span: [number, number]; expected: string; acceptable: string[]; note: string; got: string; ok: boolean }[];
 };
 export type LabelDocRow = {
@@ -461,9 +462,11 @@ export type LabelDocRow = {
   expect?: ExpectVerdict;
 };
 export type LabelDocsResp = { rows: LabelDocRow[]; total: number; counts: Record<string, number>; offset: number; limit: number;
-  expected?: { n: number; ok: number } };
+  expected?: { n: number; ok: number }; clarities?: Record<string, number> };
 export type ExpectedSummary = { n: number; ok: number; wrong: { file: string; line: number; id: string | null; expected: string;
-  acceptable: string[]; got: string; note: string; paragraphs_wrong: number; no_row?: boolean }[];
+  acceptable: string[]; got: string; note: string; paragraphs_wrong: number; no_row?: boolean;
+  clarity?: string; clarity_reason?: string; gate_expected?: boolean }[];
+  by_clarity?: Record<string, { n: number; ok: number; review: number }>;
   profile?: string; profiles?: string[]; default?: string; notes?: Record<string, string>; rules_problem?: string | null;
   simple?: boolean; unit?: string; note?: string; problem?: string } | null;
 export type ExpectedRulesData = { about?: string; default?: string; profiles: Record<string, { same: string[][]; note?: string }>;

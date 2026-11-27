@@ -267,6 +267,7 @@ class CachedScorer:
     reworded hypotheses are scored again). "reuse_scores": true in a /label request turns it on."""
     TABLE: "collections.OrderedDict[Tuple[str, ...], Tuple[Any, ...]]" = collections.OrderedDict()
     MAX = 50000
+    LOCK = threading.Lock()   # POST /cache/clear empties the table
 
     def __init__(self, inner: Any, key: Tuple[str, ...]):
         self.inner, self.key = inner, key
@@ -386,6 +387,11 @@ def make_handler(pg: Playground):
                     return self._send(200, pg.jobs.stop(path.split("/")[2]))
                 if path == "/label":
                     return self._send(200, label_texts(pg, req))
+                if path == "/cache/clear":  # the Experiment page's "Clear score cache": score everything again
+                    with CachedScorer.LOCK:
+                        n = len(CachedScorer.TABLE)
+                        CachedScorer.TABLE.clear()
+                    return self._send(200, {"cleared": n})
                 if path != "/filter":
                     return self._send(404, {"detail": "unknown path"})
                 return self._send(200, pg.run(req))

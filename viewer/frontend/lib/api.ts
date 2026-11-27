@@ -130,7 +130,8 @@ export const api = {
     uncertain_band?: number[]; reuse_scores?: boolean }) =>
     postJSON<LabelTryResp>("/api/labels/try", body),
   labelCompare: (p: Params, s?: AbortSignal) => getJSON<CompareResp>("/api/labels/compare", p, s),
-  labelRedecide: (run: string, body: { policy?: string; policy_data?: PolicyData; output_dir: string; write_clean?: boolean; review_as?: string }) =>
+  labelRedecide: (run: string, body: { policy?: string; policy_data?: PolicyData; output_dir: string; write_clean?: boolean; review_as?: string;
+    max_removed_share?: number; drop_if_first_cut?: boolean }) =>
     postJSON<{ job: RunJob; run: string; policy: string }>(`/api/labels/${enc(run)}/redecide`, body),
   labelTestSet: (body: { file: string; policy?: string; output_dir?: string; use_judge?: boolean }) =>
     postJSON<{ job: RunJob; run: string; corpus: string; kind: string }>("/api/labels/test-sets/run", body),

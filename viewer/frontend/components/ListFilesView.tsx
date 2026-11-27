@@ -13,6 +13,7 @@ import { Crumbs, ErrorBox, Loading } from "./ui";
 type FileRow = { path: string; kind: "keywords" | "place_names" | "exceptions"; used_by_policy: string | null };
 type FilesResp = { files: FileRow[]; kinds: Record<string, string>; policy: string | null };
 type Check = { ok: boolean; errors: string[]; warnings?: string[]; entries?: number;
+  spaces?: { count: number; lines: string[]; text: string };
   preview?: { text: string; changes: { start: number; old: string; new: string }[] } };
 type RawResp = { path: string; kind: FileRow["kind"]; text: string; crlf: boolean; sha: string; check: Check };
 
@@ -132,8 +133,8 @@ export function ListFilesView() {
   const save = async () => {
     setSaving(true); setErr(null); setMsg(null);
     try {
-      const r = await postJSON<{ path: string; backup: string; check: Check }>("/api/labels/files/save", { path: file, text: cur, base_sha: raw.data?.sha });
-      setMsg(`Saved ${r.path} (old version: ${r.backup}). Runs and Try use it from the next start.`);
+      const r = await postJSON<{ path: string; backup: string; check: Check; trimmed?: number }>("/api/labels/files/save", { path: file, text: cur, base_sha: raw.data?.sha });
+      setMsg(`Saved ${r.path} (old version: ${r.backup}).${r.trimmed ? ` Stray spaces trimmed on ${r.trimmed} line${r.trimmed > 1 ? "s" : ""}.` : ""} Runs and Try use it from the next start.`);
       setText(null); setTick((t) => t + 1);
     } catch (e) { setErr((e as Error).message); }
     setSaving(false);
@@ -175,6 +176,12 @@ export function ListFilesView() {
           {kind ? <span className="faint" style={{ fontSize: 12 }}>{list.data?.kinds[kind]}</span> : null}
         </div>
         {check?.errors.length ? <ul className="policy-errors">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
+        {check?.spaces ? (
+          <div className="alert" data-testid="list-spaces">
+            <strong>Stray spaces</strong> on {check.spaces.count} line{check.spaces.count > 1 ? "s" : ""} (trimmed when you save):{" "}
+            <button className="btn small" data-testid="list-trim" onClick={() => { setText(check.spaces!.text); setMsg(null); }}>Trim spaces</button>
+            <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12.5 }}>{check.spaces.lines.map((e, i) => <li key={i}>{e}</li>)}</ul>
+          </div>) : null}
         {check?.warnings?.length ? <ul className="policy-warnings">{check.warnings.map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
         {msg ? <div className="faint" style={{ fontSize: 12, marginTop: 6 }} data-testid="list-saved">{msg}</div> : null}
         {err ? <div className="alert error" style={{ marginTop: 6 }}>{err}</div> : null}

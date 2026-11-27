@@ -107,7 +107,8 @@ def save(project: Path, body: Dict[str, Any]) -> Dict[str, Any]:
     now = time.time()
     rec = {"id": draft_id, "name": name, "auto": auto, "saved": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
            "saved_ts": now, "summary": str(body.get("summary") or "")[:2000], "base": body.get("base") or {},
-           "policy": body["policy"], "settings": body.get("settings") or {}, "texts": texts}
+           "policy": body["policy"], "settings": body.get("settings") or {}, "texts": texts,
+           "sources": body.get("sources") if isinstance(body.get("sources"), list) else []}
     raw = json.dumps(rec, ensure_ascii=False, indent=1)
     if len(raw.encode("utf-8")) > MAX_BYTES:
         raise HTTPException(413, "this draft is too big to keep (over 5 MB): remove some texts")
@@ -116,7 +117,41 @@ def save(project: Path, body: Dict[str, Any]) -> Dict[str, Any]:
     tmp.write_text(raw, "utf-8")
     os.replace(tmp, p)
     removed = prune(project) if auto else []
-    return {"id": draft_id, "saved": rec["saved"], "auto": auto, "pruned": removed}
+    same = drop_duplicates(project, draft_id, rec) if auto else {"replaced": [], "same_as": None}
+    return {"id": draft_id, "saved": rec["saved"], "auto": auto, "pruned": removed, **same}
+
+
+def _env(d: Dict[str, Any]) -> str:
+    """What makes two drafts the same: the draft policy and the run settings (not the texts or the line)."""
+    return json.dumps([d.get("policy"), d.get("settings")], sort_keys=True, ensure_ascii=False)
+
+
+def drop_duplicates(project: Path, draft_id: str, rec: Dict[str, Any]) -> Dict[str, Any]:
+    """After an automatic save: older automatic drafts identical to it are deleted (the newest stays, with its texts);
+    when a named draft is identical, this automatic one is deleted instead (the named one already keeps it). Named
+    drafts are never deleted here."""
+    env = _env(rec)
+    replaced, same_as = [], None
+    for p in drafts_dir(project).glob("*.json"):
+        if p.stem == draft_id:
+            continue
+        d = _read(p)
+        if not d or _env(d) != env:
+            continue
+        if d.get("auto"):
+            try:
+                p.unlink()
+                replaced.append(p.stem)
+            except OSError:
+                pass
+        elif same_as is None:
+            same_as = p.stem
+    if same_as:
+        try:
+            (drafts_dir(project) / f"{draft_id}.json").unlink()
+        except OSError:
+            pass
+    return {"replaced": replaced, "same_as": same_as}
 
 
 def prune(project: Path, keep: Optional[int] = None) -> List[str]:
