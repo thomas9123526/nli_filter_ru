@@ -9,7 +9,7 @@ import { actionClass } from "./LabelRunView";
 
 export function ExpectedPanel({ run, profile, setProfile, onFile, onOpen }: {
   run: string; profile: string; setProfile: (p: string) => void;
-  onFile: (file: string) => void;
+  onFile: (file: string, line?: number) => void;
   /** simple runs: open the line on this page; detail runs: undefined = link to the document page */
   onOpen?: (file: string, line: number) => void;
 }) {
@@ -40,14 +40,16 @@ export function ExpectedPanel({ run, profile, setProfile, onFile, onOpen }: {
           <thead><tr><th>File</th><th>Line</th><th>Expected</th><th>Got</th><th>Note</th><th></th></tr></thead>
           <tbody>{ex.wrong.map((w) => (
             <tr key={`${w.file}:${w.line}`}>
-              <td><button className="linklike" onClick={() => onFile(w.file)}>{w.file}</button></td>
+              <td><button className="linklike" data-testid="expected-file" title="show this line in the table below (this file, the lines not as expected)"
+                onClick={() => (onOpen ? onOpen(w.file, w.line) : onFile(w.file, w.line))}>{w.file}</button></td>
               <td>{onOpen ? <button className="linklike" data-testid="expected-open" onClick={() => onOpen(w.file, w.line)}>{w.line}</button>
                 : <Link href={href("/label/doc", { run, file: w.file, line: w.line })}>{w.line}</Link>}</td>
               <td><span className={`badge ${actionClass(w.expected)}`}>{w.expected}</span>{w.acceptable.length ? <span className="faint"> (also {w.acceptable.join(", ")})</span> : null}</td>
               <td><span className={`badge ${actionClass(w.got)}`}>{w.got}</span>{w.no_row ? <span className="faint"> (no row)</span> : null}
                 {w.paragraphs_wrong ? <span className="faint"> · {w.paragraphs_wrong} paragraph{w.paragraphs_wrong > 1 ? "s" : ""} not as expected</span> : null}</td>
               <td className="faint" style={{ fontSize: 12 }}>{w.note}</td>
-              <td><Link className="btn small" href={href("/label/try", { run, file: w.file, line: w.line, para: 0 })}>Try</Link></td>
+              <td><Link className="btn small" data-testid="expected-lab" title="open this line on the Experiment page"
+                href={href("/label/lab", { run, file: w.file, line: w.line })}>Experiment</Link></td>
             </tr>))}</tbody>
         </table></div>) : ex.n ? <div className="panel-body faint">Every line matches its expected result.</div> : null}
     </div>);

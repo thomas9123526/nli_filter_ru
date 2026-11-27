@@ -2,7 +2,7 @@
 // One nli_label.py run: token composition, labels, and the documents (filter by action / label) → a document's flow.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useRef } from "react";
 import { api, useApi } from "@/lib/api";
 import { formatSet, parseSet, useRestoreScroll, useUrlState } from "@/lib/urlState";
 import { href, num, pct } from "@/lib/format";
@@ -52,6 +52,18 @@ export function LabelRunView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docs.data, sp]);
   useRestoreScroll(!!docs.data && !simple);
+  const jumpTo = useRef<number | null>(null);
+  useEffect(() => {  // after a click on a file in Expected vs result: scroll to its line and flash it
+    const ln = jumpTo.current;
+    if (!ln || !docs.data || !docs.data.rows.some((r) => r.line === ln)) return;
+    jumpTo.current = null;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`line-${ln}`);
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.classList.remove("flash-row"); void el.offsetWidth; el.classList.add("flash-row");
+    });
+  }, [docs.data]);
   if (!run) return <div className="alert error">Missing ?run=</div>;
   const d = res.data;
   if (d && simple) return <SimpleRunView run={run} d={d} />;
@@ -85,7 +97,12 @@ export function LabelRunView() {
           {" "}{num(d.summary.redecide.missing)} missing (treated as No){d.summary.redecide.changed?.length ? `; reworded: ${d.summary.redecide.changed.join(", ")}` : ""}.</div>
       ) : null}
       {d ? <ExpectedPanel run={run} profile={profile} setProfile={(p) => setU({ profile: p })}
-        onFile={(x) => setU({ file: x, expect: "", offset: "0", open: "" })} /> : null}
+        onFile={(x, ln) => {
+          if (!ln) return setU({ file: x, expect: "", offset: "0", open: "" });
+          // jump: this file's lines not as expected (so the line is on the first page), the line opened, then scrolled to
+          jumpTo.current = ln;
+          setU({ file: x, expect: "wrong", action: "", label: "", para_action: "", offset: "0", open: String(ln) });
+        }} /> : null}
       {st ? (
         <>
           <div className="stats">
@@ -189,9 +206,7 @@ export function LabelRunView() {
                     <td>{r.labels.map((l) => <span key={l} className="chip">{l}</span>)}{r.flags.map((l) => <span key={l} className="chip">⚑ {l}</span>)}</td>
                     <td className="faint">{r.keywords.join(", ")}</td>
                     <td className="right">{r.tokens_removed ? `${num(r.tokens_removed)} / ${num(r.tokens)}` : "–"}</td>
-                    <td className="right"><Link className="btn small" data-testid="row-try" title="open this document's first paragraph on the Try page (its case, the run's policy)"
-                      href={href("/label/try", { run, file: f, line: r.line, para: 0 })}>Try</Link>{" "}
-                      <Link className="btn small ghost" data-testid="row-lab" title="open this line on the Experiment page (change any setting, compare with the run's policy)"
+                    <td className="right"><Link className="btn small" data-testid="row-lab" title="open this line on the Experiment page (change any setting, compare with the run's policy)"
                       href={href("/label/lab", { run, file: f, line: r.line })}>Experiment</Link></td>
                   </tr>
                   {openLines.has(r.line) ? <tr className="line-text-row"><td colSpan={docs.data!.expected ? 9 : 8}><LineText run={run} file={f} line={r.line} /></td></tr> : null}

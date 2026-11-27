@@ -246,7 +246,9 @@ none, and these pages look as before.
 
 - **Run page** (`/label/run/?run=…`): an **Expected vs result** panel at the top, e.g. "39 / 43 as expected (91 %)",
   with every line that does not match (file, line, expected, got, the case's note), each linked to its document.
-  Clicking the file name opens that file's list below.
+  Clicking the file name jumps to that line in the table below (the file, filtered to ✗ not as expected, the line
+  opened, scrolled to and flashed). **Experiment** opens the line on the Experiment page (the per-line "Try" buttons
+  were replaced by Experiment; the Try page stays for the case sets).
 - **File list**: an **Expected** column (✓ / ✗, the expected action, what it got) and a filter **✗ not as expected /
   ✓ as expected**; "N / M in this file".
 - **Document page**: above the Flow, "expected … got … ✓ / ✗" and the case's note. For a test document: the

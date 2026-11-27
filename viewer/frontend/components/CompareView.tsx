@@ -120,7 +120,7 @@ export function CompareView() {
                             onClick={(e) => { e.preventDefault(); router.push(href("/label/doc", { run: d.b, file: it.file, line: it.line, back: backHere(it.line) })); }}>B</Link>{" · "}
                             <button className="linklike" data-testid={`cmp-text-${it.line}`} onClick={() => setOpenText((o) => { const x = new Set(o); if (x.has(key)) x.delete(key); else x.add(key); return x; })}>
                               text {openText.has(key) ? "▾" : "▸"}</button>{" · "}
-                            <Link href={href("/label/try", { run: d.b, file: it.file, line: it.line, para: 0 })}>Try</Link></div></td> : null}
+                            <Link href={href("/label/lab", { run: d.b, file: it.file, line: it.line })}>Experiment</Link></div></td> : null}
                         {k === 0 ? <td rowSpan={Math.max(1, it.paragraphs.length)}>
                           <span className={`badge ${actionClass(it.doc.a)}`}>{it.doc.a}</span> → <span className={`badge ${actionClass(it.doc.b)}`}>{it.doc.b}</span></td> : null}
                         <td className="mono" style={{ fontSize: 12 }}>{p ? `${p.span[0]}–${p.span[1]}` : "–"}</td>

@@ -502,3 +502,24 @@ def test_experiment_prev_next(srv, tmp_path):
         await asyncio.sleep(0.1)
 
     _browser(tmp_path, scenario)
+
+
+def test_expected_file_jumps_to_its_line(srv, tmp_path):
+    """Run page, Expected vs result: a click on the file shows its line in the table below (the file's lines not as
+    expected, the line opened, scrolled to, flashed); "Experiment" instead of "Try" on the lines."""
+    import asyncio
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Emulation.setDeviceMetricsOverride", width=1300, height=600, deviceScaleFactor=1, mobile=False)
+        await call("Page.navigate", url=srv + "/label/run/?run=o_detail")
+        assert await wait_for("!!document.querySelector('[data-testid=expected-file]') && !!document.querySelector('[data-line]')")
+        assert await js("document.querySelector('[data-testid=expected-lab]').getAttribute('href').startsWith('/label/lab')")
+        assert not await js("!!document.querySelector('[data-testid=row-try]')")
+        await js("document.querySelector('[data-testid=expected-file]').click()")
+        assert await wait_for("location.search.includes('expect=wrong') && location.search.includes('open=3')")
+        assert await wait_for("document.getElementById('line-3')?.classList.contains('flash-row')")
+        assert await js("document.querySelectorAll('tr[data-line]').length") == 1
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)
