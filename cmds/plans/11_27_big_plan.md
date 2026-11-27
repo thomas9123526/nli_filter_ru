@@ -10,7 +10,7 @@ sets, `note`. 40 files, 440 lines: 306 clear, 72 hard, 62 ambiguous. The earlier
 (`labels\benchmark_clarity.csv`, `cmds\labeling\benchmark_clarity_audit.md`) were removed as no longer needed; they
 matched the new files exactly (the 3 suggested fixes, Pink Floyd / Jamala / Chornobyl, were not applied).
 
-The estimate is about 5–5½ hours:
+The estimate is about 6½–7 hours:
 - tasks 1–4 (clarity tags, new sets and fields): about 1–1½ h;
 - task 5 (expected vs decided on the Experiment page): about 45 min – 1 h;
 - task 6 (score again without the cache): about 30 min;
@@ -18,7 +18,9 @@ The estimate is about 5–5½ hours:
 - task 8 (a "Back to …" button on the Experiment page): about 30–45 min;
 - task 9 (quick as the default profile): about 10 min;
 - task 10 (a blank Experiment page with its own address): about 30–45 min;
-- task 11 (how the line's result comes out of its paragraphs): about 45 min – 1 h.
+- task 11 (how the line's result comes out of its paragraphs): about 45 min – 1 h;
+- task 12 (spaces checked when keyword files are saved): about 30 min;
+- task 13 (`--max-removed-share`: drop a document when too much of it is cut): about 45 min – 1 h.
 
 **The benchmark keeps growing** (said 2026-11-27): the user keeps generating new files into `dataset/benchmark\`. So
 nothing may hard-code set names, line counts or field lists: the builder keeps every source field and accepts any new
@@ -169,3 +171,45 @@ Build a **"Whole line"** step, after the per-paragraph flow, on the document pag
 - on the Experiment page also next to each text's "base → draft" a short "from ¶1" (which paragraph decided).
 Also fix: in a narrow trace the score number next to the bar is cut off ("0.85…" for 0.858, the draft column on the
 Experiment page): keep the number whole (smaller bar or the number on its own line).
+
+### 12. Spaces checked when keyword files are saved (about 30 min)
+
+Asked 2026-11-27: `keywords/russia_v3.txt` got the line `Petersburg<space><TAB>B<TAB>place<TAB>Russia` from a save on
+the viewer's files page (`/label/files/`, the table's keyword box keeps what is typed). Checked: harmless today —
+`nli_filter.parse_keyword_line` strips every cell, so the keyword is read as `Petersburg` and matches as before — but
+the file is untidy and a stricter reader could trip on it.
+
+On the files page (keyword lists, place-name tables, exceptions):
+- **Table view:** every cell is trimmed (spaces at the start and end) when the row is written into the file, and a
+  run of spaces inside a keyword becomes one ("St.  Petersburg" → "St. Petersburg"). Shown before saving: "2 cells
+  trimmed".
+- **Text view and the check while typing** (`/api/labels/files/check`): a warning per line with a cell that starts or
+  ends with a space, or has a double space ("line 61: 'Petersburg ' ends with a space"), and a **"Trim spaces"**
+  button that fixes them all. Tabs (the column separators) and comment lines are left as they are.
+- **Save:** the save itself trims the same way, so a file saved from the viewer never gets these spaces again;
+  the message says how many cells were trimmed.
+- The existing line `Petersburg ` in russia_v3.txt: fixed by the first save with the new check (or the "Trim spaces"
+  button), not by hand.
+- Tests: table and text saves with leading / trailing / double spaces; comments and tabs untouched; a regex in the
+  exclude column is not changed inside (only its outer spaces).
+
+### 13. `--max-removed-share`: drop a document when too much of it is cut (about 45 min – 1 h)
+
+Asked 2026-11-27 (conversation: "cutting vs rewriting for a training dataset", "what is max-removed-share"). Today a
+document with cut paragraphs is **edited** unless fewer than `--min-doc-chars` (50) characters are left, so a document
+that loses 90 % of its text but keeps 60 characters stays in the clean output as a fragment.
+
+New `nli_label.py` setting **`--max-removed-share X`** (0 < X ≤ 1; **default off**, so existing runs and commands behave
+as now): in the paragraph unit, when `tokens_removed / tokens` of a document is above X, the document action is
+**removed** (reason in the row: `removed_share`, with the share) instead of **edited**; its clean line is not written.
+Example with 0.5: russian_persons v2 line 3 (61 of 161 tokens cut, 38 %) stays edited; 300 of 400 cut (75 %) → removed.
+- Also an option **`--drop-if-first-cut`** (off by default): drop the document when its first checked paragraph is cut
+  (often the main topic).
+- Wherever `--min-doc-chars` is accepted: `run`, `redecide` (so values can be tried on an existing run without the
+  models) and `export`; recorded in summary.json settings; `redecide` without the option keeps the run's own value.
+- Summary: how many documents went from edited to removed by this rule (also per file); the run page's counts show it.
+- Viewer: both options on the Start-a-run form and in the run page's redecide panel; the document page and the
+  "Whole line" step (task 11) say "removed: 75 % of the tokens would be cut (limit 50 %)".
+- Line unit: not used (a line is kept or dropped whole anyway).
+- Docs: `cmds\labeling\output_modes.md` / the labelling guide; tests: below / at / above the limit, off by default,
+  first-paragraph option, redecide, the summary count.
