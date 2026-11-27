@@ -1,6 +1,7 @@
-# Translating texts in the viewer (中文 / Русский)
+# Translating texts in the viewer
 
-The viewer can translate the texts it shows into **Chinese** or **Russian**. Translation is **for reading only**:
+The viewer can translate the texts it shows into the languages listed in `targets` (one button each, with its
+English name, e.g. **Russian**). Translation is **for reading only**:
 labels and decisions always come from the original text.
 
 The backend is `viewer/backend/nli_viewer/translate.py`. Its tests are in `viewer/backend/tests/test_translate.py`.
@@ -39,7 +40,28 @@ Top-level options: `concurrency` (4 texts at once) and `down_seconds` (30). An u
 `down_seconds`, so every text does not wait for its timeout.
 
 The block is read from the viewer's config file. **It is read again when the file changes**, so there is no need to
-restart the viewer.
+restart the viewer. The translate buttons follow `targets` (after a page reload).
+
+### Changing the providers on the page (`/label/translate/`)
+
+Without editing the file: each provider has ↑ ↓ (the order auto tries them in), **used by auto** (on / off), and its
+**URL**, **model** and **timeout (s)**. "Save to viewer_config.json" writes them into the `translate` block:
+
+- only that block is rewritten (one line per provider); the rest of the file, its comments included, stays byte for
+  byte. Comments inside the block are not kept. The old file goes to `viewer\.backup\viewer_config.json.<time>`;
+- every other provider key (`kind`, `prompt`, `api_key_env`, `no_think` …) stays as it was; switching one back on
+  removes its `"enabled": false`;
+- checked first like a load (URL must start with `http://` / `https://`, timeout 1–3600 s, no empty model); refused
+  when the file changed since the page loaded it ("reload the page");
+- used at once, no restart.
+
+**Test** checks the URL / model / timeout typed in the row, saved or not, so a new server can be tried before saving.
+
+### Choosing the provider for one translation
+
+The translation panel next to a text has **using: auto (in order) / qwen / hunyuan / …**. Auto is the order above, with
+the fallback. Choosing one uses only that provider (no fallback; also one switched off for auto). The choice is
+remembered in this browser for every page.
 
 ## How it works
 
@@ -125,9 +147,17 @@ Other status codes:
      "providers": [{"name": "qwen", "kind": "openai", "base_url": "…", "model": "qwen3-4b", "timeout": 60.0,
                     "no_think": true, "no_think_tag": false, "prompt": "generic", "enabled": true,
                     "api_key_env": "QWEN_API_KEY", "has_key": false}, …],
-     "cache_dir": "…\\.viewer_cache\\translate", "concurrency": 4, "down_seconds": 30.0}
+     "cache_dir": "…\\.viewer_cache\\translate", "concurrency": 4, "down_seconds": 30.0,
+     "editable": true, "mtime": "1795700000123456789"}
 
-`POST /api/translate/test`, with the body `{}` or `{"provider": "qwen", "targets": ["zh"], "text": "…"}`. The default
+`POST /api/translate/settings/save` (the page's Save): `{"mtime": "<from the settings>", "providers": [{"name": "hunyuan",
+"enabled": true, "base_url": "http://127.0.0.1:8001/v1", "model": "Hunyuan-MT-7B", "timeout": 120}, {"name": "qwen", …}]}`:
+every provider exactly once, in the new order. Answer: `{"saved": "<file>", "backup": "<file>", "mtime": "…",
+"providers": […]}`. **400**: a bad value or a provider missing / twice / unknown; **409**: the file changed since
+`mtime`, or the settings do not come from a file.
+
+`POST /api/translate/test`, with the body `{}` or `{"provider": "qwen", "targets": ["zh"], "text": "…"}`; with one
+provider, `"override": {"base_url": …, "model": …, "timeout": …}` tests those values instead (not saved). The default
 text is a benchmark sentence. The test does not use the cache or the fallback:
 
     {"text": "Shchi, …",
@@ -188,13 +218,28 @@ The test used benchmark sentences from `dataset/corpus_benchmark` (Russian food 
 The model is about 16 GB: bf16, 4 safetensors shards. Download it to `models/Hunyuan-MT-7B`, which git ignores
 (`models/**`):
 
-    viewer\backend\.venv\Scripts\python.exe -c "from huggingface_hub import snapshot_download; snapshot_download('tencent/Hunyuan-MT-7B', local_dir='models/Hunyuan-MT-7B')"
+    pip install huggingface_hub     # the viewer's .venv does not have it
+    python -c "from huggingface_hub import snapshot_download; snapshot_download('tencent/Hunyuan-MT-7B', local_dir='models/Hunyuan-MT-7B')"
 
 **Status on 2026-11-25: not downloaded.** D: had only ~35 GB free, and the plan says skip under 60 GB.
 
 **For the offline H200:** copy the whole `models/Hunyuan-MT-7B` folder, including `tokenizer_config.json` (which holds
 the chat template) and `generation_config.json`. The pip packages are vllm (Linux), or transformers>=4.56 + accelerate
 + torch. Add them to the pkgs / offline notes.
+
+### On a PC without a GPU: a 4-bit GGUF with llama.cpp
+
+The full model (15 GB in bf16) does not fit next to Windows in 16 GB of RAM. A 4-bit quantized copy does: the community
+conversion `Mungert/Hunyuan-MT-7B-GGUF` (not from Tencent; same licence), file `Hunyuan-MT-7B-q4_k_m.gguf`, 4.4 GB.
+`llama-server` speaks the same OpenAI-compatible API, so the `hunyuan` provider (port 8001, model `Hunyuan-MT-7B`) uses
+it without a config change.
+
+    winget install ggml.llamacpp
+    python -c "from huggingface_hub import hf_hub_download; hf_hub_download('Mungert/Hunyuan-MT-7B-GGUF', 'Hunyuan-MT-7B-q4_k_m.gguf', local_dir='models/Hunyuan-MT-7B-GGUF')"
+    llama-server -m models\Hunyuan-MT-7B-GGUF\Hunyuan-MT-7B-q4_k_m.gguf --alias Hunyuan-MT-7B --port 8001 --jinja -c 4096
+
+About 5–6 GB of RAM while running. Slower than a GPU (several seconds per sentence) and slightly lower quality than
+bf16. Smaller files (`q3_k_m` 3.5 GB) use less RAM and are worse; `q5_k_m` (5.1 GB) is a little better.
 
 ### Serving with vLLM (Linux / WSL / the H200)
 

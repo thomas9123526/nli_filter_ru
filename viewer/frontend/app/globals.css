@@ -525,7 +525,7 @@ mark.rewritten { background: color-mix(in srgb, var(--accent) 22%, transparent);
 .doc-text mark.mark-kw { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
 .doc-text mark.mark-marker { background: var(--filter-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
 
-/* ---- text tools: [Copy ▾] [中文] [Русский] and the translation side panel ---- */
+/* ---- text tools: [Copy ▾] [Korean] [Russian] and the translation side panel ---- */
 .text-tools { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; position: relative; }
 .text-tools .tt-copy { display: inline-flex; position: relative; }
 .text-tools .tt-copy .tt-more { padding-left: 4px; padding-right: 4px; }

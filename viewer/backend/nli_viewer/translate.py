@@ -27,7 +27,10 @@ model, prompt version).
 Endpoints (wired by install(app, cfg)):
     POST /api/translate            {"texts": [...]} or {"paragraphs": [...]}, "target": "zh"|"ru",
                                    optional "provider" (force one, no fallback), "nocache"
-    GET  /api/translate/settings   the providers (no keys) and targets
+    GET  /api/translate/settings   the providers (no keys) and targets; "editable" + "mtime" for the save below
+    POST /api/translate/settings/save  order, on / off, base_url, model, timeout of the providers: rewrites only the
+                                   "translate" block of viewer_config.json (old file to .backup/), refused when the
+                                   file changed since it was loaded; used at once (the file is re-read on change)
     POST /api/translate/test       per provider: reachable, served models, a sample translation + language check
 """
 from __future__ import annotations
@@ -63,6 +66,7 @@ SAMPLE_TEXT = ("Shchi, a cabbage soup often made with sauerkraut, has been eaten
 LANGUAGES: Dict[str, Tuple[str, str, str]] = {
     "zh": ("Chinese", "简体中文", "中文"),
     "ru": ("Russian", "русский язык", "Russian"),
+    "ko": ("Korean", "Korean", "Korean"),
 }
 
 
@@ -235,12 +239,13 @@ def _script(ch: str) -> str:
 
 
 def language_check(text: str, target: str) -> Dict[str, Any]:
-    """Is text written in the target language? By script: zh -> mostly CJK, ru -> mostly Cyrillic.
+    """Is text written in the target language? By script: zh -> mostly CJK, ru -> mostly Cyrillic,
+    ko -> mostly Hangul.
     Digits / punctuation are ignored. Units: one CJK character = 1, one word of an alphabetic script = 1.
     Latin words (names, abbreviations) are ignored as long as the target script is at least 50% of all units;
     other scripts (Cyrillic in a Chinese answer, CJK in a Russian one) must stay below 20% of the non-Latin units.
     Very short answers (< 3 units) pass unless another script dominates."""
-    want = "cjk" if target == "zh" else "cyrillic"
+    want = {"zh": "cjk", "ru": "cyrillic", "ko": "hangul"}[target]
     units: Dict[str, int] = {}
     prev = None
     for ch in text or "":
@@ -277,16 +282,18 @@ def build_messages(p: Provider, text: str, target: str, strict: bool = False) ->
         else:
             msg = f"Translate the following segment into {hy}, without additional explanation.\n\n{text}"
         return [{"role": "user", "content": msg}]
-    system = (f"You are a professional translator. Translate the user's text into {en} ({own}). Keep names, "
+    lang = en if own == en else f"{en} ({own})"
+    system = (f"You are a professional translator. Translate the user's text into {lang}. Keep names, "
               f"numbers, line breaks and paragraph breaks. Output only the translation.")
-    head = f"Translate the following text into {en} ({own}). Output only the translation."
+    head = f"Translate the following text into {lang}. Output only the translation."
     if p.no_think and p.no_think_tag:
         head += " /no_think"
     msgs = [{"role": "system", "content": system}]
     if strict:
+        msgs[0]["content"] += f" The answer must be written in {en} only, never in another language."
+    if strict and target in EXAMPLES:
         # the retry: one worked example in the target language. On qwen3-4b the plain prompt answered a text about
         # Russian food in Russian when asked for Chinese (4 of 8 tries); with the example: 0 of 8.
-        msgs[0]["content"] += f" The answer must be written in {en} only, never in another language."
         msgs += [{"role": "user", "content": f"{head}\n\n{EXAMPLE_SOURCE}"},
                  {"role": "assistant", "content": EXAMPLES[target]}]
     msgs.append({"role": "user", "content": f"{head}\n\n{text}"})
@@ -320,6 +327,134 @@ def request_body(p: Provider, messages: List[Dict[str, str]], text: str, strict:
     if p.no_think:
         body["chat_template_kwargs"] = {"enable_thinking": False}
     return body
+
+
+# --------------------------------------------------------------------------------------------- saving the block
+
+def find_value_span(text: str, key: str) -> Optional[Tuple[int, int, str]]:
+    """(start, end, indent) of the value of a top-level "key" in a JSON-with-// comments text: text[start:end] is the
+    whole {...} value, indent the leading whitespace of the key's line. None when there is no such object key."""
+    depth = 0
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == chr(92) else 1
+            word = text[i + 1:j]
+            k = j + 1
+            if depth == 1 and word == key:
+                m = k
+                while m < n and text[m] in " \t\r\n":
+                    m += 1
+                if m < n and text[m] == ":":
+                    m += 1
+                    while m < n and text[m] in " \t\r\n":
+                        m += 1
+                    if m < n and text[m] == "{":
+                        end = _match_brace(text, m)
+                        line_start = text.rfind("\n", 0, i) + 1
+                        indent = re.match(r"[ \t]*", text[line_start:]).group(0)
+                        return (m, end, indent) if end else None
+            i = k
+            continue
+        if ch == "/" and text.startswith("//", i):
+            nl = text.find("\n", i)
+            i = n if nl < 0 else nl
+            continue
+        if ch in "{[":
+            depth += 1
+        elif ch in "}]":
+            depth -= 1
+        i += 1
+    return None
+
+
+def _match_brace(text: str, start: int) -> Optional[int]:
+    depth, i, n = 0, start, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == chr(92) else 1
+            i = j + 1
+            continue
+        if ch == "/" and text.startswith("//", i):
+            nl = text.find("\n", i)
+            i = n if nl < 0 else nl
+            continue
+        if ch in "{[":
+            depth += 1
+        elif ch in "}]":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return None
+
+
+def format_block(block: Dict[str, Any], indent: str) -> str:
+    """The "translate" value as written back: one line per setting, one line per provider."""
+    inner = indent + "  "
+    lines = ["{"]
+    keys = [k for k in block if k != "providers"] + (["providers"] if "providers" in block else [])
+    for n, k in enumerate(keys):
+        comma = "," if n < len(keys) - 1 else ""
+        if k == "providers":
+            provs = block["providers"]
+            lines.append(f'{inner}"providers": [')
+            for m, p in enumerate(provs):
+                pc = "," if m < len(provs) - 1 else ""
+                lines.append(f"{inner}  {json.dumps(p, ensure_ascii=False)}{pc}")
+            lines.append(f"{inner}]{comma}")
+        else:
+            lines.append(f"{inner}{json.dumps(k)}: {json.dumps(block[k], ensure_ascii=False)}{comma}")
+    lines.append(indent + "}")
+    return "\n".join(lines)
+
+
+EDITABLE = ("enabled", "base_url", "model", "timeout")
+
+
+def edited_block(block: Dict[str, Any], edits: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """The block with the providers in the order of `edits` (every provider exactly once, by name) and their
+    enabled / base_url / model / timeout replaced; every other field stays as it was."""
+    old = {p.get("name"): p for p in block.get("providers") or []}
+    names = [e.get("name") for e in edits]
+    if sorted(map(str, names)) != sorted(map(str, old)) or len(set(names)) != len(names):
+        raise ValueError(f"give every provider exactly once: have {sorted(old)}, got {names}")
+    provs = []
+    for e in edits:
+        p = dict(old[e["name"]])
+        for k in EDITABLE:
+            if k not in e or e[k] is None:
+                continue
+            v = e[k]
+            if k == "enabled":
+                v = bool(v)
+                if v:
+                    p.pop("enabled", None)      # on = the default: leave it out
+                    continue
+            elif k == "timeout":
+                v = float(v)
+                if not 1 <= v <= 3600:
+                    raise ValueError(f"{e['name']}: timeout must be 1 to 3600 seconds")
+                v = int(v) if v == int(v) else v
+            else:
+                v = str(v).strip()
+                if not v:
+                    raise ValueError(f"{e['name']}: {k} is empty")
+                if k == "base_url":
+                    if not re.match(r"^https?://[^\s/]+", v):
+                        raise ValueError(f"{e['name']}: base_url must start with http:// or https://")
+                    v = v.rstrip("/")
+            p[k] = v
+        provs.append(p)
+    out = dict(block)
+    out["providers"] = provs
+    return out
 
 
 # --------------------------------------------------------------------------------------------- the service
@@ -361,6 +496,51 @@ class Translator:
                 self._settings = parse_settings(_read_block(self._file), str(self._file))
                 self._mtime = mtime
         return self._settings
+
+    @property
+    def editable(self) -> bool:
+        return self._file is not None and self._file.is_file()
+
+    def file_mtime(self) -> Optional[str]:
+        """The config file's change time in ns, as a string (a JavaScript number would round it)."""
+        try:
+            return str(self._file.stat().st_mtime_ns) if self._file else None
+        except OSError:
+            return None
+
+    def save(self, edits: List[Dict[str, Any]], mtime: Optional[str]) -> Dict[str, Any]:
+        """Write the edited providers into the config file's "translate" block (see edited_block)."""
+        if not self.editable:
+            raise HTTPException(409, "these settings do not come from a viewer_config.json file: edit them where "
+                                     "the viewer was configured")
+        f = self._file
+        with self._lock:
+            if mtime is not None and self.file_mtime() != mtime:
+                raise HTTPException(409, f"{f.name} changed since this page loaded it: reload the page and try again")
+            from .config import _strip_comments
+            text = f.read_text("utf-8")
+            block = json.loads(_strip_comments(text)).get("translate")
+            span = find_value_span(text, "translate")
+            if not isinstance(block, dict) or span is None:
+                raise HTTPException(409, f'no "translate" block found in {f.name}')
+            try:
+                new = edited_block(block, edits)
+                parse_settings(new, str(f))          # the same checks as on loading
+            except ValueError as exc:
+                raise HTTPException(400, str(exc))
+            start, end, indent = span
+            out = text[:start] + format_block(new, indent) + text[end:]
+            json.loads(_strip_comments(out))         # still a valid config
+            bdir = f.parent / ".backup"
+            bdir.mkdir(exist_ok=True)
+            backup = bdir / f"{f.name}.{time.strftime('%Y%m%d-%H%M%S')}"
+            backup.write_bytes(f.read_bytes())
+            tmp = f.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_text(out, "utf-8", newline="")
+            os.replace(tmp, f)
+            self._mtime = None                      # re-read at the next use
+            self._down.clear()
+        return {"saved": str(f), "backup": str(backup), "mtime": self.file_mtime()}
 
     def provider(self, name: str) -> Provider:
         for p in self.settings.providers:
@@ -520,8 +700,20 @@ class Translator:
             return {"reachable": False, "models": [], "error": self._mask(p, f"{type(exc).__name__}: {exc}"),
                     "seconds": round(time.time() - t0, 3)}
 
-    def test(self, names: Optional[List[str]], targets: List[str], text: str) -> List[Dict[str, Any]]:
+    def test(self, names: Optional[List[str]], targets: List[str], text: str,
+             override: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         provs = [self.provider(n) for n in names] if names else list(self.settings.providers)
+        if override and len(provs) == 1:
+            # unsaved values from the settings page (base_url / model / timeout), checked like a save would
+            import dataclasses
+            name = provs[0].name
+            try:
+                e = edited_block({"providers": [provs[0].public()]},
+                                 [{"name": name, **{k: override.get(k) for k in ("base_url", "model", "timeout")}}])
+            except ValueError as exc:
+                raise HTTPException(400, str(exc))
+            p = e["providers"][0]
+            provs = [dataclasses.replace(provs[0], base_url=p["base_url"], model=p["model"], timeout=float(p["timeout"]))]
 
         def one(p: Provider) -> Dict[str, Any]:
             row = {"name": p.name, "model": p.model, "base_url": p.base_url, "enabled": p.enabled, **self.models(p)}
@@ -564,8 +756,14 @@ class TranslateRequest(BaseModel):
     nocache: bool = False
 
 
+class TranslateSaveRequest(BaseModel):
+    providers: List[Dict[str, Any]]
+    mtime: Optional[str] = None
+
+
 class TranslateTestRequest(BaseModel):
     provider: Optional[str] = None
+    override: Optional[Dict[str, Any]] = None     # unsaved base_url / model / timeout for this one provider
     targets: Optional[List[str]] = None
     text: Optional[str] = None
 
@@ -616,7 +814,17 @@ def api_translate_settings(request: Request):
     return {"configured": st.configured, "source": st.source,
             "targets": [{"code": t, "name": LANGUAGES[t][0], "label": LANGUAGES[t][1]} for t in st.targets],
             "providers": [p.public() for p in st.providers], "cache_dir": str(tr.cache_dir),
-            "concurrency": st.concurrency, "down_seconds": st.down_seconds}
+            "concurrency": st.concurrency, "down_seconds": st.down_seconds,
+            "editable": tr.editable, "mtime": tr.file_mtime()}
+
+
+@router.post("/api/translate/settings/save")
+def api_translate_settings_save(body: TranslateSaveRequest, request: Request):
+    tr = _translator(request)
+    r = tr.save(body.providers, body.mtime)
+    st = tr.settings
+    r["providers"] = [p.public() for p in st.providers]
+    return r
 
 
 @router.post("/api/translate/test")
@@ -626,7 +834,8 @@ def api_translate_test(body: TranslateTestRequest, request: Request):
     for t in targets:
         _check_target(tr, t)
     text = (body.text or "").strip() or SAMPLE_TEXT
-    return {"text": text, "providers": tr.test([body.provider] if body.provider else None, targets, text)}
+    return {"text": text, "providers": tr.test([body.provider] if body.provider else None, targets, text,
+                                               body.override if body.provider else None)}
 
 
 def install(app: FastAPI, cfg: Any) -> Translator:

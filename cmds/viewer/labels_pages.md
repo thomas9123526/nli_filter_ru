@@ -351,16 +351,20 @@ Old links without these parameters still work.
 ## Copy and translate any shown text
 
 Next to every text the Labelling pages show (run page ▸ line text, document page, simple run line, corpus page lines,
-Try page, compare page "text ▸", documents test set and case editors, Experiment page): **[Copy ▾] [中文] [Русский]**.
+Try page, compare page "text ▸", documents test set and case editors, Experiment page): **[Copy ▾]** and one
+translate button per language in the config's `targets` (English names, e.g. **[Russian]**).
 
 - **Copy**: the text; ▾ more: the selected paragraph (document page), **with source** (the text, then
   `— file · line N · id X · run R`), the row as JSON, the translation. "Copied (1,234 characters)" for a moment; long
   texts are copied whole (the corpus page loads a shortened line in full first). Works on 127.0.0.1 / localhost
   (clipboard API) and from another computer over plain http:// (a select-and-copy fallback).
-- **中文 / Русский**: the translation in a side panel, paragraph by paragraph (on the document page with the remove /
+- **The language buttons**: the translation in a side panel, paragraph by paragraph (on the document page with the remove /
   review / keep colours), "translated by qwen" or "by hunyuan (fallback)", "show original" side by side. For reading
-  only: labels and decisions always come from the original. Settings and the providers' test buttons:
-  `/label/translate/`; details in `cmds\viewer\translate.md`.
+  only: labels and decisions always come from the original. **using**: auto (the providers in order, with the
+  fallback) or one provider only, remembered in this browser.
+- **Settings** `/label/translate/`: the providers' order, on / off for auto, URL, model and timeout, saved into
+  `viewer_config.json` (backup, used at once); a Test button per provider (also with unsaved values). Details in
+  `cmds\viewer\translate.md`.
 
 ## Keyword statistics (`/label/kwstats/`)
 

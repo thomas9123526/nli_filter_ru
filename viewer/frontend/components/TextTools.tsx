@@ -1,10 +1,11 @@
 "use client";
-// [Copy ▾] [中文] [Русский] next to every text the Labelling pages show. Copy: the text, the selected paragraph, the
+// [Copy ▾] [Korean] [Russian] next to every text the Labelling pages show. Copy: the text, the selected paragraph, the
 // text with its source (file · line · id), the row as JSON, the translation. Translate: POST /api/translate (the
 // providers of viewer_config.json "translate", tried in order: Qwen endpoint first, Hunyuan-MT-7B when it fails),
 // shown in a side panel with the provider that answered; for reading only, labels always come from the original.
+// The panel's "using" choice: auto (in order, with the fallback) or one provider only; remembered in this browser.
 import { useEffect, useRef, useState } from "react";
-import { postJSON } from "@/lib/api";
+import { getJSON, postJSON } from "@/lib/api";
 
 export type TextSource = { run?: string; file?: string | null; line?: number | null; id?: string | null };
 
@@ -46,16 +47,40 @@ export type TranslateResult = { translation: string | null; provider: string | n
   fallback?: boolean; cached?: boolean; error?: string | null; errors?: { provider: string; error: string }[] };
 export type TranslateResp = { target: string; results: TranslateResult[] };
 
-const TARGETS: [string, string][] = [["zh", "中文"], ["ru", "Русский"]];
+// the buttons until the settings arrive; then the "targets" of viewer_config.json (English names)
+const TARGETS: [string, string][] = [["ko", "Korean"], ["ru", "Russian"]];
 const tcache = new Map<string, TranslateResp>();  // this page view: the same text again is instant
 
-export async function translate(texts: string[], target: string): Promise<TranslateResp> {
-  const key = `${target}\u0000${texts.join("\u0001")}`;
+export async function translate(texts: string[], target: string, provider?: string): Promise<TranslateResp> {
+  const key = `${target}\u0000${provider || ""}\u0000${texts.join("\u0001")}`;
   const hit = tcache.get(key);
   if (hit) return hit;
-  const r = await postJSON<TranslateResp>("/api/translate", { texts, target });
+  const r = await postJSON<TranslateResp>("/api/translate", { texts, target, ...(provider ? { provider } : {}) });
   tcache.set(key, r);
   return r;
+}
+
+// ---- the provider choice ("" = auto: in order, with the fallback), shared by every TextTools on the page
+export type ProviderInfo = { name: string; enabled?: boolean; model?: string };
+const PROVIDER_KEY = "nli.translate.provider";
+type TrSettings = { providers: ProviderInfo[]; targets: { code: string; name: string }[] };
+let settingsP: Promise<TrSettings> | null = null;
+function loadSettings(fresh = false): Promise<TrSettings> {
+  if (!settingsP || fresh) {
+    settingsP = getJSON<TrSettings>("/api/translate/settings")
+      .then((r) => ({ providers: r.providers || [], targets: r.targets || [] }))
+      .catch(() => { settingsP = null; return { providers: [], targets: [] }; });
+  }
+  return settingsP;
+}
+export function loadProviders(fresh = false): Promise<ProviderInfo[]> {
+  return loadSettings(fresh).then((s) => s.providers);
+}
+export function savedProvider(): string {
+  try { return localStorage.getItem(PROVIDER_KEY) || ""; } catch { return ""; }
+}
+function storeProvider(name: string) {
+  try { if (name) localStorage.setItem(PROVIDER_KEY, name); else localStorage.removeItem(PROVIDER_KEY); } catch { /* private mode */ }
 }
 
 type Para = { span: [number, number]; action: string };
@@ -77,6 +102,14 @@ export function TextTools({ text: shown, source, row, paragraph, paragraphs, tes
   const [flash, setFlash] = useState<string | null>(null);
   const [tr, setTr] = useState<{ target: string; resp: TranslateResp | null; error: string | null; busy: boolean } | null>(null);
   const [showOrig, setShowOrig] = useState(true);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [using, setUsing] = useState("");
+  const [targets, setTargets] = useState<[string, string][]>(TARGETS);
+  useEffect(() => {
+    let live = true;
+    loadSettings().then((s) => { if (live && s.targets.length) setTargets(s.targets.map((t) => [t.code, t.name])); });
+    return () => { live = false; };
+  }, []);
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!menu) return;
@@ -107,11 +140,16 @@ export function TextTools({ text: shown, source, row, paragraph, paragraphs, tes
     return [{ text, action: null }];
   };
   const parts = partsOf(text);
-  const run = async (target: string) => {
+  const run = async (target: string, choice?: string) => {
     setTr({ target, resp: null, error: null, busy: true });
     try {
+      let use = choice ?? savedProvider();
+      const provs = await loadProviders();
+      setProviders(provs);
+      if (use && !provs.some((p) => p.name === use)) use = "";   // a provider that is gone: auto
+      setUsing(use);
       const t = await getText();
-      const resp = await translate(partsOf(t).map((p) => p.text.trim()), target);
+      const resp = await translate(partsOf(t).map((p) => p.text.trim()), target, use || undefined);
       setTr({ target, resp, error: null, busy: false });
     } catch (e) {
       setTr({ target, resp: null, error: (e as Error).message, busy: false });
@@ -135,18 +173,25 @@ export function TextTools({ text: shown, source, row, paragraph, paragraphs, tes
             {translation ? <button onClick={() => doCopy("the translation", translation)}>translation</button> : null}
           </span>) : null}
       </span>
-      {TARGETS.map(([t, name]) => (
+      {targets.map(([t, name]) => (
         <button key={t} className={`btn small ghost${tr?.target === t ? " on" : ""}`} data-testid={`translate-${t}`}
           title={`translate to ${name} (for reading only)`} onClick={() => run(t)}>{name}</button>))}
       {flash ? <span className="tt-flash" data-testid="copy-flash">{flash}</span> : null}
       {tr ? (
         <div className="tt-drawer" data-testid="translation">
           <div className="row" style={{ flexWrap: "wrap" }}>
-            <strong>{TARGETS.find(([t]) => t === tr.target)?.[1]}</strong>
+            <strong>{targets.find(([t]) => t === tr.target)?.[1] || tr.target}</strong>
             {tr.busy ? <span className="faint">translating…</span> : null}
-            {used.length ? <span className="faint" style={{ fontSize: 12 }} data-testid="translated-by">translated by {used.join(", ")}{fallback ? " (fallback)" : ""}
+            {used.length ? <span className="faint" style={{ fontSize: 12 }} data-testid="translated-by">translated by {used.join(", ")}{fallback ? " (fallback)" : ""}{using ? " (chosen)" : ""}
               {tr.resp?.results.some((r) => r.cached) ? " · cached" : ""}</span> : null}
             <span className="spacer" />
+            {providers.length ? (
+              <label className="faint" style={{ fontSize: 12 }} title="auto: the providers in their order, the next one when one fails; or only one (remembered in this browser)">using{" "}
+                <select value={using} data-testid="translate-provider" disabled={tr.busy}
+                  onChange={(e) => { storeProvider(e.target.value); run(tr.target, e.target.value); }}>
+                  <option value="">auto (in order)</option>
+                  {providers.map((p) => <option key={p.name} value={p.name}>{p.name}{p.enabled === false ? " (disabled in auto)" : ""}</option>)}
+                </select></label>) : null}
             <label className="faint" style={{ fontSize: 12 }}><input type="checkbox" checked={showOrig} onChange={(e) => setShowOrig(e.target.checked)} /> show original</label>
             {translation ? <button className="btn small ghost" onClick={() => doCopy("the translation", translation)}>Copy</button> : null}
             <button className="btn small ghost" onClick={() => setTr(null)}>close ✕</button>

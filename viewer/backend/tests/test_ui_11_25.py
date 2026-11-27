@@ -88,7 +88,7 @@ def srv(tmp_path_factory):
     port = s.getsockname()[1]
     s.close()
     cfgf = proj / "viewer_config.json"
-    cfgf.write_text(json.dumps({"datasets": [], "translate": {"targets": ["zh", "ru"], "providers": [
+    cfgf.write_text(json.dumps({"datasets": [], "translate": {"targets": ["ko", "ru"], "providers": [
         {"name": "qwen", "kind": "openai", "base_url": "http://127.0.0.1:9/v1", "model": "qwen-test", "timeout": 2}]}}),
         encoding="utf-8")
     cfg = ViewerConfig(datasets=[], cache_dir=str(tmp_path_factory.mktemp("c1125")), project_dir=str(proj),
@@ -114,7 +114,7 @@ def test_simple_run_expected_panel_profiles_and_filter(srv, tmp_path):
     assert "4 / 4 as expected" in quick
     wrong = dom(srv + "/label/run/?run=o_simple&expect=wrong&open=3", tmp_path)
     assert 'data-testid="simple-line"' in wrong and 'data-testid="simple-line-expect"' in wrong
-    assert 'data-testid="simple-tools"' in wrong and 'data-testid="translate-zh"' in wrong and 'data-testid="simple-lab"' in wrong
+    assert 'data-testid="simple-tools"' in wrong and 'data-testid="translate-ko"' in wrong and 'data-testid="simple-lab"' in wrong
 
 
 def test_detail_run_rule_shown_and_rules_editor(srv, tmp_path):
@@ -156,9 +156,8 @@ def test_experiment_and_translate_pages(srv, tmp_path):
         assert f'data-testid="{tid}"' in home, tid
 
 
-def test_back_returns_to_the_same_view(srv, tmp_path):
-    """Run page (filter, page 2, an opened line, scrolled) -> "open the document page" -> browser Back: the same URL
-    state, the opened line and the scroll position (Chrome over the DevTools protocol)."""
+def _browser(tmp_path, scenario):
+    """Run `await scenario(call, js, wait_for)` in a headless Chrome over the DevTools protocol."""
     import asyncio
     import subprocess
     import urllib.request
@@ -204,29 +203,74 @@ def test_back_returns_to_the_same_view(srv, tmp_path):
                     await asyncio.sleep(0.2)
                 return False
 
-            await call("Page.enable")
-            await call("Emulation.setDeviceMetricsOverride", width=1300, height=700, deviceScaleFactor=1, mobile=False)
-            await call("Page.navigate", url=srv + "/label/run/?run=o_big&action=removed")
-            assert await wait_for("!!document.querySelector('[data-testid=label-docs]')")
-            await js("[...document.querySelectorAll('button')].find(b => b.textContent.includes('next'))?.click()")
-            assert await wait_for("location.search.includes('offset=40') && !!document.querySelector('[data-line=\"45\"]')")
-            await js("document.querySelector('[data-testid=toggle-45]').click()")
-            assert await wait_for("!!document.querySelector('[data-testid=line-text-45] a.btn')")
-            await js("document.querySelector('[data-line=\"45\"]').scrollIntoView({block: 'center'})")
-            await asyncio.sleep(0.6)
-            y = await js("window.scrollY")
-            assert y > 100
-            await js("[...document.querySelectorAll('[data-testid=line-text-45] a')].find(a => a.textContent.includes('document page')).click()")
-            assert await wait_for("location.pathname.startsWith('/label/doc')")
-            assert await wait_for("!!document.querySelector('[data-testid=doc-tools]')")
-            await js("history.back()")
-            assert await wait_for("location.pathname.startsWith('/label/run') && !!document.querySelector('[data-testid=line-text-45]')")
-            await asyncio.sleep(1.0)
-            state = await js("({s: location.search, y: window.scrollY})")
-            assert "offset=40" in state["s"] and "open=45" in state["s"] and "action=removed" in state["s"]
-            assert abs(state["y"] - y) < 80, (state, y)
+            await scenario(call, js, wait_for)
 
     try:
         asyncio.run(main())
     finally:
         proc.terminate()
+
+
+def test_back_returns_to_the_same_view(srv, tmp_path):
+    """Run page (filter, page 2, an opened line, scrolled) -> "open the document page" -> browser Back: the same URL
+    state, the opened line and the scroll position (Chrome over the DevTools protocol)."""
+    import asyncio
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Emulation.setDeviceMetricsOverride", width=1300, height=700, deviceScaleFactor=1, mobile=False)
+        await call("Page.navigate", url=srv + "/label/run/?run=o_big&action=removed")
+        assert await wait_for("!!document.querySelector('[data-testid=label-docs]')")
+        await js("[...document.querySelectorAll('button')].find(b => b.textContent.includes('next'))?.click()")
+        assert await wait_for("location.search.includes('offset=40') && !!document.querySelector('[data-line=\"45\"]')")
+        await js("document.querySelector('[data-testid=toggle-45]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=line-text-45] a.btn')")
+        await js("document.querySelector('[data-line=\"45\"]').scrollIntoView({block: 'center'})")
+        await asyncio.sleep(0.6)
+        y = await js("window.scrollY")
+        assert y > 100
+        await js("[...document.querySelectorAll('[data-testid=line-text-45] a')].find(a => a.textContent.includes('document page')).click()")
+        assert await wait_for("location.pathname.startsWith('/label/doc')")
+        assert await wait_for("!!document.querySelector('[data-testid=doc-tools]')")
+        await js("history.back()")
+        assert await wait_for("location.pathname.startsWith('/label/run') && !!document.querySelector('[data-testid=line-text-45]')")
+        await asyncio.sleep(1.0)
+        state = await js("({s: location.search, y: window.scrollY})")
+        assert "offset=40" in state["s"] and "open=45" in state["s"] and "action=removed" in state["s"]
+        assert abs(state["y"] - y) < 80, (state, y)
+
+    _browser(tmp_path, scenario)
+
+
+def test_translate_settings_edit_save_and_provider_choice(srv, tmp_path):
+    """/label/translate/: change a provider's URL, save (written to viewer_config.json, used at once); the translate
+    panel offers auto / one provider, remembered in the browser."""
+    import asyncio
+
+    async def scenario(call, js, wait_for):
+        await call("Page.enable")
+        await call("Page.navigate", url=srv + "/label/translate/")
+        assert await wait_for("!!document.querySelector('[data-testid=url-qwen]')")
+        assert await js("document.querySelector('[data-testid=translate-save]').disabled")
+        await js("""(() => { const i = document.querySelector('[data-testid=url-qwen]');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'http://127.0.0.1:9/v2/');
+            i.dispatchEvent(new Event('input', {bubbles: true})); })()""")
+        assert await wait_for("!document.querySelector('[data-testid=translate-save]').disabled")
+        await js("document.querySelector('[data-testid=translate-save]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=translate-saved]')")
+        url = await js("fetch('/api/translate/settings').then(r => r.json()).then(d => d.providers[0].base_url)")
+        assert url == "http://127.0.0.1:9/v2"
+        assert await wait_for("document.querySelector('[data-testid=url-qwen]').value === 'http://127.0.0.1:9/v2'")
+        # the provider choice in the translate panel
+        await js("document.querySelector('[data-testid=translate-try] [data-testid=translate-ko]').click()")
+        assert await wait_for("!!document.querySelector('[data-testid=translate-provider]')")
+        opts = await js("[...document.querySelectorAll('[data-testid=translate-provider] option')].map(o => o.value)")
+        assert opts == ["", "qwen"]
+        await wait_for("!document.querySelector('[data-testid=translate-provider]').disabled", 20)
+        await js("""(() => { const s = document.querySelector('[data-testid=translate-provider]');
+            Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'qwen');
+            s.dispatchEvent(new Event('change', {bubbles: true})); })()""")
+        assert await wait_for("localStorage.getItem('nli.translate.provider') === 'qwen'")
+        await asyncio.sleep(0.1)
+
+    _browser(tmp_path, scenario)

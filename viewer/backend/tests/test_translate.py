@@ -201,6 +201,10 @@ def test_wrong_language_twice_goes_to_next(tmp_path, servers):
     assert a.calls == 4
 
 
+# made-up Hangul syllables built from code points (no real words), for the "ko" script check
+HANGUL = " ".join("".join(chr(0xAC00 + 588 * i + 28 * j) for j in range(3)) for i in range(5)) + "."
+
+
 @pytest.mark.parametrize("text,target,ok", [
     (ZH, "zh", True),
     (RU, "ru", True),
@@ -215,6 +219,10 @@ def test_wrong_language_twice_goes_to_next(tmp_path, servers):
     ("Moscow", "zh", True),                        # a single name: too short to judge
     ("Москва", "zh", False),                       # too short, but another script only
     ("こんにちは、これは日本語です。", "zh", False),  # kana
+    (HANGUL, "ko", True),
+    ("This is English only, nothing translated.", "ko", False),
+    (ZH, "ko", False),
+    (RU, "ko", False),
 ])
 def test_language_check(text, target, ok):
     assert language_check(text, target)["ok"] is ok, language_check(text, target)
@@ -427,3 +435,101 @@ def test_block_read_from_config_file(tmp_path, servers):
     f.write_text('{"datasets": [], "translate": {"providers": [' + json.dumps(_prov("other", a.url)) + "]}}", "utf-8")
     os.utime(f, (time.time() + 5, time.time() + 5))
     assert c.get("/api/translate/settings").json()["providers"][0]["name"] == "other"
+
+
+# ------------------------------------------------------------------ editing the providers from the settings page
+
+def _file_client(tmp_path, servers):
+    a, b = servers(), servers()
+    f = tmp_path / "viewer_config.json"
+    f.write_text('{\n  // datasets\n  "datasets": [],\n  // translate buttons\n  "translate": {\n    "targets": ["zh", "ru"],\n'
+                 '    "providers": [\n      // the first one\n      ' + json.dumps(_prov("qwen", a.url, api_key_env="QWEN_X")) +
+                 ',\n      ' + json.dumps(_prov("hunyuan", b.url, prompt="hunyuan")) + '\n    ]\n  },\n  "after": 1\n}\n',
+                 "utf-8")
+    app = FastAPI()
+    translate.install(app, ViewerConfig(datasets=[], base_dir=str(tmp_path)))
+    return TestClient(app), f, a, b
+
+
+def test_save_reorders_and_edits(tmp_path, servers):
+    c, f, a, b = _file_client(tmp_path, servers)
+    s = c.get("/api/translate/settings").json()
+    assert s["editable"] and s["mtime"]
+    r = c.post("/api/translate/settings/save", json={"mtime": s["mtime"], "providers": [
+        {"name": "hunyuan", "timeout": 30},
+        {"name": "qwen", "enabled": False, "base_url": "http://10.0.0.9:8000/v1/", "model": "qwen-x"}]})
+    assert r.status_code == 200, r.text
+    assert [p["name"] for p in r.json()["providers"]] == ["hunyuan", "qwen"]
+    text = f.read_text("utf-8")
+    assert "// datasets" in text and "// translate buttons" in text and '"after": 1' in text   # outside the block kept
+    from nli_viewer.config import _strip_comments
+    blk = json.loads(_strip_comments(text))["translate"]
+    assert blk["targets"] == ["zh", "ru"]
+    q = blk["providers"][1]
+    assert q["base_url"] == "http://10.0.0.9:8000/v1" and q["model"] == "qwen-x" and q["enabled"] is False
+    assert q["api_key_env"] == "QWEN_X" and blk["providers"][0]["timeout"] == 30 and blk["providers"][0]["prompt"] == "hunyuan"
+    assert list((tmp_path / ".backup").glob("viewer_config.json.*"))
+    # used at once: qwen is off, so hunyuan answers; the settings page shows the new order
+    x = c.post("/api/translate", json={"texts": ["Hi."], "target": "zh"}).json()["results"][0]
+    assert x["ok"] and x["provider"] == "hunyuan" and not x["fallback"]
+    s2 = c.get("/api/translate/settings").json()
+    assert [p["name"] for p in s2["providers"]] == ["hunyuan", "qwen"] and s2["providers"][1]["enabled"] is False
+    # back on: "enabled" is left out again
+    c.post("/api/translate/settings/save", json={"mtime": s2["mtime"], "providers": [{"name": "qwen", "enabled": True}, {"name": "hunyuan"}]})
+    blk = json.loads(_strip_comments(f.read_text("utf-8")))["translate"]
+    assert [p["name"] for p in blk["providers"]] == ["qwen", "hunyuan"] and "enabled" not in blk["providers"][0]
+
+
+def test_save_refusals(tmp_path, servers):
+    c, f, a, b = _file_client(tmp_path, servers)
+    s = c.get("/api/translate/settings").json()
+    before = f.read_text("utf-8")
+    bad = [
+        [{"name": "qwen"}],                                                   # one missing
+        [{"name": "qwen"}, {"name": "qwen"}],                                 # twice
+        [{"name": "qwen"}, {"name": "hunyuan"}, {"name": "new"}],            # unknown
+        [{"name": "qwen", "base_url": "ftp://x"}, {"name": "hunyuan"}],
+        [{"name": "qwen", "model": "  "}, {"name": "hunyuan"}],
+        [{"name": "qwen", "timeout": 0}, {"name": "hunyuan"}],
+    ]
+    for provs in bad:
+        r = c.post("/api/translate/settings/save", json={"mtime": s["mtime"], "providers": provs})
+        assert r.status_code == 400, (provs, r.text)
+    assert f.read_text("utf-8") == before
+    # changed on disk since loaded
+    r = c.post("/api/translate/settings/save", json={"mtime": str(int(s["mtime"]) - 1), "providers": [{"name": "hunyuan"}, {"name": "qwen"}]})
+    assert r.status_code == 409 and f.read_text("utf-8") == before
+
+
+def test_save_not_editable_without_file(tmp_path, servers):
+    a = servers()
+    c = _client(tmp_path, [_prov("qwen", a.url)])
+    assert c.get("/api/translate/settings").json()["editable"] is False
+    assert c.post("/api/translate/settings/save", json={"providers": [{"name": "qwen"}]}).status_code == 409
+
+
+def test_save_real_config_shape(tmp_path):
+    """The project's viewer_config.json: the block is found, rewritten, and the rest of the file is byte-identical."""
+    from nli_viewer.translate import find_value_span, format_block, edited_block
+    from nli_viewer.config import _strip_comments
+    text = (Path(__file__).resolve().parents[2] / "viewer_config.json").read_text("utf-8")
+    a, b, ind = find_value_span(text, "translate")
+    blk = json.loads(_strip_comments(text))["translate"]
+    new = edited_block(blk, [{"name": p["name"]} for p in reversed(blk["providers"])])
+    out = text[:a] + format_block(new, ind) + text[b:]
+    assert out[:a] == text[:a] and out[a + len(format_block(new, ind)):] == text[b:]
+    data = json.loads(_strip_comments(out))
+    assert [p["name"] for p in data["translate"]["providers"]] == [p["name"] for p in reversed(blk["providers"])]
+    assert {k: v for k, v in data.items() if k != "translate"} == {k: v for k, v in json.loads(_strip_comments(text)).items() if k != "translate"}
+
+
+def test_test_button_with_unsaved_values(tmp_path, servers):
+    """The settings page's Test with a URL / model typed but not saved: that server is tried, nothing is written."""
+    a, b = servers(), servers()
+    c = _client(tmp_path, [_prov("qwen", "http://127.0.0.1:9/v1")])
+    r = c.post("/api/translate/test", json={"provider": "qwen", "targets": ["zh"],
+                                            "override": {"base_url": b.url + "/", "model": "fake-model"}}).json()
+    p = r["providers"][0]
+    assert p["reachable"] and p["base_url"] == b.url and p["model"] == "fake-model" and p["model_served"]
+    assert c.get("/api/translate/settings").json()["providers"][0]["base_url"] == "http://127.0.0.1:9/v1"
+    assert c.post("/api/translate/test", json={"provider": "qwen", "override": {"base_url": "nope"}}).status_code == 400

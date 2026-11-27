@@ -6,7 +6,7 @@
   // Translate buttons (for reading only): OpenAI-compatible providers, tried in order (cmds/viewer/translate.md).
   // The key comes from the environment variable named by api_key_env (unset: no key sent); never put it here.
   "translate": {
-    "targets": ["zh", "ru"],
+    "targets": ["ko", "ru"],
     "providers": [
       {"name": "qwen", "kind": "openai", "base_url": "http://192.168.170.108:8000/v1", "model": "qwen3-4b",
        "api_key_env": "QWEN_API_KEY", "timeout": 60, "no_think": true},
