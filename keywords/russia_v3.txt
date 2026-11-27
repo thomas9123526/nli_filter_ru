@@ -57,3 +57,4 @@ Kremlin-backed	B	org	supported by the Russian government
 pro-Kremlin	B	org	supporting the Russian government
 Putin	B	person	the president of Russia
 Aeroflot	B	company	the Russia Airport
+Poltava	A	place	Ukraine

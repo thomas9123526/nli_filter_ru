@@ -98,7 +98,9 @@ export function ListFilesView() {
   const dirty = text !== null && text !== raw.data?.text;
   const rows = useMemo(() => (kind ? parse(kind, cur) : []), [kind, cur]);
 
-  useEffect(() => { setText(null); setMsg(null); setErr(null); }, [file]);
+  // a new row is empty, and an empty line is no row: it waits here until it has some text, then joins the file
+  const [pending, setPending] = useState<Extract<Row, { kind: "row" }>[]>([]);
+  useEffect(() => { setText(null); setMsg(null); setErr(null); setPending([]); }, [file]);
   useEffect(() => {  // check while typing (and the place-name preview)
     if (!kind) return;
     const ctl = new AbortController();
@@ -116,6 +118,17 @@ export function ListFilesView() {
   }, [dirty]);
 
   const setRows = (fn: (r: Row[]) => Row[]) => { if (kind) { setText(unparse(kind, fn(rows.map((r) => ({ ...r }) as Row)))); setMsg(null); } };
+  const editPending = (j: number, fn: (x: Extract<Row, { kind: "row" }>) => void) => {
+    const z = { ...pending[j], cells: [...pending[j].cells], edited: true };
+    fn(z);
+    if (kind && z.cells.some((c) => c.trim())) {   // has text now: into the file, at its end
+      setText(unparse(kind, [...rows, z]));
+      setMsg(null);
+      setPending((ps) => ps.filter((_, k) => k !== j));
+    } else {
+      setPending((ps) => ps.map((y, k) => (k === j ? z : y)));
+    }
+  };
   const save = async () => {
     setSaving(true); setErr(null); setMsg(null);
     try {
@@ -185,14 +198,12 @@ export function ListFilesView() {
           <div className="row" style={{ padding: "8px 12px" }}>
             <input type="search" placeholder="filter rows…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ maxWidth: 260 }} />
             <span className="faint" style={{ fontSize: 12 }}>{rows.filter((r) => r.kind === "row").length} rows · comments are kept (edit them on the Text tab)</span>
-            <span className="spacer" />
-            <button className="btn small" onClick={() => setRows((rs) => [...rs, { kind: "row", on: true, cells: cols.map(() => ""), edited: true }])} data-testid="list-add">+ add a row</button>
           </div>
           <div className="table-wrap">
             <table className="ptable" data-testid="list-table">
               <thead><tr><th>on</th>{cols.map((c) => <th key={c}>{c}</th>)}{kind === "exceptions" ? <th>case-sensitive</th> : null}<th /></tr></thead>
               <tbody>
-                {rows.map((r, i) => {
+                {[...rows.map((r, i) => {
                   if (r.kind === "text") return q ? null : (r.line.trim() ? <tr key={i}><td /><td colSpan={cols.length + 2} className="faint mono" style={{ fontSize: 11.5 }}>{r.line}</td></tr> : null);
                   if (q && !r.cells.some((c) => c.toLowerCase().includes(q))) return null;
                   const set = (fn: (x: Extract<Row, { kind: "row" }>) => void) => setRows((rs) => rs.map((y, k) => {
@@ -208,9 +219,32 @@ export function ListFilesView() {
                       {kind === "exceptions" ? <td style={{ textAlign: "center" }}><input type="checkbox" checked={!!r.caseSens} onChange={(e) => set((x) => { x.caseSens = e.target.checked; })} /></td> : null}
                       <td><button className="btn small ghost" title="delete this row" onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))}>✕</button></td>
                     </tr>);
-                })}
+                }), ...pending.map((r, j) => (
+                  <tr key={rows.length + j} data-testid="list-new-row">
+                    <td><input type="checkbox" checked={r.on} onChange={(e) => editPending(j, (x) => { x.on = e.target.checked; })} /></td>
+                    {cols.map((c, k) => (
+                      <td key={c}><input type="text" className={k === 0 ? "mono" : ""} value={r.cells[k] ?? ""} placeholder={k === 0 ? "new" : ""}
+                        onChange={(e) => editPending(j, (x) => { x.cells[k] = e.target.value; })}
+                        style={{ width: k === 0 ? 180 : kind === "keywords" && (k === 1) ? 40 : 150 }} /></td>))}
+                    {kind === "exceptions" ? <td style={{ textAlign: "center" }}><input type="checkbox" checked={!!r.caseSens} onChange={(e) => editPending(j, (x) => { x.caseSens = e.target.checked; })} /></td> : null}
+                    <td><button className="btn small ghost" title="drop this new row" onClick={() => setPending((ps) => ps.filter((_, k) => k !== j))}>✕</button></td>
+                  </tr>))]}
               </tbody>
             </table>
+          </div>
+          <div className="row" style={{ padding: "8px 12px" }}>
+            <button className="btn small" data-testid="list-add" title="a new row at the end of the file"
+              onClick={() => {
+                setFilter("");
+                setPending((ps) => [...ps, { kind: "row", on: true, cells: cols.map(() => ""), edited: true }]);
+                requestAnimationFrame(() => {   // to the new row, cursor in its first box
+                  const trs = document.querySelectorAll<HTMLTableRowElement>("[data-testid=list-table] tbody tr");
+                  const last = trs[trs.length - 1];
+                  last?.scrollIntoView({ block: "center", behavior: "smooth" });
+                  last?.querySelector<HTMLInputElement>("input[type=text]")?.focus();
+                });
+              }}>+ add a row</button>
+            <span className="faint" style={{ fontSize: 12 }}>added at the end of the file</span>
           </div>
         </div>) : null}
     </>
